@@ -67,3 +67,11 @@ uq_usuario_instalacao
 uq_usuario_habito  
 
 ---
+
+## 4.5 Prefixo de SYS 
+
+Todas as roles seguem o prefixo: sys_
+✔ Exemplos:
+sys_devops  
+sys_analista_bi  
+---

@@ -1,6 +1,6 @@
-# 🏗️ Arquitetura de Dados — Projeto Delta
+# 🏗️ Engenharia de Dados — Projeto Delta
 
-Este documento descreve a arquitetura de dados do Projeto Delta, explicando o papel de cada banco de dados utilizado na solução e como eles se integram dentro do sistema de monitoramento inteligente de consumo de água.
+Este documento descreve a engenharia de dados do Projeto Delta, explicando o papel de cada banco de dados utilizado na solução e como eles se integram dentro do sistema de monitoramento inteligente de consumo de água.
 
 O sistema adota uma arquitetura multi-banco para atender diferentes necessidades: transacional, analítica, tempo real, dados massivos e relações complexas.
 

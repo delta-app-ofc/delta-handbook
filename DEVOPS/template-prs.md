@@ -29,24 +29,31 @@ O template de Pull Request deve conter as seguintes seções, organizadas de for
 ```markdown
 
 ## 📄 Descrição
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO
 > Descrição objetiva do que foi implementado.
 
 ## ✨ Tipo de PR (Seguindo Conventional Commits) 
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO
 > Seleção do tipo de PR (feat, fix, refactor, docs, test).
 
 ## 💻 Módulos Impactados - 1° ANO (Marque com um "x")
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO PARA O 1° ANO
 > Seleção dos módulos mais simples que foram impactados pelo 1° ano.
 
 ## 💻 Módulos Impactados - 2° ANO (Marque com um "x")
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO PARA O 2° ANO
 > Seleção dos módulos mais complexos que foram impactados pelo 2° ano.
 
 ## 🤖 Uso de Inteligência Artificial
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO
 > Indicação clara se houve ou não uso de IA no desenvolvimento, para auxiliar na demanda de Memorial Descritivo do 1° ano.
 
-## 🛠️ Padrões de Projeto e Testes (Se aplicável) 
+## 🛠️ Padrões de Projeto e Testes 
+[!NOTE] PREENCHIMENTO OPCIONAL
 > Descrição do teste utilizado para garantir consistência da feature.
 
 ## ✅ Checklist de Rigor Técnico (Marque com um "x")
+[!NOTE] PREENCHIMENTO OBRIGATÓRIO
 > Seleção de itens de checklist que garantem o rigor técnico do código, como uso de Conventional Commits, acessibilidade, tratamento de exceções, validação de dados, etc.
 ```
 

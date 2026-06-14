@@ -35,16 +35,17 @@ Para evitar a replicação de scripts em múltiplos repositórios do ecossistema
 ### **Estrutura de Pastas no Repositório .github**
 
 ```plaintext
-.github/  
+.github/
+├── .github/
+├── └── workflows/
+│       └── main.yml  # Workflow do GitHub Actions herdado globalmente
 ├── profile/  
 ├── scripts/  
 │   ├── route_checks.py          # Script Python com a inteligência de validação e roteamento  
 │   └── route_reviewers.py       # Script Python com a lógica de roteamento de revisores
-└── workflows/  
-    └── main.yml      # Workflow do GitHub Actions herdado globalmente
 ```
 
-*Nota de Implementação:* Quando o workflow é disparado em um repositório satélite (ex: delta-database), o GitHub Actions realiza o download temporário do repositório .github em uma pasta isolada chamada central-scripts para conseguir executar o interpretador Python sem expor ou poluir o diretório do projeto principal.
+*Nota de Implementação:* Quando o workflow é disparado em um repositório satélite (ex: delta-database), o GitHub Actions realiza o download temporário do repositório .github em uma pasta isolada chamada central-scripts para conseguir executar o interpretador Python sem expor ou poluir o diretório do projeto principal. Esse processo é executado a partir de um .github/workflows/*.yml que centraliza a lógica de execução de workflow do repositório central da organização.
 
 ## **⚙️ 3. Configuração do Workflow (main.yml)**
 

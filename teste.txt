@@ -1,0 +1,2 @@
+Isto é apenas um teste para verificar se o fluxo de reviews está funcionando corretamente.
+NÃO MERGEAR ESTE ARQUIVO, ELE DEVE SER DELETADO APÓS O TESTE.

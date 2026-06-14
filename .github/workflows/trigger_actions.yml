@@ -1,7 +1,7 @@
 name: "Execute Delta Checks"
 on:
     pull_request:
-       types: [opened, edited]
+        types: [opened, edited]
 
 jobs:
     run-central-governance:

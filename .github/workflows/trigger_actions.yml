@@ -1,17 +1,16 @@
-name: "Execute Delta Checks"
+name: Execute Delta Checks
+
 on:
-    pull_request:
-        types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
 
 jobs:
-    validate-pr-checks:
-        # Aponta diretamente para o arquivo central usando o padrão: Organizacao/RepoCentral/Caminho@Branch
-        uses: delta-app-ofc/.github/.github/workflows/main.yml@main
-        permissions:
+  validate-pr-checks:
+    uses: delta-app-ofc/.github/.github/workflows/main.yml@main
+    permissions:
             pull-requests: write
             repository-projects: read
             contents: read
-        steps:
-            - name: Carregando token
-              env:
-                GH_TOKEN: ${{ secrets.DELTA_ORG_AUTOMATION_TOKEN }}
+
+    secrets:
+      GH_TOKEN: ${{ secrets.DELTA_ORG_AUTOMATION_TOKEN }}

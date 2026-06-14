@@ -7,6 +7,8 @@ jobs:
     validate-pr-checks:
         # Aponta diretamente para o arquivo central usando o padrão: Organizacao/RepoCentral/Caminho@Branch
         uses: delta-app-ofc/.github/.github/workflows/main.yml@main
+        secrets:
+            GH_TOKEN: ${{ secrets.DELTA_ORG_AUTOMATION_TOKEN }}
         permissions:
             pull-requests: write
             repository-projects: read

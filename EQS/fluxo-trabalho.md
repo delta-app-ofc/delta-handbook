@@ -74,7 +74,7 @@ git push origin feat/cadastro-de-usuarios
 3. Siga o template de Pull Request.
 4. Aguarde revisão.
 
-### 6. Revisão de Código
+### 5. Revisão de Código
 
 Após abrir a Pull Request:
 
@@ -83,14 +83,14 @@ Após abrir a Pull Request:
 3. Realize os ajustes solicitados.
 4. Responda comentários quando necessário.
 
-### 7. Aprovação e Merge
+### 6. Aprovação e Merge
 
 Após aprovação:
 
 1. Verifique se não existem conflitos.
 2. Realize o merge seguindo a estratégia definida pelo projeto.
 
-### 8. Conclusão da Tarefa
+### 7. Conclusão da Tarefa
 
 Após o merge:
 

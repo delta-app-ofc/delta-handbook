@@ -28,6 +28,8 @@ feat/cadastro-de-usuarios
 fix/correcao-login
 docs/governanca-de-dados
 refactor/ajusta-variaveis
+test/cobertura-endpoint-login
+chore/atualizar-dependencias
 ```
 
 ### Passos
@@ -53,6 +55,8 @@ feat: adiciona endpoint de cadastro de usuário
 fix: corrige validação de CPF
 refactor: reorganiza camada de serviço
 docs: atualiza documentação
+chore: atualiza arquivo .gitignore
+test: adiciona testes para cadastro de usuário
 ```
 
 

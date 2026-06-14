@@ -6,7 +6,7 @@ on:
 jobs:
     run-central-governance:
         # Aponta diretamente para o arquivo central usando o padrão: Organizacao/RepoCentral/Caminho@Branch
-        uses: ${{ github.repository_owner }}/.github/.github/workflows/main.yml@main
+        uses: delta-app-ofc/.github/.github/workflows/main.yml@main
         permissions:
             pull-requests: write
             repository-projects: read

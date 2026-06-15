@@ -45,7 +45,7 @@ Para evitar a replicação de scripts em múltiplos repositórios do ecossistema
 │   └── route_reviewers.py       # Script Python com a lógica de roteamento de revisores
 ```
 
-*Nota de Implementação:* Quando o workflow é disparado em um repositório satélite (ex: delta-database), o GitHub Actions realiza o download temporário do repositório .github em uma pasta isolada chamada central-scripts para conseguir executar o interpretador Python sem expor ou poluir o diretório do projeto principal. Esse processo é executado a partir de um .github/workflows/*.yml que centraliza a lógica de execução de workflow do repositório central da organização.
+*Nota de Implementação:* Quando o workflow é disparado em um repositório satélite (ex: delta-database), o GitHub Actions realiza o download temporário do repositório .github em uma pasta isolada chamada central-scripts para conseguir executar o interpretador Python sem expor ou poluir o diretório do projeto principal. Esse processo é executado a partir de um .github/workflows/*.yml que centraliza a lógica de execução de workflow do repositório central da organização, mas cada repositório possui invidualmente um .github/workflows/*.yml que ativa o actions.
 
 ## **⚙️ 3. Configuração do Workflow (main.yml)**
 

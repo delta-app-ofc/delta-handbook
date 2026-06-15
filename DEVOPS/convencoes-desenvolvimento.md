@@ -37,7 +37,6 @@ fix/validacao-cpf
 refactor/reorganizar-services
 docs/convencao-desenvolvimento
 test/testes-cadastro-usuario
-chore/atualizar-dependencias
 ```
 
 ---

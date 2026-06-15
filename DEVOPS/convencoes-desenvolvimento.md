@@ -27,7 +27,7 @@ Padronizar a criação de branches para facilitar rastreabilidade e entendimento
 | refactor | Refatoração                     |
 | docs     | Alterações em documentação      |
 | test     | Criação ou manutenção de testes |
-| chore    | Tarefas de manutenção / configuração           |
+| style    | Alteração de estilização           |
 
 ### Exemplos
 
@@ -37,6 +37,7 @@ fix/validacao-cpf
 refactor/reorganizar-services
 docs/convencao-desenvolvimento
 test/testes-cadastro-usuario
+style/remove-espaços-brancos
 ```
 
 ---
@@ -62,7 +63,7 @@ Manter um histórico de alterações claro e padronizado utilizando o padrão Co
 | refactor | Refatoração sem alteração de comportamento |
 | docs     | Alterações em documentação                 |
 | test     | Criação ou manutenção de testes            |
-| chore    | Tarefas de manutenção                      |
+| style    | Alterações de estilização                      |
 
 ### Exemplos
 
@@ -77,7 +78,7 @@ docs: atualiza documentação de onboarding
 
 test: adiciona testes para autenticação
 
-chore: atualiza dependências do projeto
+style: remove espaços em branco
 ```
 ---
 

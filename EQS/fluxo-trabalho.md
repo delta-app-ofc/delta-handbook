@@ -59,6 +59,7 @@ chore: atualiza arquivo .gitignore
 test: adiciona testes para cadastro de usuário
 ```
 
+Para informações mais detalhes sobre as conveções de desenvolvimento, confira a doc: [convenções-desenvolvimento](/DEVOPS/convencoes-desenvolvimento.md)
 
 ### 4. Abertura da Pull Request
 
@@ -118,6 +119,8 @@ Ajustes (se necessário)
 Aprovação
         ↓
 Merge
+        ↓
+Documentar atividade (se necessário)
         ↓
 Concluir tarefa
 ```

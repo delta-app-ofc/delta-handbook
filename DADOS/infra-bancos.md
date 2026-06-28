@@ -7,9 +7,9 @@ dividindo as responsabilidades entre MongoDB, Redis e PostgreSQL.
 ## Diagrama de Arquitetura de Fluxo de Dados
 ![img.png](diagrama-infra.png)
 
-## 1. Comunicação de Borda (Arduino Uno R4 Wifi)
+## 1. Comunicação de Borda (Arduino Uno R4 Wifi/ESP32-C3 Super Mini)
 Para mitigar problemas de concorrência e sobrecarga no servidor de aplicação, 
-o hardware do Arduino Uno R4 consolidará as medições magnéticas localmente em lotes temporais (janelas de 5 a 10 minutos) 
+o hardware do Arduino consolidará as medições magnéticas localmente em lotes temporais (janelas de 5 a 10 minutos) 
 e utilizará uma estratégia de escalonamento (Load Leveling/Jittering) para envio das requisições.
 
 ### 1.1. Payload do Arduino para a API (JSON bruto via HTTP POST)
@@ -17,17 +17,53 @@ Este é o formato de dados enxuto transmitido pelo microcontrolador. O cabeçalh
 ```json
 {
   "device_id": "ARD-R4-SP-0912",
-  "timestamp_envio": "2026-06-21T17:10:00Z",
-  "janela_minutos": 5,
-  "pulsos_acumulados": 14
+  "sent_at": "2026-06-21T17:10:00Z",
+  "window_size_minutes": 5,
+  "total_pulses": 6,
+  "pulses_history": [
+    {
+      "pulsed_at": "2026-06-21T17:05:12Z",
+      "ms_since_boot": 3452210,
+      "delta_ms": 0            // Primeiro pulso da janela
+    },
+    {
+      "pulsed_at": "2026-06-21T17:05:14Z",
+      "ms_since_boot": 3453210,
+      "delta_ms": 1000         // 3453210 - 3452210 = 1 segundo
+    },
+    {
+      "pulsed_at": "2026-06-21T17:06:45Z",
+      "ms_since_boot": 3545210,
+      "delta_ms": 92000        // 3545210 - 3453210 = 1 min e 32 segundos
+    },
+    {
+      "pulsed_at": "2026-06-21T17:07:01Z",
+      "ms_since_boot": 3559210,
+      "delta_ms": 14000        // 3559210 - 3545210 = 14 segundos
+    },
+    {
+      "pulsed_at": "2026-06-21T17:09:20Z",
+      "ms_since_boot": 3698210,
+      "delta_ms": 139000       // 3698210 - 3559210 = 2 min e 19 segundos
+    },
+    {
+      "pulsed_at": "2026-06-21T17:09:55Z",
+      "ms_since_boot": 3733210,
+      "delta_ms": 35000        // 3733210 - 3698210 = 35 segundos
+    }
+  ]
 }
 ```
 
 #### Descrição dos Campos:
 - device_id: Identificador único do hardware registrado no banco SQL.
-- timestamp_envio: Horário exato que o Arduino finalizou a contagem e iniciou o envio (padrão ISO 8601 UTC).
-- janela_minutos: Tempo de amostragem configurado no firmware do Arduino.
-- pulsos_acumulados: Soma física de pulsos magnéticos detectados pela porta de interrupção do hardware no período.
+- sent_at: Horário exato que o Arduino finalizou a contagem e iniciou o envio (padrão ISO 8601 UTC).
+- window_size_minutes: Tempo de amostragem configurado no firmware do Arduino.
+- total_pulses: Soma física de pulsos magnéticos detectados pela porta de interrupção do hardware no período.
+- pulses_history: Array de histórico de cada pulso captado pelo Arduino.
+- pulses_history.pulsed_at: Horário exato da captação do pulso específico.
+- pulses_history.ms_since_boot: Milissegundos que se passaram desde o início do funcionamento do Arduino.
+- pulses_history.delta_ms: Milissegundos que se passaram desde o último pulso.
 
 ## 2. Processamento e Consolidação no Back-end
 Conforme validado no desenho de arquitetura, o Back-end assume a responsabilidade de processar o payload imediatamente após a autenticação.
@@ -42,12 +78,12 @@ simplificando as análises estatísticas da IA e o cálculo do ranking.
 
 ### 2.1. Payload Consolidado enviado aos Bancos de Dados
 ```json{
-  "usuario_id": "60c72b2f9b1d8b2bad723456",
+  "user_id": "60c72b2f9b1d8b2bad723456",
   "device_id": "ARD-R4-SP-0912",
-  "data_inicio_leitura": "2026-06-21T17:05:00Z",
-  "data_fim_leitura": "2026-06-21T17:10:00Z",
-  "consumo_litros": 14,
-  "vazao_media_lpm": 2.8
+  "window_started_at": "2026-06-21T17:05:00Z",
+  "windowt_finished_at": "2026-06-21T17:10:00Z",
+  "liter_consumption": 14,
+  "lpm_average": 2.8
 }
 ```
 

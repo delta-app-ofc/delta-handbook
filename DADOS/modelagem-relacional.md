@@ -1,139 +1,148 @@
-# Modelagem de Dados - PostgreSQL
-Este documento descreve todas as tabelas do banco de dados relacional PostgreSQL do Projeto Delta, responsável por armazenar os dados transacionais principais do sistema de monitoramento inteligente de consumo de água.
+# 📊 Modelagem de Dados - PostgreSQL (Projeto Delta)
 
-Para visualizar os códigos, acesse: https://github.com/delta-app-ofc/delta-database
+Este documento descreve a modelagem relacional do banco de dados PostgreSQL do Projeto Delta, responsável por armazenar informações de usuários, imóveis, dispositivos IoT, hábitos de consumo e regras regionais de tarifação de água.
 
-
-
-## 👤 1. Tabela: tbl_usuario
-Armazena os dados dos usuários do sistema.
-
-### 📌 Atributos
-- **id (PK)**: Identificador único do usuário.
-- **nome**: Nome completo do usuário.
-- **email**: E-mail utilizado para login e comunicação.
-- **senha**: Senha criptografada do usuário.
-- **telefone**: Número de contato.
-- **data_nascimento**: Data de nascimento do usuário.
-- **data_cadastro**: Data de criação da conta no sistema.
-- **ativo**: Campo boleano que índica que o usuário está ou não ativo.
+🔗 Repositório: https://github.com/delta-app-ofc/delta-database
 
 ---
 
-## 🏠 2. Tabela: tbl_instalacao
+## 🌎 1. Tabela: `tb_region`
 
-Representa os imóveis onde foram instalados os dispositivos que são monitorados pelo sistema.
+Armazena as regiões utilizadas para cálculo de tarifas.
 
 ### 📌 Atributos
-
-- **id (PK)**: Identificador único da instalação.
-- **nome_identificador**: Nome personalizado da instalação (ex: "Casa Centro", "Swift da Leopoldina").
-- **tipo_classificacao**: Tipo de uso (residencial ou comercial).
-- **tipo_imovel**: Tipo do imóvel (casa, apartamento, etc.).
-- **percentual_consumo**: Percentual estimado de consumo associado à instalação.
-- **cep**: Código postal do imóvel.
-- **cidade**: Cidade onde a instalação está localizada.
-- **estado**: Estado da instalação.
-- **data_cadastro**: Data de registro da instalação no sistema.
+- **id (PK)**: Identificador da região.
+- **name**: Nome da região.
+  - Valores permitidos: `LESTE`, `OESTE`, `SUL`, `NORTE`, `CENTRO`
 
 ---
 
-## 🔗 3. Tabela: tbl_usuario_instalacao
+## 📅 2. Tabela: `tb_day_of_week`
 
-Tabela de relacionamento N:N entre usuários e instalações.
+Define os dias da semana utilizados na associação de hábitos.
 
 ### 📌 Atributos
-- **id**: Identificados da tabela de relacionamento N:N entre usuários e instalações.
-- **id_usuario (FK)**: Referência ao usuário.
-- **id_instalacao (FK)**: Referência à instalação.
-- **data_vinculo**: Data em que o usuário foi vinculado à instalação.
+- **id (PK)**: Identificador do dia da semana.
+- **name**: Nome do dia.
+  - Valores permitidos: `SEGUNDA`, `TERÇA`, `QUARTA`, `QUINTA`, `SEXTA`, `SÁBADO`, `DOMINGO`
 
 ---
 
-## 📟 4. Tabela: tbl_dispositivo
+## 🧠 3. Tabela: `tb_habit`
 
-Armazena os dispositivos IoT (ESP32) instalados nas residências.
-
-### 📌 Atributos
-
-- **id (PK)**: Identificador interno do dispositivo.
-- **device_id**: Identificador físico do dispositivo (ex: ESP32_001).
-- **id_instalacao (FK)**: Instalação onde o dispositivo está instalado.
-- **ativo**: Campo boleano que índica que o dispositivo está ou não ativo.
-- **data_instalacao**: Data de instalação do dispositivo.
-- **ultima_comunicacao**: Última vez que o dispositivo enviou dados.
-
----
-
-##  🎯 5. Tabela: tbl_meta_consumo
-
-Define metas de consumo de água para cada instalação.
+Armazena os tipos de hábitos de consumo de água.
 
 ### 📌 Atributos
-
-- **id (PK)**: Identificador da meta.
-- **id_instalacao (FK)**: Instalação associada.
-- **limite_diario_litros**: Limite diário de consumo permitido.
-- **limite_mensal_litros**: Limite mensal de consumo permitido.
-- **data_inicio**: Início da vigência da meta.
-- **data_fim**: Fim da vigência da meta.
-
----
-
-## 🚨 6. Tabela: tbl_alerta
-
-Armazena os alertas ativos gerados pelo sistema.
-
-### 📌 Atributos
-
-- **id (PK)**: Identificador do alerta.
-- **id_instalacao (FK)**: Instalação onde o alerta foi gerado.
-- **tipo**: Tipo do alerta (ex: vazamento, consumo alto).
-- **mensagem**: Descrição do alerta.
-- **status**: Situação do alerta (ativo, resolvido).
-- **data_criacao**: Data de criação do alerta.
-- **data_resolucao**: Data em que o alerta foi resolvido.
-
----
-
-## 💰 7. Tabela: tbl_tarifa_agua
-
-Tabela responsável pela definição de tarifas de água por cidade.
-
-### 📌 Atributos
-
-- **id (PK)**: Identificador da tarifa.
-- **cidade**: Cidade de aplicação da tarifa.
-- **faixa_inicial**: Início da faixa de consumo (m³).
-- **faixa_final**: Fim da faixa de consumo (m³).
-- **valor_m3**: Valor cobrado por metro cúbico.
-- **vigencia_inicio**: Início da validade da tarifa.
-- **vigencia_fim**: Fim da validade da tarifa.
-
----
-
-## 🧠 8. Tabela: tbl_habito
-
-Tabela responsável por armazenar os tipos de hábitos de consumo de água do sistema.  
-
-### 📌 Atributos
-
 - **id (PK)**: Identificador do hábito.
-- **codigo**: Código técnico do hábito (ex: JARDIM, PISCINA, LAVAGEM_ALTA).
-- **descricao**: Descrição textual do hábito (ex: "Possui jardim", "Uso frequente de máquina de lavar").
+- **name**: Nome do hábito.
+  - Valores permitidos: `BANHO LONGO`, `LAVAR QUINTAL`, `LAVAR ROUPA`, `REGAR PLANTAS`, `LAVAR CARRO`, `LAVAR LOUÇA`
+- **description**: Descrição opcional do hábito.
 
 ---
 
-## 🔗 9. Tabela: tbl_usuario_habito
+## 📍 4. Tabela: `tb_address`
 
-Tabela de relacionamento **N:N entre usuários e hábitos**, permitindo que um usuário possua vários hábitos e um hábito pertença a vários usuários
-
+Armazena os endereços dos imóveis cadastrados.
 
 ### 📌 Atributos
-
-- **id (PK)**: Identificador do relacionamento.
-- **id_usuario (FK)**: Referência ao usuário.
-- **id_habito (FK)**: Referência ao hábito.
-- **data_vinculo**: Data em que o hábito foi associado ao usuário.
+- **id (PK)**: Identificador do endereço.
+- **region_id (FK)**: Referência para `tb_region`.
+- **cep**: CEP (8 dígitos numéricos).
+- **city**: Cidade.
+- **state**: Estado.
 
 ---
+
+## 👤 5. Tabela: `tb_user`
+
+Armazena os usuários do sistema.
+
+### 📌 Atributos
+- **id (PK)**: Identificador do usuário.
+- **name**: Nome completo.
+- **email**: E-mail (único).
+- **password**: Senha criptografada.
+- **phone**: Telefone.
+- **birth_date**: Data de nascimento.
+- **registration_date**: Data de cadastro (padrão: CURRENT_DATE).
+- **is_active**: Indica se o usuário está ativo.
+- **is_admin**: Indica se o usuário é administrador.
+
+---
+
+## 🏠 6. Tabela: `tb_property`
+
+Representa os imóveis cadastrados no sistema.
+
+### 📌 Atributos
+- **id (PK)**: Identificador do imóvel.
+- **name**: Nome do imóvel.
+- **type**: Tipo do imóvel (`CASA`, `PRÉDIO`).
+- **classification**: Classificação (`RESIDENCIAL`, `COMERCIAL`).
+- **address_id (FK)**: Referência para `tb_address`.
+- **registration_date**: Data de cadastro.
+
+---
+
+## 🔗 7. Tabela: `tb_user_property`
+
+Tabela de relacionamento N:N entre usuários e imóveis.
+
+### 📌 Atributos
+- **id (PK)**: Identificador do relacionamento.
+- **user_id (FK)**: Referência para `tb_user`.
+- **property_id (FK)**: Referência para `tb_property`.
+- **association_date**: Data de vinculação.
+
+
+---
+
+## 📟 8. Tabela: `tb_device`
+
+Armazena os dispositivos IoT instalados nos imóveis.
+
+### 📌 Atributos
+- **id (PK)**: Identificador interno.
+- **device_id**: Identificador físico do dispositivo (único).
+- **property_id (FK)**: Referência para `tb_property`.
+- **is_active**: Status do dispositivo (ativo/inativo).
+- **installation_date**: Data de instalação.
+
+---
+
+## 💧 9. Tabela: `tb_region_rate`
+
+Define tarifas de água por região e faixa de consumo.
+
+### 📌 Atributos
+- **id (PK)**: Identificador da tarifa.
+- **region_id (FK)**: Referência para `tb_region`.
+- **initial_range**: Início da faixa de consumo (>= 0).
+- **final_range**: Fim da faixa de consumo (> inicial).
+- **m3_value**: Valor por m³ (> 0).
+- **initial_validity**: Início da vigência.
+- **final_validity**: Fim da vigência (pode ser NULL).
+
+---
+
+## 👥 10. Tabela: `tb_user_habit`
+
+Relaciona usuários aos seus hábitos de consumo.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **user_id (FK)**: Referência para `tb_user`.
+- **habit_id (FK)**: Referência para `tb_habit`.
+- **frequency**: Frequência do hábito (> 0).
+
+
+---
+
+## 📆 11. Tabela: `tb_user_habit_day`
+
+Define em quais dias da semana cada hábito ocorre.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **user_habit_id (FK)**: Referência para `tb_user_habit`.
+- **day_of_week_id (FK)**: Referência para `tb_day_of_week`.

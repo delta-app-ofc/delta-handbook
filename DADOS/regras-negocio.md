@@ -2,69 +2,88 @@
 
 Este documento descreve todas as regras de negócio do banco de dados relacional PostgreSQL do Projeto Delta.
 
-## 1. Padrão de letras nos registros
+---
 
-Todos os dados inseridos no banco devem ser armazenados em letras minúsculas, quando aplicável.
+## 1. 🔤 Padrão de letras nos registros
 
-✔ Exemplos:
-- nomes → "maria silva"
-- cidades → "sao paulo"
-- tipos → "residencial", "comercial"
-
-
-## 2. Padrão de idioma
-
-- Todos os objetos do banco devem estar em **português**
-- Isso inclui tabelas, colunas, constraints e registros
-
-## 3. Padrão de acentuação
-
-- Todos os objetos do banco devem estar sem acentos, quando aplicável, para facilitar consultas e verificações.
-- Isso inclui tabelas, colunas, constraints e registros
-
-# 4. Prefixos utilizados no projeto
-
-## 4.1 Prefixo de tabelas
-
-- tbl_ → identifica tabelas do sistema
+Todos os **dados inseridos no banco devem ser armazenados em MAIÚSCULAS**, quando aplicável.
 
 ✔ Exemplos:
-tbl_usuario  
-tbl_instalacao  
-tbl_dispositivo  
+- nomes → "MARIA SILVA"
+- cidades → "SAO PAULO"
+- tipos → "RESIDENCIAL", "COMERCIAL"
 
 ---
 
-## 4.2 Prefixo de Foreign Keys (FK)
+## 2. 🌐 Padrão de idioma
 
-- fk_ → identifica chaves estrangeiras
-
-Formato:
-fk_<tabela_origem>_<tabela_destino>
-
-✔ Exemplos:
-fk_usuario_instalacao_usuario  
-fk_usuario_instalacao_instalacao  
+- Todos os **objetos do banco de dados devem estar em INGLÊS**
+- Isso inclui:
+  - tabelas
+  - colunas
+  - constraints
+  - procedures
+  - functions
 
 ---
 
-## 4.3 Prefixo de CHECK constraints
+## 3. 🔡 Padrão de acentuação
+
+- Os **registros podem conter acentuação normalmente**
+- Já os **objetos do banco NÃO devem conter acentos**
+- Isso inclui:
+  - tabelas
+  - colunas
+  - constraints
+  - procedures
+  - functions
+
+---
+
+## 4. 🏷️ Prefixos utilizados no projeto
+
+---
+
+## 4.1 📦 Prefixo de tabelas
+
+- Prefixo: `tb_`
+- Todas as tabelas do sistema devem seguir este padrão
+
+✔ Exemplos:
+tb_user  
+tb_property  
+tb_device  
+
+---
+
+## 4.2 🔑 Prefixo de Foreign Keys (FK)
+
+- Prefixo: `fk_`
+- Formato:
+    fk_<tabela_origem>_<tabela_destino>
+
+✔ Exemplos:
+fk_user_property_user  
+fk_user_property_property  
+
+---
+
+## 4.3 ✅ Prefixo de CHECK constraints
 
 - chk_ → regras de validação
 
 ✔ Exemplos:
-chk_tipo_classificacao  
-chk_percentual_consumo  
-
+chk_property_type  
+chk_region_name 
 ---
 
-## 4.4 Prefixo de UNIQUE constraints
+## 4.4 🔒 Prefixo de UNIQUE constraints
 
 - uq_ → regras de unicidade
 
 ✔ Exemplos:
-uq_usuario_instalacao  
-uq_usuario_habito  
+uq_user_email  
+uq_user_property  
 
 ---
 
@@ -73,5 +92,5 @@ uq_usuario_habito
 Todas as roles seguem o prefixo: sys_
 ✔ Exemplos:
 sys_devops  
-sys_analista_bi  
+sys_analyst  
 ---

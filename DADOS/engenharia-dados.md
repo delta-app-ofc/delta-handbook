@@ -10,39 +10,56 @@ O sistema adota uma arquitetura multi-banco para atender diferentes necessidades
 
 ## Papel no sistema
 
-O PostgreSQL é o **banco principal do sistema**, responsável por armazenar todos os dados estruturados, normalizados e essenciais para o funcionamento da aplicação.
+O PostgreSQL é o **banco de dados principal do sistema**, responsável por armazenar todos os **dados cadastrais, estruturais e transacionais essenciais** para o funcionamento da aplicação.
 
 ---
 
-## 📌 Responsabilidades
+## Responsabilidades
 
-O PostgreSQL armazena:
+O PostgreSQL armazena principalmente **dados cadastrais do sistema**, incluindo:
 
-- tbl_usuario;
-- tbl_instalacao;
-- tbl_usuario_instalacao;
-- tbl_dispositivo
-- tbl_meta_consumo;
-- tbl_alerta;
-- tbl_tarifa_agua;
-- tbl_habito;
-- tbl_usuario_habito;
-- views analíticas;
-- triggers, functions, procedures e tabelas de auditoria das respectivas tabelas.
+- tb_user 
+- tb_property 
+- tb_address 
+- tb_device 
+- tb_region 
+- tb_habit 
+- tb_user_property 
+- tb_user_habit 
+- tb_user_habit_day 
+- tb_region_rate 
 
-Ou seja, dados dos usuários, estrutura física e regras de negócio, representando o CORE do Sistema, além das VIEWS analíticas, usadas para camada de BI.
+Além disso, também armazena:
+
+- Views analíticas (camada de BI)
+- Functions, triggers e procedures (regras de negócio no banco)
+- Tabelas auxiliares de suporte e histórico, quando aplicável
 
 ---
 
-## Finalidade
+## Uso obrigatório
+
+O banco é responsável por:
+
+- **Dados cadastrais (core do sistema)**  
+  Ex: usuários, imóveis, dispositivos, regiões
+
+- **Dados relacionais**  
+  Ex: vínculos entre usuário e imóvel, usuário e hábito
+
+- **Dados analíticos (BI)**  
+  Ex: views para relatórios e dashboards
+
+---
+
+##  Finalidade
 
 O PostgreSQL garante:
-- Integridade dos dados
-- Relacionamentos (PK/FK)
-- Consistência transacional
-- Base oficial do sistema
 
----
+- Integridade dos dados
+- Consistência transacional (ACID)
+- Relacionamentos via PK/FK
+- Padronização dos dados cadastrais
 
 # MongoDB — Dados Não Estruturados 
 

@@ -1,8 +1,9 @@
 # Documento de Arquitetura e Modelagem de Dados
-Este documento descreve as especificações técnicas de infraestrutura, 
+Este documento descreve as especificações técnicas de infraestrutura de informações geradas pelo Arduino, 
 modelagem e tráfego de dados para o sistema de monitoramento de consumo de água via telemetria IoT. 
 A arquitetura foi planejada para garantir escalabilidade, segurança e eficiência computacional, 
 dividindo as responsabilidades entre MongoDB, Redis e PostgreSQL.
+OBS.: Este documento **não** abrange a modelagem de todos os dados que transitarão na aplicação, apenas as informações de telemetria IoT.
 
 ## Diagrama de Arquitetura de Fluxo de Dados
 ![img.png](diagrama-infra.png)

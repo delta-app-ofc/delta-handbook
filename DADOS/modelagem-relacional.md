@@ -67,6 +67,7 @@ Armazena os usuários do sistema.
 - **registration_date**: Data de cadastro (padrão: CURRENT_DATE).
 - **is_active**: Indica se o usuário está ativo.
 - **is_admin**: Indica se o usuário é administrador.
+- **is_manager**: Indica se o usuário é gerente, para a versão comercial.
 
 ---
 
@@ -117,8 +118,6 @@ Define tarifas de água por região e faixa de consumo.
 ### 📌 Atributos
 - **id (PK)**: Identificador da tarifa.
 - **region_id (FK)**: Referência para `tb_region`.
-- **initial_range**: Início da faixa de consumo (>= 0).
-- **final_range**: Fim da faixa de consumo (> inicial).
 - **m3_value**: Valor por m³ (> 0).
 - **initial_validity**: Início da vigência.
 - **final_validity**: Fim da vigência (pode ser NULL).

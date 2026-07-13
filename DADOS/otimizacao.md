@@ -1,4 +1,3 @@
-````md
 # 📘 Documentação — Functions e Procedures de Regras de Negócio (PostgreSQL)
 
 ## 1. Objetivo

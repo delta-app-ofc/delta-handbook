@@ -82,7 +82,7 @@ simplificando as análises estatísticas da IA e o cálculo do ranking.
   "user_id": "60c72b2f9b1d8b2bad723456",
   "device_id": "ARD-R4-SP-0912",
   "window_started_at": "2026-06-21T17:05:00Z",
-  "windowt_finished_at": "2026-06-21T17:10:00Z",
+  "window_finished_at": "2026-06-21T17:10:00Z",
   "liter_consumption": 14,
   "lpm_average": 2.8
 }

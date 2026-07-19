@@ -141,10 +141,6 @@ de saúde do hardware.
 }
 ```
 
-> 💡 **Nota de divergência do rascunho inicial:** nas discussões de ideação, `device_id` havia sido cogitado
-> como o próprio `_id` do documento. A modelagem oficial optou por manter `_id` como `ObjectId` padrão em
-> todas as coleções (consistência de driver/ORM) e tratar `device_id` como campo único indexado. Ver seção 5.
-
 ### 3.4. Estruturas planejadas (ainda não implementadas)
 
 - **`maintenance_logs`** — histórico de manutenção física do hardware (`device_id`, `technician_id`,

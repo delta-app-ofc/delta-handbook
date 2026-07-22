@@ -141,13 +141,6 @@ de saúde do hardware.
 }
 ```
 
-### 3.4. Estruturas planejadas (ainda não implementadas)
-
-- **`maintenance_logs`** — histórico de manutenção física do hardware (`device_id`, `technician_id`,
-  `maintenance_date`, `reason`, `notes`). Discutida como candidata natural para `db_delta_telemetry`, mas
-  ainda não consta na modelagem oficial (diagrama atual). Deve ser adicionada quando o fluxo de suporte
-  técnico de campo for priorizado.
-
 ---
 
 ## 4. Database: `db_delta_app`
@@ -269,14 +262,6 @@ referência lógica, não uma *foreign key* imposta pelo banco.
 }
 ```
 
-### 4.5. Estruturas planejadas (ainda não implementadas)
-
-- **`chat_context`** — estado temporário (tópico atual, entidades extraídas) usado para reduzir o volume de
-  tokens enviados ao modelo de IA em sessões longas ou reabertas. Discutida na ideação técnica, mas **não
-  está no diagrama oficial**. Fica marcada como pendência: só se justifica quando o chatbot evoluir de
-  respostas com regras fixas para um modelo conversacional (LLM) de fato. Se implementada, deve nascer
-  com TTL Index (ex.: 30 minutos de inatividade), já que seu valor é puramente operacional/efêmero.
-
 ---
 
 ## 5. Índices e Configurações de Coleção
@@ -294,12 +279,6 @@ referência lógica, não uma *foreign key* imposta pelo banco.
 | `chat_sessions` | `{ user_id: 1, last_activity_at: -1 }` | Composto | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente. |
 | `chat_sessions` | `{ user_id: 1, is_open: 1 }` | Composto | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova. |
 | `chat_feedback` | `{ session_id: 1 }` | Simples | Suporta o cruzamento (via `$lookup` em agregação) entre sessão e sua avaliação, usado em métricas de satisfação do bot. |
-
-> 💡 **Validação de schema (opcional, recomendada para `pulses_raw` e `consumption_summary`).** Como
-> essas coleções recebem escrita direta de um processo automatizado (a API de ingestão), vale considerar um
-> validador `$jsonSchema` com `validationLevel: moderate` — ele barra documentos claramente malformados
-> sem travar a ingestão de documentos já existentes ou pouco divergentes, mantendo a robustez que se
-> espera de uma coleção alimentada por hardware de campo.
 
 ---
 

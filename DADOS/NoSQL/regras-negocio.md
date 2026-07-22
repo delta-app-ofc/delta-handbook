@@ -6,11 +6,11 @@ Este documento descreve todas as regras de negócio do banco de dados não relac
 
 ## 1. 🔤 Padrão de letras nos registros
 
-Todos os **dados inseridos no banco devem ser armazenados em MAIÚSCULAS**, quando aplicável.
+Todos os **dados inseridos no banco devem ser armazenados em MINÚSCULAS**, quando aplicável.
 
 ✔ Exemplos:
-- status → "ONLINE"
-- severidade → "ALTA"
+- status → "online"
+- severidade → "high"
 
 ---
 
@@ -114,6 +114,6 @@ ttl_pulses_raw_sent_at
 Todas as roles seguem o prefixo: role_
 ✔ Exemplos:
 role_devops  
-role_analyst  
+role_bi_analyst  
 
 ---

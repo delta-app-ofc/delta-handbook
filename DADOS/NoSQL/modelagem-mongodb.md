@@ -87,16 +87,16 @@ detalhado de pulsos captados pelo sensor.
 Documento consolidado e leve, gerado pelo back-end após o processamento do `pulses_raw` pela IA. É a
 fonte de dados que o aplicativo consulta para montar gráficos de consumo.
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador do documento |
-| `device_id` | string | Sim | Dispositivo de origem |
-| `user_id` | string | Não | Usuário dono do dispositivo |
-| `window_started_at` | timestamp | Sim | Início da janela resumida |
-| `window_finished_at` | timestamp | Sim | Fim da janela resumida |
-| `consumption_liters` | long | Sim | Volume total consumido na janela |
-| `lpm_average` | int | Não | Vazão média (litros/minuto) |
-| `anomaly_detected` | bool | Não | Flag setada pela IA/regras de negócio |
+| Campo                | Tipo      | Obrigatório | Descrição                             |
+|----------------------|-----------|-------------|---------------------------------------|
+| `_id`                | ObjectId  | Sim         | Identificador do documento            |
+| `device_id`          | string    | Sim         | Dispositivo de origem                 |
+| `user_id`            | string    | Não         | Usuário dono do dispositivo           |
+| `window_started_at`  | timestamp | Sim         | Início da janela resumida             |
+| `window_finished_at` | timestamp | Sim         | Fim da janela resumida                |
+| `consumption_liters` | double    | Sim         | Volume total consumido na janela      |
+| `lpm_average`        | double    | Não         | Vazão média (litros/minuto)           |
+| `anomaly_detected`   | bool      | Não         | Flag setada pela IA/regras de negócio |
 
 ```json
 {
@@ -105,8 +105,8 @@ fonte de dados que o aplicativo consulta para montar gráficos de consumo.
   "user_id": "60c72b2f9b1d8b2bad723456",
   "window_started_at": "2026-07-17T17:05:00Z",
   "window_finished_at": "2026-07-17T17:10:00Z",
-  "consumption_liters": 14,
-  "lpm_average": 2,
+  "consumption_liters": 14.4,
+  "lpm_average": 2.5,
   "anomaly_detected": false
 }
 ```
@@ -119,15 +119,15 @@ app e a exportação diária para as tabelas de dashboard no PostgreSQL.
 Documento único por dispositivo (padrão *upsert*), atualizado a cada ping. Alimenta o painel administrativo
 de saúde do hardware.
 
-| Campo | Tipo      | Obrigatório | Descrição |
-|---|-----------|---|---|
-| `_id` | ObjectId  | Sim | Identificador do documento |
-| `device_id` | string    | Sim | Identificador do dispositivo |
-| `last_ping_at` | timestamp | Não | Último contato recebido |
-| `wifi_signal_rssi` | string    | Não | Faixa de sinal Wi-Fi (ex.: `excellent`, `good`, `weak`, `critical`) |
-| `firmware_version` | string    | Não | Versão do firmware instalado |
-| `connectivity_status` | string    | Não | `online` / `offline` / `unstable` |
-| `unavailability_reason` | string    | Não | Motivo registrado quando `connectivity_status != online` |
+| Campo                   | Tipo      | Obrigatório | Descrição                                                           |
+|-------------------------|-----------|-------------|---------------------------------------------------------------------|
+| `_id`                   | ObjectId  | Sim         | Identificador do documento                                          |
+| `device_id`             | string    | Sim         | Identificador do dispositivo                                        |
+| `last_ping_at`          | timestamp | Não         | Último contato recebido                                             |
+| `wifi_signal_rssi`      | string    | Não         | Faixa de sinal Wi-Fi (ex.: `excellent`, `good`, `weak`, `critical`) |
+| `firmware_version`      | string    | Não         | Versão do firmware instalado                                        |
+| `connectivity_status`   | string    | Não         | `online` / `offline` / `unstable`                                   |
+| `unavailability_reason` | string    | Não         | Motivo registrado quando `connectivity_status != online`            |
 
 ```json
 {
@@ -149,21 +149,21 @@ de saúde do hardware.
 
 Documento único por usuário, armazenando preferências de notificação, metas, tema e outras configurações.
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador do documento |
-| `user_id` | string | Sim | Usuário dono das preferências |
-| `daily_liters_target` | int | Não | Meta diária de consumo |
-| `notifications_enabled` | bool | Não | Liga/desliga notificações push |
-| `quiet_hours` | objeto | Não | Janela de silêncio de alertas |
-| `quiet_hours.start_hour` | string | Não | Início do período (ex.: `"22:00"`) |
-| `quiet_hours.end_hour` | string | Não | Fim do período (ex.: `"06:00"`) |
-| `dark_mode_enabled` | bool | Sim | Preferência visual do app |
+| Campo                    | Tipo     | Obrigatório | Descrição                          |
+|--------------------------|----------|-------------|------------------------------------|
+| `_id`                    | ObjectId | Sim         | Identificador do documento         |
+| `user_id`                | int      | Sim         | Usuário dono das preferências      |
+| `daily_liters_target`    | double   | Não         | Meta diária de consumo             |
+| `notifications_enabled`  | bool     | Não         | Liga/desliga notificações push     |
+| `quiet_hours`            | objeto   | Não         | Janela de silêncio de alertas      |
+| `quiet_hours.start_hour` | string   | Não         | Início do período (ex.: `"22:00"`) |
+| `quiet_hours.end_hour`   | string   | Não         | Fim do período (ex.: `"06:00"`)    |
+| `dark_mode_enabled`      | bool     | Sim         | Preferência visual do app          |
 
 ```json
 {
   "_id": { "$oid": "60c72b2f9b1d8b2bad723b01" },
-  "user_id": "60c72b2f9b1d8b2bad723456",
+  "user_id": 212,
   "daily_liters_target": 300,
   "notifications_enabled": true,
   "quiet_hours": { "start_hour": "22:00", "end_hour": "06:00" },
@@ -176,21 +176,21 @@ Documento único por usuário, armazenando preferências de notificação, metas
 Registro definitivo de cada anomalia disparada pela IA/regras de negócio — é o que o app renderiza na tela
 de notificações do usuário.
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador do documento |
-| `device_id` | string | Sim | Dispositivo que originou o alerta |
-| `user_id` | string | Não | Usuário notificado |
-| `alert_type` | string | Sim | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
-| `triggered_at` | timestamp | Sim | Momento de abertura do alerta |
-| `resolved_at` | timestamp | Não | Momento de resolução (`null` enquanto ativo) |
-| `severity` | string | Não | `low` / `medium` / `high` |
+| Campo          | Tipo      | Obrigatório | Descrição                                                         |
+|----------------|-----------|-------------|-------------------------------------------------------------------|
+| `_id`          | ObjectId  | Sim         | Identificador do documento                                        |
+| `device_id`    | string    | Sim         | Dispositivo que originou o alerta                                 |
+| `user_id`      | int       | Não         | Usuário notificado                                                |
+| `alert_type`   | string    | Sim         | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
+| `triggered_at` | timestamp | Sim         | Momento de abertura do alerta                                     |
+| `resolved_at`  | timestamp | Não         | Momento de resolução (`null` enquanto ativo)                      |
+| `severity`     | string    | Não         | `low` / `medium` / `high`                                         |
 
 ```json
 {
   "_id": { "$oid": "60c72b2f9b1d8b2bad723b02" },
   "device_id": "ESP32-SP-0912",
-  "user_id": "60c72b2f9b1d8b2bad723456",
+  "user_id": 212,
   "alert_type": "vazamento_continuo",
   "triggered_at": "2026-07-17T03:12:00Z",
   "resolved_at": null,
@@ -203,25 +203,25 @@ de notificações do usuário.
 Cada documento representa **uma sessão de chat completa** — não uma mensagem isolada. As mensagens
 ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador da sessão |
-| `user_id` | string | Sim | Usuário dono da sessão |
-| `started_at` | timestamp | Sim | Início da sessão |
-| `last_activity_at` | timestamp | Sim | Última interação |
-| `is_open` | bool | Não | Sessão aceita novas mensagens |
-| `is_active` | bool | Não | Sessão em atendimento no momento |
-| `is_deleted` | bool | Não | Soft delete (não remove o documento) |
-| `messages[]` | array de objetos | Não | Mensagens da sessão, em ordem cronológica |
-| `messages[].role` | string | Sim | `user` ou `bot` |
-| `messages[].text` | string | Sim | Conteúdo da mensagem |
-| `messages[].sent_at` | string | Sim | Horário de envio |
-| `messages[].api_status_code` | int | Sim | Status retornado pela API de IA na geração da resposta |
+| Campo                        | Tipo             | Obrigatório | Descrição                                              |
+|------------------------------|------------------|-------------|--------------------------------------------------------|
+| `_id`                        | ObjectId         | Sim         | Identificador da sessão                                |
+| `user_id`                    | timestamp        | Sim         | Usuário dono da sessão                                 |
+| `started_at`                 | timestamp        | Sim         | Início da sessão                                       |
+| `last_activity_at`           | timestamp        | Sim         | Última interação                                       |
+| `is_open`                    | bool             | Não         | Sessão aceita novas mensagens                          |
+| `is_active`                  | bool             | Não         | Sessão em atendimento no momento                       |
+| `is_deleted`                 | bool             | Não         | Soft delete (não remove o documento)                   |
+| `messages[]`                 | array de objetos | Não         | Mensagens da sessão, em ordem cronológica              |
+| `messages[].role`            | string           | Sim         | `user` ou `bot`                                        |
+| `messages[].text`            | string           | Sim         | Conteúdo da mensagem                                   |
+| `messages[].sent_at`         | timestamp        | Sim         | Horário de envio                                       |
+| `messages[].api_status_code` | int              | Sim         | Status retornado pela API de IA na geração da resposta |
 
 ```json
 {
   "_id": { "$oid": "61a8f9c2b9d1b2bad723c001" },
-  "user_id": "60c72b2f9b1d8b2bad723456",
+  "user_id": 212,
   "started_at": "2026-07-17T14:00:00Z",
   "last_activity_at": "2026-07-17T14:05:00Z",
   "is_open": false,
@@ -244,13 +244,13 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
 Avaliação do usuário sobre uma sessão encerrada. Referencia `chat_sessions` por `session_id` — uma
 referência lógica, não uma *foreign key* imposta pelo banco.
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador do documento |
-| `session_id` | ObjectId | Sim | Referência a `chat_sessions._id` |
-| `is_satisfied` | bool | Sim | Avaliação binária (👍/👎) |
-| `user_comment` | string | Não | Comentário livre opcional |
-| `created_at` | timestamp | Não | Momento do envio do feedback |
+| Campo          | Tipo      | Obrigatório | Descrição                        |
+|----------------|-----------|-------------|----------------------------------|
+| `_id`          | ObjectId  | Sim         | Identificador do documento       |
+| `session_id`   | ObjectId  | Sim         | Referência a `chat_sessions._id` |
+| `is_satisfied` | bool      | Sim         | Avaliação binária (👍/👎)        |
+| `user_comment` | string    | Não         | Comentário livre opcional        |
+| `created_at`   | timestamp | Não         | Momento do envio do feedback     |
 
 ```json
 {
@@ -266,19 +266,19 @@ referência lógica, não uma *foreign key* imposta pelo banco.
 
 ## 5. Índices e Configurações de Coleção
 
-| Coleção | Índice | Tipo | Justificativa |
-|---|---|---|---|
-| `pulses_raw` | `{ sent_at: 1 }` | **TTL** (`expireAfterSeconds: 604800`) | Expira o dado bruto após 7 dias. Contém o volume mais pesado de escrita do sistema; sem expiração automática, estoura o limite do cluster gratuito (M0/512 MB) em pouco tempo. A auditoria de longo prazo é responsabilidade do armazenamento frio (S3/Delta Lake), não deste banco. |
-| `pulses_raw` | `{ device_id: 1, sent_at: -1 }` | Composto | Suporta consultas de debug/reprocessamento por dispositivo dentro da janela de 7 dias em que o dado ainda existe. |
-| `consumption_summary` | `{ user_id: 1, window_started_at: -1 }` | Composto | Este é o índice mais crítico do database de telemetria: sustenta a leitura do histórico/gráfico de consumo do usuário no app, sempre ordenado por tempo. |
-| `consumption_summary` | `{ device_id: 1 }` | Simples | Consultas administrativas e de suporte por dispositivo, independente do usuário. |
-| `device_status` | `{ device_id: 1 }` | **Único** | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas. |
-| `alerts_history` | `{ user_id: 1, triggered_at: -1 }` | Composto | Alimenta a tela de notificações do app, sempre lida por usuário e ordenada por data. |
-| `alerts_history` | `{ device_id: 1, resolved_at: 1 }` | Composto (parcial, `resolved_at: null`) | Consulta rápida de "alertas ainda ativos" por dispositivo, sem varrer o histórico já resolvido. |
-| `user_preferences` | `{ user_id: 1 }` | **Único** | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`. |
-| `chat_sessions` | `{ user_id: 1, last_activity_at: -1 }` | Composto | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente. |
-| `chat_sessions` | `{ user_id: 1, is_open: 1 }` | Composto | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova. |
-| `chat_feedback` | `{ session_id: 1 }` | Simples | Suporta o cruzamento (via `$lookup` em agregação) entre sessão e sua avaliação, usado em métricas de satisfação do bot. |
+| Coleção               | Índice                                  | Tipo                                    | Justificativa                                                                                                                                                                                                                                                                        |
+|-----------------------|-----------------------------------------|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pulses_raw`          | `{ sent_at: 1 }`                        | **TTL** (`expireAfterSeconds: 604800`)  | Expira o dado bruto após 7 dias. Contém o volume mais pesado de escrita do sistema; sem expiração automática, estoura o limite do cluster gratuito (M0/512 MB) em pouco tempo. A auditoria de longo prazo é responsabilidade do armazenamento frio (S3/Delta Lake), não deste banco. |
+| `pulses_raw`          | `{ device_id: 1, sent_at: -1 }`         | Composto                                | Suporta consultas de debug/reprocessamento por dispositivo dentro da janela de 7 dias em que o dado ainda existe.                                                                                                                                                                    |
+| `consumption_summary` | `{ user_id: 1, window_started_at: -1 }` | Composto                                | Este é o índice mais crítico do database de telemetria: sustenta a leitura do histórico/gráfico de consumo do usuário no app, sempre ordenado por tempo.                                                                                                                             |
+| `consumption_summary` | `{ device_id: 1 }`                      | Simples                                 | Consultas administrativas e de suporte por dispositivo, independente do usuário.                                                                                                                                                                                                     |
+| `device_status`       | `{ device_id: 1 }`                      | **Único**                               | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas.                                                                                          |
+| `alerts_history`      | `{ user_id: 1, triggered_at: -1 }`      | Composto                                | Alimenta a tela de notificações do app, sempre lida por usuário e ordenada por data.                                                                                                                                                                                                 |
+| `alerts_history`      | `{ device_id: 1, resolved_at: 1 }`      | Composto (parcial, `resolved_at: null`) | Consulta rápida de "alertas ainda ativos" por dispositivo, sem varrer o histórico já resolvido.                                                                                                                                                                                      |
+| `user_preferences`    | `{ user_id: 1 }`                        | **Único**                               | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`.                                                                                                                        |
+| `chat_sessions`       | `{ user_id: 1, last_activity_at: -1 }`  | Composto                                | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente.                                                                                                                                                                                                       |
+| `chat_sessions`       | `{ user_id: 1, is_open: 1 }`            | Composto                                | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova.                                                                                                                                                                                              |
+| `chat_feedback`       | `{ session_id: 1 }`                     | Simples                                 | Suporta o cruzamento (via `$lookup` em agregação) entre sessão e sua avaliação, usado em métricas de satisfação do bot.                                                                                                                                                              |
 
 ---
 
@@ -311,8 +311,4 @@ pequena, mas que evita tratamento especial nessa única coleção.
 
 ## 7. Diagrama de Referência
 
-### 7.1. `db_delta_telemetry`
-![img.png](modelagem-telemetry.png)
-
-### 7.2. `db_delta_app`
-![img.png](modelagem-app.png)
+![Modelagem Delta](modelagem-delta.png)

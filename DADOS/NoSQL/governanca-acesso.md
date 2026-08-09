@@ -1,7 +1,3 @@
-Aqui está a documentação completa da **Governança de Acesso do MongoDB**, estruturada exatamente no mesmo padrão e formatação do seu arquivo do PostgreSQL (`governanca-acesso.md`), considerando os scripts de roles dos dois clusters.
-
----
-
 # Governança de Acesso (MongoDB NoSQL) — Projeto Delta
 
 Este documento define as *Custom Roles* e permissões dos bancos NoSQL (MongoDB Atlas) do Projeto Delta, divididos entre o **Cluster de Telemetria** e o **Cluster do Aplicativo**.
@@ -20,9 +16,9 @@ Coleções atualmente planejadas e implementadas nos schemas dos clusters NoSQL:
 
 ### Cluster 2: Aplicativo (`db_delta_app`)
 
-* `client_preferences`
-* `chat_history`
-* `user_notifications`
+* `user_preferences`
+* `alerts_history`
+* `chat_sessions`
 * `chat_feedback`
 
 > **Nota de Arquitetura:** No MongoDB, todas as Custom Roles são registradas centralmente no banco `admin`, porém seus privilégios (escopo de atuação) aplicam-se especificamente às coleções de cada banco de dados (`db_delta_telemetry` ou `db_delta_app`).
@@ -136,8 +132,6 @@ Permissões:
 ---
 
 # 2. Atribuição de Usuários às Roles do MongoDB
-
-OBSERVAÇÃO: Integrantes com a role `role_data_engineer` possuem acesso completo a todas as coleções de ambos os clusters, por isso só tem essa role atribuída
 
 | Integrante                  | Disciplinas                   | Roles Atribuídas (Telemetria)                                   | Roles Atribuídas (App)                                           |
 |-----------------------------|-------------------------------|-----------------------------------------------------------------|------------------------------------------------------------------|

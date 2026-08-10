@@ -14,11 +14,11 @@ produção.
 
 O Projeto Delta usa três motores de persistência, cada um com uma responsabilidade fechada:
 
-| Motor | Responsabilidade |
-|---|---|
+| Motor          | Responsabilidade                                                                                       |
+|----------------|--------------------------------------------------------------------------------------------------------|
 | **PostgreSQL** | CRUD relacional obrigatório, cadastro de usuários/propriedades/dispositivos, tabelas agregadas para BI |
-| **MongoDB** | Ingestão de telemetria do ESP32, domínio de aplicativo (preferências, alertas, chat) |
-| **Redis** | Cache de rotina calculada pela IA, throttling de notificações, rankings (Sorted Sets) |
+| **MongoDB**    | Ingestão de telemetria do ESP32, domínio de aplicativo (preferências, alertas, chat)                   |
+| **Redis**      | Cache de rotina calculada pela IA, throttling de notificações, rankings (Sorted Sets)                  |
 
 O MongoDB entra especificamente onde o SQL sofreria: escrita de alto volume vinda dos dispositivos IoT e
 documentos com estrutura variável (histórico de mensagens de chat, preferências flexíveis por usuário).
@@ -32,10 +32,10 @@ o MongoDB **não duplica** esse domínio.
 A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separando a carga de máquina
 (alto volume, escrita constante) da carga de usuário (baixo volume, leitura predominante):
 
-| Database | Conteúdo | Padrão de carga |
-|---|---|---|
-| `db_delta_telemetry` | `pulses_raw`, `consumption_summary`, `device_status` | Escrita pesada e constante (ESP32 → API a cada 5 min) |
-| `db_delta_app` | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback` | Leitura predominante, escrita esporádica (ação do usuário) |
+| Database             | Conteúdo                                                               | Padrão de carga                                            |
+|----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
+| `db_delta_telemetry` | `pulses_raw`, `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback` | Leitura predominante, escrita esporádica (ação do usuário) |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
 > de acesso: a credencial que a API usa para ingestão de telemetria não precisa (e não deve) ter acesso ao
@@ -50,17 +50,17 @@ A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separa
 Recebe o payload bruto enviado pelo dispositivo a cada janela de 5 (ou 10) minutos, incluindo o array
 detalhado de pulsos captados pelo sensor.
 
-| Campo | Tipo | Obrigatório | Descrição |
-|---|---|---|---|
-| `_id` | ObjectId | Sim | Identificador do documento |
-| `device_id` | string | Sim | Identificador do dispositivo (ESP32/Arduino) |
-| `sent_at` | timestamp | Sim | Momento do envio do pacote |
-| `window_minutes` | int | Não | Duração da janela de acumulação |
-| `total_pulses` | int | Não | Total de pulsos detectados na janela |
-| `pulses[]` | array de objetos | Não | Histórico detalhado de cada pulso |
-| `pulses[].pulsed_at` | timestamp | Sim | Horário estimado do pulso |
-| `pulses[].ms_since_boot` | long | Sim | `millis()` do dispositivo no momento do pulso |
-| `pulses[].delta_ms` | int | Sim | Intervalo desde o pulso anterior na mesma janela |
+| Campo                    | Tipo             | Obrigatório | Descrição                                        |
+|--------------------------|------------------|-------------|--------------------------------------------------|
+| `_id`                    | ObjectId         | Sim         | Identificador do documento                       |
+| `device_id`              | string           | Sim         | Identificador do dispositivo (ESP32/Arduino)     |
+| `sent_at`                | timestamp        | Sim         | Momento do envio do pacote                       |
+| `window_minutes`         | int              | Não         | Duração da janela de acumulação                  |
+| `total_pulses`           | int              | Não         | Total de pulsos detectados na janela             |
+| `pulses[]`               | array de objetos | Não         | Histórico detalhado de cada pulso                |
+| `pulses[].pulsed_at`     | timestamp        | Sim         | Horário estimado do pulso                        |
+| `pulses[].ms_since_boot` | long             | Sim         | `millis()` do dispositivo no momento do pulso    |
+| `pulses[].delta_ms`      | int              | Sim         | Intervalo desde o pulso anterior na mesma janela |
 
 ```json
 {
@@ -124,9 +124,9 @@ de saúde do hardware.
 | `_id`                   | ObjectId  | Sim         | Identificador do documento                                          |
 | `device_id`             | string    | Sim         | Identificador do dispositivo                                        |
 | `last_ping_at`          | timestamp | Não         | Último contato recebido                                             |
-| `wifi_signal_rssi`      | string    | Não         | Faixa de sinal Wi-Fi (ex.: `excellent`, `good`, `weak`, `critical`) |
+| `wifi_signal_rssi`      | enum      | Não         | Faixa de sinal Wi-Fi (ex.: `excellent`, `good`, `weak`, `critical`) |
 | `firmware_version`      | string    | Não         | Versão do firmware instalado                                        |
-| `connectivity_status`   | string    | Não         | `online` / `offline` / `unstable`                                   |
+| `connectivity_status`   | enum      | Não         | `online` / `offline` / `unstable`                                   |
 | `unavailability_reason` | string    | Não         | Motivo registrado quando `connectivity_status != online`            |
 
 ```json
@@ -184,7 +184,7 @@ de notificações do usuário.
 | `alert_type`   | string    | Sim         | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
 | `triggered_at` | timestamp | Sim         | Momento de abertura do alerta                                     |
 | `resolved_at`  | timestamp | Não         | Momento de resolução (`null` enquanto ativo)                      |
-| `severity`     | string    | Não         | `low` / `medium` / `high`                                         |
+| `severity`     | enum      | Não         | `low` / `medium` / `high`                                         |
 
 ```json
 {
@@ -213,8 +213,9 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
 | `is_active`                  | bool             | Não         | Sessão em atendimento no momento                       |
 | `is_deleted`                 | bool             | Não         | Soft delete (não remove o documento)                   |
 | `messages[]`                 | array de objetos | Não         | Mensagens da sessão, em ordem cronológica              |
-| `messages[].role`            | string           | Sim         | `user` ou `bot`                                        |
-| `messages[].text`            | string           | Sim         | Conteúdo da mensagem                                   |
+| `messages[].role`            | enum             | Sim         | `user` ou `bot`                                        |
+| `messages[].content_type`    | enum             | Sim         | Tipo do conteúdo da mensagem (`text`, `function`)      |
+| `messages[].content`         | string           | Sim         | Conteúdo da mensagem                                   |
 | `messages[].sent_at`         | timestamp        | Sim         | Horário de envio                                       |
 | `messages[].api_status_code` | int              | Sim         | Status retornado pela API de IA na geração da resposta |
 
@@ -228,8 +229,8 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
   "is_active": false,
   "is_deleted": false,
   "messages": [
-    { "role": "user", "text": "Por que meu consumo subiu tanto ontem?", "sent_at": "2026-07-17T14:00:05Z", "api_status_code": 200 },
-    { "role": "bot", "text": "Identifiquei um fluxo contínuo de 2.8 LPM de madrugada. Pode ser um vazamento.", "sent_at": "2026-07-17T14:00:12Z", "api_status_code": 200 }
+    { "role": "user", "content_type": "text", "content": "Por que meu consumo subiu tanto ontem?", "sent_at": "2026-07-17T14:00:05Z", "api_status_code": 200 },
+    { "role": "bot", "content_type": "text", "content": "Identifiquei um fluxo contínuo de 2.8 LPM de madrugada. Pode ser um vazamento.", "sent_at": "2026-07-17T14:00:12Z", "api_status_code": 200 }
   ]
 }
 ```

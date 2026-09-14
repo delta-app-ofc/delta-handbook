@@ -145,6 +145,19 @@ ZRANGE ranking:agua:202606 0 9 WITHSCORES
 ```
 
 ### 4.2. Cache de Regras de Alerta da IA (Evitando gargalo no MongoDB)
+
+> ⚠️ **Design anterior, não implementado.** O que foi de fato implementado
+> (`delta-nosql-database`, `delta-artificial-intelligence/detection/`) é
+> diferente do descrito nesta seção 4.2 e na tabela `alertas_vazamentos`
+> (seção 5.1) abaixo: os alertas ficam em **MongoDB**
+> (`db_delta_app.alerts_history`, ver `DADOS/NoSQL/modelagem-mongodb.md`), não
+> em Postgres via cache de limites no Redis. Quem calcula o indício de
+> vazamento é o motor de detecção (`detection/`, regras + Isolation Forest),
+> não uma checagem de `limite:madrugada` fixo por usuário no Redis. Esta
+> seção fica como registro histórico da ideia original — não trate como
+> implementada sem conferir o código real (mesmo aviso do `AGENTS.md` deste
+> repositório sobre Redis).
+
 Para evitar que cada payload recebido execute um find() no MongoDB buscando a rotina de consumo, 
 o Back-end carrega as metas e limites do usuário direto no cache do Redis. A verificação do alerta 
 se torna uma operação extremamente rápida de leitura de memória (GET).
@@ -194,6 +207,10 @@ CREATE INDEX idx_dash_usuario_data ON dashboard_consumo_diario(usuario_id, data_
 ```
 
 #### Tabela: alertas_vazamentos
+
+> ⚠️ **Não implementada — ver nota da seção 4.2.** O alerta real fica em
+> `db_delta_app.alerts_history` (MongoDB), não nesta tabela Postgres.
+
 Para alimentar a área de auditoria e controle de anomalias na aplicação Web, esta tabela registra todos os alertas confirmados pelo processamento de eventos do Redis.
 
 ```sql

@@ -107,6 +107,15 @@ Perguntas que responde:
 
 **Fonte de dados**: MongoDB.
 
+> O Agente de Vazamento (`delta-artificial-intelligence/app/agents/leak.py`) só **lê**
+> `consumption_summary.anomaly_detected` e `alerts_history` — ele nunca decide um limiar novo
+> (proibido pelo próprio prompt do agente). Quem calcula esses dois campos é um componente
+> separado, o motor de detecção (`delta-artificial-intelligence/detection/`): heurísticas
+> explicáveis (fluxo contínuo, consumo de madrugada, desvio da baseline estatística do próprio
+> usuário) combinadas com um modelo de Isolation Forest, reagindo quase em tempo real via MongoDB
+> Change Streams. Ver `DADOS/NoSQL/modelagem-mongodb.md` e `detection/README.md` naquele
+> repositório.
+
 ### Agente 3 — Previsão
 Responsável por:
 - prever consumo futuro;

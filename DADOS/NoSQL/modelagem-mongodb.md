@@ -115,11 +115,10 @@ fonte de dados que o aplicativo consulta para montar gráficos de consumo.
 > Agente de Vazamento) — ele só *lê* este campo e o histórico de `alerts_history`, nunca decide
 > limiar por conta própria (regra explícita do prompt desse agente: "nunca invente limiares/padrões").
 > Quem calcula é um componente separado, o motor de detecção
-> (`delta-artificial-intelligence/detection/`): heurísticas explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário) combinadas com um modelo de
-> Isolation Forest não-supervisionado, reagindo quase em tempo real via MongoDB Change Streams sobre
-> as janelas recém-inseridas nesta coleção. Ver `detection/README.md` naquele repositório para o
-> detalhe completo.
+> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
+> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML, reagindo
+> quase em tempo real via MongoDB Change Streams sobre as janelas recém-inseridas nesta
+> coleção. Ver `detection/README.md` naquele repositório para o detalhe completo.
 
 Esta é a coleção **permanente** do banco de telemetria: não tem TTL e é ela quem sustenta o histórico do
 app e a exportação diária para as tabelas de dashboard no PostgreSQL.
@@ -208,9 +207,9 @@ de notificações do usuário.
 }
 ```
 
-> **Coleção relacionada:** o motor de detecção
-> (`delta-artificial-intelligence/detection/`) mantém, na mesma database,
-> `user_hour_baseline` — um documento por `user_id` + hora do dia, com a
+> **Coleção relacionada:** o motor de detecção (`delta-business-rules/detection/`)
+> mantém, na mesma database, `user_hour_baseline` — um documento por `user_id`
+> (`int`, mesma representação de `alerts_history.user_id`) + hora do dia, com a
 > média/desvio de consumo daquele usuário naquele horário, atualizado de
 > forma incremental. É estado interno do motor de detecção (não telemetria
 > bruta nem dado consumido pelo app) — ver `detection/README.md`.

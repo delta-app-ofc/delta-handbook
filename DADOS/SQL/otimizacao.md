@@ -53,14 +53,14 @@ Retorna o nome da região.
 
 Exemplo:
 ```
-CENTRO
+GRANDE_SP
 ```
 
 ### 3. fn_get_current_region_rate()
 
 ####  Descrição
 
-A função retorna o valor da tarifa de água vigente para uma determinada região considerando uma data específica. A tarifa retornada deve estar dentro do período de validade cadastrado (initial_validity e final_validity)
+A função retorna o valor da tarifa de água vigente para uma determinada região e categoria de imóvel, considerando uma data específica. A tarifa retornada deve estar dentro do período de validade cadastrado (initial_validity e final_validity)
 
 
 #### Assinatura
@@ -68,6 +68,7 @@ A função retorna o valor da tarifa de água vigente para uma determinada regi�
 ```sql
 fn_get_current_region_rate(
     p_region_id INTEGER,
+    p_classification_id INTEGER,
     p_date DATE
 )
 ```
@@ -89,7 +90,7 @@ A função verifica se um usuário possui todos os requisitos necessários para 
 * se o usuário está ativo;
 * se existe uma propriedade vinculada;
 * se a propriedade possui dispositivo ativo;
-* se existe tarifa válida para a região.
+* se existe tarifa válida para a região e categoria do imóvel.
 
 
 #### Assinatura
@@ -114,13 +115,14 @@ fn_user_can_estimate(
 
 ####  Descrição
 
-A procedure realiza a alteração da tarifa de água de uma região mantendo o histórico de valores. Quando uma nova tarifa é cadastrada, a tarifa anterior é encerrada automaticamente, pois uma região não pode possuir duas tarifas vigentes ao mesmo tempo.
+A procedure realiza a alteração da tarifa de água de uma região e categoria de imóvel, mantendo o histórico de valores. Quando uma nova tarifa é cadastrada, a tarifa anterior daquela combinação região/categoria é encerrada automaticamente, pois uma região e categoria não podem possuir duas tarifas vigentes ao mesmo tempo.
 
 #### Assinatura
 
 ```sql
 sp_change_region_rate(
     p_region_id INTEGER,
+    p_classification_id INTEGER,
     p_new_rate NUMERIC(10,2),
     p_initial_validity DATE
 )
@@ -129,8 +131,9 @@ sp_change_region_rate(
 A procedure executa:
 
 * validação da existência da região;
+* validação da existência da categoria;
 * validação do valor informado;
-* encerramento da tarifa atual;
+* encerramento da tarifa atual daquela região/categoria;
 * inserção da nova tarifa.
 
 ---
@@ -202,7 +205,7 @@ A procedure executa:
 |---|---|---|
 | `fn_user_is_active()` | Function | Verifica se um usuário está ativo antes da execução de operações do sistema. |
 | `fn_get_property_region()` | Function | Retorna a região associada a uma propriedade através do relacionamento entre imóvel, endereço e região. |
-| `fn_get_current_region_rate()` | Function | Consulta a tarifa de água vigente de uma região considerando o período de validade cadastrado. |
+| `fn_get_current_region_rate()` | Function | Consulta a tarifa de água vigente de uma região e categoria de imóvel considerando o período de validade cadastrado. |
 | `fn_user_can_estimate()` | Function | Verifica se um usuário possui todos os requisitos necessários para geração de estimativas de consumo. |
 
 ---
@@ -211,7 +214,7 @@ A procedure executa:
 
 | Nome | Tipo | Objetivo |
 |---|---|---|
-| `sp_change_region_rate()` | Procedure | Atualiza tarifas de uma região mantendo o histórico de valores e controle de vigência. |
+| `sp_change_region_rate()` | Procedure | Atualiza tarifas de uma região e categoria de imóvel mantendo o histórico de valores e controle de vigência. |
 | `sp_register_property()` | Procedure | Realiza o cadastro de uma propriedade e cria automaticamente o vínculo com o usuário responsável. |
 | `sp_disable_user()` | Procedure | Desativa usuários e seus dispositivos relacionados mantendo os dados históricos. |
 

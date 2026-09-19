@@ -81,7 +81,9 @@ O MongoDB armazena:
 - consumo em tempo real
 
 ### 📊 Eventos do sistema
-- detecção de vazamentos
+- detecção de vazamentos — implementado em `delta-business-rules/detection/`
+  (regras explicáveis, sem modelo de ML, não pelo agente de chat; ver
+  `DADOS/NoSQL/modelagem-mongodb.md`)
 - picos de consumo
 - logs de comunicação
 - dados de integração com APIs externas (ex: clima)

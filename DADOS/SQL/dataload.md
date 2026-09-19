@@ -6,7 +6,7 @@ Documentação resumida do script `script-dataload.sql`, responsável por popula
 
 | # | Tabela | Registros | Observações |
 |---|---|---:|---|
-| 1 | `tb_region` | 5 | Valores fixos: LESTE, OESTE, SUL, NORTE, CENTRO |
+| 1 | `tb_region` | 5 | Valores fixos: GRANDE_SP, LINS, PRESIDENTE_PRUDENTE, ADAMANTINA_PIRAPOZINHO, BRAGANCA_PAULISTA |
 | 2 | `tb_day_of_week` | 7 | Valores fixos: SEGUNDA a DOMINGO |
 | 3 | `tb_habit` | 6 | Valores fixos com descrição |
 | 4 | `tb_address` | 150 | CEP plausível por região (zonas de São Paulo) · 30 endereços por região |
@@ -14,11 +14,11 @@ Documentação resumida do script `script-dataload.sql`, responsável por popula
 | 6 | `tb_property` | 150 | Alterna CASA/PRÉDIO · RESIDENCIAL/COMERCIAL conforme padrão do script |
 | 7 | `tb_user_property` | 150 | 1 imóvel por usuário (associação direta usuário ↔ propriedade) |
 | 8 | `tb_device` | 150 | 1 dispositivo por imóvel |
-| 9 | `tb_region_rate` | 30 | 5 regiões × 2 vigências × 3 faixas de consumo |
+| 9 | `tb_region_rate` | 40 | 5 regiões × 8 categorias de imóvel, vigência única a partir de 2026-01-01 |
 | 10 | `tb_user_habit` | 400 | Hábitos associados a usuários (frequência 1–7), 2 hábitos por usuário em média |
 | 11 | `tb_user_habit_day` | 400 | 1 dia da semana por hábito de usuário |
 | 12 | `tb_last_water_bill` | 200 | 1 conta por usuário "normal" (ids 1–200), meses de JAN/2025 a JUN/2025. Admin (id 201) não possui conta, pois não tem imóvel associado |
-| | **Total** | **1.849** | |
+| | **Total** | **1.879** | |
 
 ## Como validar a contagem
 

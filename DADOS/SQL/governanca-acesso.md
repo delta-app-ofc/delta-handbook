@@ -83,7 +83,6 @@ Permissões:
 | Davi | Mobile, DAD, DS2, EQS | `sys_backend_developer` |
 | João | Mobile, DS2, IA, EQS | `sys_backend_developer` |
 | Mariana | MDD, BD2, DS2, IA, EQS | `sys_data_engineer`, `sys_backend_developer` |
-| Rahquel | Mobile, DAD, UX, EQS | `sys_backend_developer` |
 | Samuel | BI, DevOps, BD2, IA, MDD, EQS | `sys_devops`, `sys_data_engineer`, `sys_bi_analyst` |
 | Primeiro Ano | Apoio / Leitura | `sys_first_year` |
 

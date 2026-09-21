@@ -12,7 +12,6 @@ Organização da distribuição da equipe por matéria e por pessoa.
 
 - Davi - Criação dos Diagramas.
 - Mariana - Monitorando nas próprias tarefas.
-- Rahquel - Monitorando nas próprias tarefas.
 - Samuel - Monitorando nas próprias tarefas.
 - João - Criação do board, divisão de tarefas e lançamento das Sprints.
 - Ana - Monitorando nas próprias tarefas.
@@ -22,7 +21,6 @@ Organização da distribuição da equipe por matéria e por pessoa.
 ### User Experience —— UX
 
 - Ana - Prototipando as telas da plataforma WEB.
-- Rahquel - Prototipando as telas do aplicativo mobile.
 
 ---
 
@@ -30,7 +28,6 @@ Organização da distribuição da equipe por matéria e por pessoa.
 
 - Ana - Desenvolvimento do protótipo e do código.
 - Davi - Desenvolvimento do código.
-- Rahquel - Desenvolvimento do protótipo e do código.
 
 ---
 
@@ -38,7 +35,6 @@ Organização da distribuição da equipe por matéria e por pessoa.
 
 - Davi - Estruturando e desenvolvendo o código do projeto mobile.
 - João - Desenvolvimento do Backend do mobile.
-- Rahquel - Desenvolvimento do Frontend da chuteira da copa.
 
 ---
 

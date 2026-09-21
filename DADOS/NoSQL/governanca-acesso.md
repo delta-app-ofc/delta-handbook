@@ -139,6 +139,5 @@ Permissões:
 | **Davi**                    | Mobile, DAD, DS2, EQS         | `role_dev_backend`                                              | `role_dev_backend`                                               |
 | **João**                    | Mobile, DS2, IA, EQS          | `role_dev_backend`                                              | `role_dev_backend`                                               |
 | **Mariana**                 | MDD, BD2, DS2, IA, EQS        | `role_data_engineer`, `role_dev_backend`                        | `role_data_engineer`, `role_dev_backend`                         |
-| **Rahquel**                 | Mobile, DAD, UX, EQS          | `role_dev_backend`                                              | `role_dev_backend`                                               |
 | **Samuel**                  | BI, DevOps, BD2, IA, MDD, EQS | `role_data_engineer`, `role_devops_engineer`, `role_bi_analyst` | `role_data_engineer`, `role_devops_engineer`, `role_bi_analyst`  |
 | **Service Accounts (APIs)** | Aplicação / Ingestão          | `role_api_service`                                              | `role_api_service`                                               |

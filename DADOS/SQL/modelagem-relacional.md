@@ -170,4 +170,71 @@ Define em quais dias da semana cada hábito ocorre.
 ### 📌 Atributos
 - **id (PK)**: Identificador.
 - **user_habit_id (FK)**: Referência para `tb_user_habit`.
+
+---
+
+## 🗄️ 12. Tabela: `tb_backup_restore_log`
+
+Registra cada execução do teste de restauração de backup, uma linha por
+tabela verificada — ver `backup-recuperacao.md` para o procedimento.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **started_at**: Início do teste de restauração.
+- **finished_at**: Fim do teste de restauração. NULL enquanto o teste está em andamento.
+- **status**: `RUNNING`, `SUCCESS` ou `ERROR` — resultado da verificação daquela tabela.
+- **table_name**: Tabela verificada nesse teste.
+- **expected_row_count**: Quantidade de linhas esperada, conforme o manifesto gerado no backup.
+- **restored_row_count**: Quantidade de linhas realmente restauradas no banco descartável.
+- **note**: Observação livre sobre a execução.
+
+---
+
+## 🧾 13. Tabela: `tb_last_water_bill`
+
+Guarda a última conta de água conhecida de cada usuário, usada nas
+estimativas de gasto do app.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **user_id (FK)**: Referência para `tb_user`. Único em conjunto com `month`.
+- **month**: Mês de referência da conta. Sempre o primeiro dia do mês (CHECK).
+- **total_value**: Valor total pago na conta (>= 0).
+- **m3_value**: Consumo em m³ registrado na conta (>= 0).
+
+---
+
+## 🤖 14. Tabela: `tb_log_rpa`
+
+Registra cada execução do RPA que migra dado do banco legado (Primeiro
+Ano) para este banco.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **started_at**: Início da execução.
+- **finished_at**: Fim da execução. NULL enquanto em andamento.
+- **status**: `RUNNING`, `SUCCESS` ou `ERROR`.
+- **inserted_count**: Quantidade de registros inseridos (>= 0).
+- **updated_count**: Quantidade de registros atualizados (>= 0).
+- **deleted_count**: Quantidade de registros excluídos (>= 0).
+- **validation_error_count**: Quantidade de erros de validação (>= 0).
+- **error_message**: Mensagem de erro, quando a execução falha. NULL quando não há erro.
+
+---
+
+## 📚 15. Tabela: `tb_data_catalog`
+
+Catálogo técnico de metadados do schema — uma linha por coluna de cada
+tabela funcional, usado pra governança de dados (classificação de
+sensibilidade). Não cobre as tabelas `tb_log_*` de auditoria, que são
+espelhos automáticos das tabelas principais.
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **table_name**: Nome da tabela documentada. Único em conjunto com `column_name`.
+- **column_name**: Nome da coluna documentada.
+- **data_type**: Tipo da coluna (ex. `VARCHAR(60)`).
+- **description**: Descrição da coluna.
+- **business_rule**: Regra de negócio associada à coluna, quando houver.
+- **access_level**: Classificação de sensibilidade — `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL` (este último para PII/LGPD, ex. e-mail, telefone, senha, data de nascimento).
 - **day_of_week_id (FK)**: Referência para `tb_day_of_week`.

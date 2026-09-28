@@ -82,11 +82,13 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
 
   `MongoDB db_delta_telemetry.consumption_summary` (real) → `bi_etl.py` → `stage.consumption_summary`
   (cópia 1:1, `mongo_id` único e idempotente) → `silver.sp_load_ft_consumption_reading` (`JOIN tb_device`
-  resolve `device_id` → `property_id`) → `silver.ft_consumption_reading` →
-  `silver.sp_load_ft_consumption_daily` (CTE de agregação por dia) → `silver.ft_consumption_daily` →
+  resolve `device_id` → `property_id`) → `silver.ft_consumption_reading` (grão device x instante -
+  `UNIQUE (device_id, read_at)`, porque uma propriedade pode ter mais de 1 dispositivo instalado) →
+  `silver.sp_load_ft_consumption_daily` (CTE de agregação por dia, soma todos os devices de uma
+  propriedade) → `silver.ft_consumption_daily` →
   `gold.sp_load_ft_consumption_daily` (chave substituta + `fn_get_current_region_rate` pro custo) →
-  `gold.ft_consumption_daily` → `dw.vw_consumption_daily` / `vw_property_ranking` / `vw_monthly_variation`
-  / `vw_consumption_distribution`.
+  `gold.ft_consumption_daily` → `dw.vw_ft_consumption_daily` / `vw_ft_property_ranking` / `vw_ft_monthly_variation`
+  / `vw_ft_consumption_distribution`.
 
 - **Propriedade + organização + perfil operacional** - dado cadastral já limpo, pula a `stage`:
   `tb_property` + `tb_organization` + `tb_property_operational_profile` → `silver.sp_load_dm_property`
@@ -99,11 +101,11 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
 - **Fatura residencial** - pula a `stage`: `tb_last_water_bill` + `tb_user` →
   `silver.sp_load_ft_water_bill` → `silver.ft_water_bill` → `gold.sp_load_ft_water_bill_monthly` (chave
   substituta via `dm_person`/`dm_date`) → `gold.ft_water_bill_monthly` →
-  `dw.vw_residential_efficiency_ranking`.
+  `dw.vw_ft_residential_efficiency_ranking`.
 
 - **Cenário de investimento (CAPEX)** - o mais curto, dado de referência estático, não passa por
   `stage`/`silver`: `tb_investment_scenario` → `gold.sp_load_ft_investment_scenario` (só chave substituta)
-  → `gold.ft_investment_scenario` → `dw.vw_capex_comparison`.
+  → `gold.ft_investment_scenario` → `dw.vw_ft_capex_comparison`.
 
 - **Auditoria (cadeia de reajuste de tarifa)** - fora do star schema, é a estrutura avançada da seção 6:
   `tb_region_rate` (operações reais) → `trg_log_region_rate`/`fn_log_region_rate` (auditoria já existente)
@@ -118,26 +120,26 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
 Todas as 7 views de `dw` usam pelo menos uma CTE, além de 1 procedure de carga:
 
 - `silver.sp_load_ft_consumption_daily` - agrega leituras por propriedade/dia antes do `INSERT`.
-- `dw.vw_consumption_daily` - CTE monta os `JOIN`s (propriedade, data) antes das window functions -
+- `dw.vw_ft_consumption_daily` - CTE monta os `JOIN`s (propriedade, data) antes das window functions -
   necessário, porque o Postgres não permite `JOIN` depois de `OVER` no mesmo nível.
-- `dw.vw_property_ranking` - 2 CTEs em cadeia: agrega consumo/custo, depois calcula litros/m² - evita
+- `dw.vw_ft_property_ranking` - 2 CTEs em cadeia: agrega consumo/custo, depois calcula litros/m² - evita
   repetir a divisão em cada `OVER` do `SELECT` final.
-- `dw.vw_consumption_distribution` - agrega os totais diários, depois calcula os percentis
+- `dw.vw_ft_consumption_distribution` - agrega os totais diários, depois calcula os percentis
   (`PERCENTILE_CONT`) numa CTE separada que entra via `CROSS JOIN`.
-- `dw.vw_monthly_variation` - agrega por mês antes de aplicar `LAG()`.
-- `dw.vw_capex_comparison` - CTE simples, por padronização com as outras views.
-- `dw.vw_residential_efficiency_ranking` - monta os `JOIN`s antes das window functions.
+- `dw.vw_ft_monthly_variation` - agrega por mês antes de aplicar `LAG()`.
+- `dw.vw_ft_capex_comparison` - CTE simples, por padronização com as outras views.
+- `dw.vw_ft_residential_efficiency_ranking` - monta os `JOIN`s antes das window functions.
 - `dw.vw_audit_history_chain` - `WITH RECURSIVE` (seção 6).
 
 ### Window Functions
 
 | Tipo | Onde | Uso |
 |---|---|---|
-| Running total | `SUM() OVER (PARTITION BY property_id ORDER BY full_date ROWS UNBOUNDED PRECEDING)` em `vw_consumption_daily` | Soma acumulada de consumo por propriedade ao longo do tempo |
+| Running total | `SUM() OVER (PARTITION BY property_id ORDER BY full_date ROWS UNBOUNDED PRECEDING)` em `vw_ft_consumption_daily` | Soma acumulada de consumo por propriedade ao longo do tempo |
 | Média móvel | `AVG() OVER (... ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)`, mesma view | Média móvel de 7 dias, suaviza variação diária |
-| Ranking | `RANK()`/`DENSE_RANK()` em `vw_property_ranking`, `vw_capex_comparison`, `vw_residential_efficiency_ranking` | Eficiência (L/m²), custo, payback, consumo residencial (`PARTITION BY` mês) |
-| Distribuição | `NTILE(4)`/`NTILE(5)` + `PERCENT_RANK()` em `vw_property_ranking`/`vw_consumption_distribution` | Quartil/quintil de consumo, posição relativa 0-1 |
-| Comparação com período anterior | `LAG()` em `vw_monthly_variation` | Variação percentual mês a mês |
+| Ranking | `RANK()`/`DENSE_RANK()` em `vw_ft_property_ranking`, `vw_ft_capex_comparison`, `vw_ft_residential_efficiency_ranking` | Eficiência (L/m²), custo, payback, consumo residencial (`PARTITION BY` mês) |
+| Distribuição | `NTILE(4)`/`NTILE(5)` + `PERCENT_RANK()` em `vw_ft_property_ranking`/`vw_ft_consumption_distribution` | Quartil/quintil de consumo, posição relativa 0-1 |
+| Comparação com período anterior | `LAG()` em `vw_ft_monthly_variation` | Variação percentual mês a mês |
 
 Todas testadas com dado real (seção 7).
 
@@ -218,12 +220,12 @@ processo descrito na íntegra a seguir.
 
 | View | Padrão de acesso | Resultado no volume grande |
 |---|---|---|
-| `vw_consumption_daily` | `JOIN` propriedade+data, window functions | Já usa Index Scan nos índices de `UNIQUE` existentes (não precisa de índice novo) |
-| `vw_property_ranking` | `SUM` de TODAS as linhas por propriedade | `Seq Scan` correto - agregação total não tem filtro pra um índice explorar |
-| `vw_monthly_variation` | `SUM` de TODAS as linhas por mês | Mesmo caso - agregação total |
-| `vw_consumption_distribution` | Percentis (`PERCENTILE_CONT`) sobre 100% dos dados | Por definição lê tudo - índice não ajudaria |
-| `vw_capex_comparison` | Tabela de referência, não cresce em volume | Sem necessidade de índice |
-| `vw_residential_efficiency_ranking` | Ranking global por mês | `Seq Scan` correto - lê tudo por definição |
+| `vw_ft_consumption_daily` | `JOIN` propriedade+data, window functions | Já usa Index Scan nos índices de `UNIQUE` existentes (não precisa de índice novo) |
+| `vw_ft_property_ranking` | `SUM` de TODAS as linhas por propriedade | `Seq Scan` correto - agregação total não tem filtro pra um índice explorar |
+| `vw_ft_monthly_variation` | `SUM` de TODAS as linhas por mês | Mesmo caso - agregação total |
+| `vw_ft_consumption_distribution` | Percentis (`PERCENTILE_CONT`) sobre 100% dos dados | Por definição lê tudo - índice não ajudaria |
+| `vw_ft_capex_comparison` | Tabela de referência, não cresce em volume | Sem necessidade de índice |
+| `vw_ft_residential_efficiency_ranking` | Ranking global por mês | `Seq Scan` correto - lê tudo por definição |
 | `vw_audit_history_chain` | CTE recursiva sobre `previous_log_id` | **Achado real, ver abaixo** |
 
 Conclusão: das 7 views, 6 fazem agregação/ranking sobre 100% dos dados de entrada - nelas, `Seq Scan`/
@@ -269,8 +271,12 @@ carrega a cadeia `stage → silver → gold`:
 
 1. Lê o watermark atual (`MAX(window_started_at)` em `stage.consumption_summary`); se vazio, busca todo o
    histórico.
-2. Busca no MongoDB só documentos mais novos que o watermark.
-3. Insere em `stage.consumption_summary` com `ON CONFLICT (mongo_id) DO NOTHING` (idempotente).
+2. Busca no MongoDB os documentos com `window_started_at >= watermark` (inclusive, não estrito) - garante
+   que nenhum documento com o mesmo instante do watermark fique de fora, mesmo que uma execução anterior
+   tenha sido interrompida no meio.
+3. Processa o cursor em lotes de 1000 documentos (não carrega tudo em memória de uma vez), inserindo em
+   `stage.consumption_summary` com `ON CONFLICT (mongo_id) DO NOTHING` a cada lote - o `>=` do passo 2
+   pode reencontrar um documento já carregado, mas essa trava garante que ele nunca duplica.
 4. Executa `CALL silver.sp_load(); CALL gold.sp_load();`.
 
 Agendado via GitHub Actions (`.github/workflows/bi-etl.yml`), diariamente, mesmo padrão de cron já usado
@@ -301,6 +307,6 @@ correspondente no Mongo ainda.
 - **Redis/Neo4j**: documentados como planejados em toda a arquitetura do projeto (ver
   `DADOS/infra-bancos.md`, seção 4.2), sem código em nenhum repositório - nada a fazer aqui. Se o ranking
   Web em Redis (`ZSET`) for implementado no futuro, ele seria um cache de leitura alimentado por
-  `dw.vw_property_ranking`, não um substituto dela.
+  `dw.vw_ft_property_ranking`, não um substituto dela.
 - **Coleções MongoDB do perfil industrial** (alerta, escalonamento, relatório agendado) - fora do escopo
   deste repositório (só Postgres); pendência de modelagem pra quem cuidar do MongoDB do perfil industrial.

@@ -111,7 +111,7 @@ gold.dm_property
 gold.dm_date  
 silver.ft_consumption_daily  
 gold.ft_consumption_daily  
-dw.vw_property_ranking  
+dw.vw_ft_property_ranking  
 stage.consumption_summary (sem prefixo - espelha o nome da coleção Mongo)
 
 As demais regras deste documento (maiúsculas nos registros, inglês sem acento nos objetos, `chk_`/`uq_`/`fk_`

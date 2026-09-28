@@ -1,7 +1,7 @@
 # 💰 Pesquisa de mercado - Cenários de investimento (CAPEX)
 
 Este documento explica de onde vêm os valores de `tb_investment_scenario` (3 cenários: aeradores/registros
-economizadores, reuso de água cinza, captação de água de chuva), usados pela view `dw.vw_capex_comparison`
+economizadores, reuso de água cinza, captação de água de chuva), usados pela view `dw.vw_ft_capex_comparison`
 (camada de BI, `camada-bi.md`). Escrito porque esses números podem ser reutilizados pelo protótipo web e,
 no futuro, por um agente de IA (RAG) — por isso a fonte de cada número precisa estar clara, e não só o
 resultado final.

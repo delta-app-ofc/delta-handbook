@@ -4,27 +4,26 @@ Este documento define as roles e permissões do banco de dados relacional Postgr
 
 ## Estruturas consideradas
 
-Tabelas atualmente implementadas no schema (`script-dataload.sql` / DDL):
+Tabelas do schema `public` (cadastral/transacional, perfil residencial e comercial/industrial):
 
-- `tb_region`
-- `tb_day_of_week`
-- `tb_habit`
-- `tb_address`
-- `tb_user`
-- `tb_property`
-- `tb_user_property`
-- `tb_device`
-- `tb_region_rate`
-- `tb_user_habit`
-- `tb_user_habit_day`
-- `tb_last_water_bill`
+- `tb_region`, `tb_day_of_week`, `tb_habit`, `tb_water_usage_type`, `tb_address`, `tb_user`,
+  `tb_organization`, `tb_property`, `tb_property_classification`, `tb_property_operational_profile`,
+  `tb_property_shift`, `tb_property_water_usage`, `tb_property_operation_day`, `tb_user_property`,
+  `tb_user_organization`, `tb_device`, `tb_region_rate`, `tb_user_habit`, `tb_user_habit_day`,
+  `tb_last_water_bill`, `tb_investment_scenario`
+- Trio de auditoria (`tb_log_*`/`fn_log_*`/`trg_log_*`) para cada uma das tabelas acima - ver
+  `auditoria.md`.
 
-Estruturas **planejadas, ainda não criadas** no banco (sem `CREATE TABLE`/`CREATE VIEW` correspondente até o momento):
+Camada de BI, em schemas próprios (não em `public`) - ver `camada-bi.md`:
 
-- views analíticas
-- functions, procedures, triggers e auditoria
+- `stage` - espelho bruto da telemetria do MongoDB.
+- `silver` - dado tratado (dimensões e fatos no grão original).
+- `gold` - modelo dimensional (star schema, chave substituta).
+- `dw` - views analíticas (`vw_ft_*`, `vw_audit_history_chain`), a camada que o BI consome de fato.
 
-> Enquanto essas estruturas não existirem, as permissões abaixo (ex.: `sys_bi_analyst`) recaem sobre as tabelas normais do schema `public`, não sobre views. Assim que as views/functions forem criadas, os grants precisam ser revisados.
+`sys_bi_analyst` tem `USAGE`/`SELECT` nos schemas `gold` e `dw` (além do `public`) - é o papel pensado
+pra consumir o resultado da camada de BI. `sys_data_engineer` tem controle total sobre `stage`/`silver`/
+`gold` e leitura em `dw`, porque é quem mantém o pipeline.
 
 ---
 
@@ -33,8 +32,10 @@ Estruturas **planejadas, ainda não criadas** no banco (sem `CREATE TABLE`/`CREA
 Permissões:
 - Criação e manutenção de tabelas normalizadas
 - Definição de PKs, FKs e constraints
-- `CREATE` no schema `public` (permite criar functions, procedures, triggers e views quando forem implementadas)
+- `CREATE` no schema `public` (permite criar functions, procedures, triggers e views)
 - `ALL PRIVILEGES` em todas as tabelas e sequences do schema `public`
+- `ALL PRIVILEGES` nos schemas `stage`/`silver`/`gold` da camada de BI e `SELECT` em `dw` - é quem
+  mantém o pipeline `stage → silver → gold → dw` (`camada-bi.md`)
 - Controle estrutural do banco
 
 ---
@@ -42,7 +43,8 @@ Permissões:
 ## sys_backend_developer *(anteriormente referido como "sys_desenvolvedor_backend")*
 
 Permissões:
-- CRUD completo (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) nas 12 tabelas do sistema listadas em "Estruturas consideradas"
+- CRUD completo (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) nas tabelas cadastrais/transacionais do sistema
+  listadas individualmente em "Estruturas consideradas" (schema `public`)
 - Privilégio padrão (`ALTER DEFAULT PRIVILEGES`) garante o mesmo CRUD em tabelas futuras criadas no schema `public`
 
 ---
@@ -50,9 +52,11 @@ Permissões:
 ## sys_bi_analyst *(anteriormente referido como "sys_analista_bi")*
 
 Permissões:
-- `SELECT` em todas as tabelas do schema `public` (hoje não existem views analíticas separadas; quando forem criadas, o acesso deve ser restrito a elas)
-- `USAGE` no schema `public`
-- Sem permissão de escrita
+- `SELECT` em todas as tabelas do schema `public`
+- `USAGE` + `SELECT` nos schemas `gold` e `dw` da camada de BI (`camada-bi.md`) - é o acesso real que este
+  papel usa no dia a dia, já que o BI consome as views de `dw` e, quando precisa, o modelo dimensional de
+  `gold` diretamente
+- Sem permissão de escrita em nenhum schema
 
 ---
 

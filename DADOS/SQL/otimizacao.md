@@ -56,7 +56,55 @@ Exemplo:
 GRANDE_SP
 ```
 
-### 3. fn_get_current_region_rate()
+### 3. fn_get_property_classification()
+
+####  Descrição
+
+A função retorna o nome da categoria de classificação de um imóvel (ex.: `RESIDENCIAL_NORMAL`,
+`COMERCIAL_NORMAL_INDUSTRIAL`), para não precisar repetir o `JOIN` com `tb_property_classification` em
+toda consulta que precisa dessa informação.
+
+#### Assinatura
+
+```sql
+fn_get_property_classification(
+    p_property_id INTEGER
+)
+```
+
+#### Retorno
+
+Retorna o nome da categoria.
+
+Exemplo:
+```
+COMERCIAL_NORMAL_INDUSTRIAL
+```
+
+---
+
+### 4. fn_get_property_classification_group()
+
+####  Descrição
+
+A função retorna o grupo mais amplo de uma categoria de imóvel (`RESIDENCIAL` ou `COMERCIAL`), usado
+principalmente pelo motor de detecção de vazamento para regras que só valem pra um dos dois grupos.
+
+#### Assinatura
+
+```sql
+fn_get_property_classification_group(
+    p_property_id INTEGER
+)
+```
+
+#### Retorno
+
+Retorna o grupo da categoria (`RESIDENCIAL` ou `COMERCIAL`).
+
+---
+
+### 5. fn_get_current_region_rate()
 
 ####  Descrição
 
@@ -78,7 +126,7 @@ Retorna o valor do metro cúbico da água.
 
 ---
 
-### 4. fn_user_can_estimate()
+### 6. fn_user_can_estimate()
 
 ####  Descrição
 
@@ -171,7 +219,7 @@ A procedure executa:
 
 ---
 
-### 2. sp_disable_user()
+### 3. sp_disable_user()
 
 ####  Descrição
 
@@ -198,6 +246,31 @@ A procedure executa:
 
 ---
 
+### 4. sp_update_property_classification()
+
+####  Descrição
+
+A procedure atualiza a categoria de classificação de um imóvel já cadastrado (ex.: de
+`RESIDENCIAL_NORMAL` pra `RESIDENCIAL_SOCIAL`). A mudança fica registrada automaticamente pelo trigger de
+auditoria da tabela `tb_property` (`trg_log_property`), sem precisar de lógica extra aqui.
+
+#### Assinatura
+
+```sql
+sp_update_property_classification(
+    p_property_id INTEGER,
+    p_classification VARCHAR(50)
+)
+```
+#### Funcionamento
+A procedure executa:
+
+* verificação se o imóvel existe;
+* resolução do nome da categoria informada pro `id` correspondente em `tb_property_classification`;
+* atualização de `tb_property.classification_id`.
+
+---
+
 ### Resumo
 #### Functions Implementadas
 
@@ -205,6 +278,8 @@ A procedure executa:
 |---|---|---|
 | `fn_user_is_active()` | Function | Verifica se um usuário está ativo antes da execução de operações do sistema. |
 | `fn_get_property_region()` | Function | Retorna a região associada a uma propriedade através do relacionamento entre imóvel, endereço e região. |
+| `fn_get_property_classification()` | Function | Retorna o nome da categoria de classificação de um imóvel. |
+| `fn_get_property_classification_group()` | Function | Retorna o grupo (RESIDENCIAL/COMERCIAL) da categoria de um imóvel. |
 | `fn_get_current_region_rate()` | Function | Consulta a tarifa de água vigente de uma região e categoria de imóvel considerando o período de validade cadastrado. |
 | `fn_user_can_estimate()` | Function | Verifica se um usuário possui todos os requisitos necessários para geração de estimativas de consumo. |
 
@@ -217,5 +292,6 @@ A procedure executa:
 | `sp_change_region_rate()` | Procedure | Atualiza tarifas de uma região e categoria de imóvel mantendo o histórico de valores e controle de vigência. |
 | `sp_register_property()` | Procedure | Realiza o cadastro de uma propriedade e cria automaticamente o vínculo com o usuário responsável. |
 | `sp_disable_user()` | Procedure | Desativa usuários e seus dispositivos relacionados mantendo os dados históricos. |
+| `sp_update_property_classification()` | Procedure | Atualiza a categoria de classificação de um imóvel já cadastrado. |
 
 ---

@@ -40,6 +40,14 @@ Exemplo:
 | tb_user_habit | tb_log_user_habit |
 | tb_user_habit_day | tb_log_user_habit_day |
 | tb_last_water_bill | tb_log_last_water_bill |
+| tb_organization | tb_log_organization |
+| tb_user_organization | tb_log_user_organization |
+| tb_property_operational_profile | tb_log_property_operational_profile |
+| tb_property_shift | tb_log_property_shift |
+| tb_water_usage_type | tb_log_water_usage_type |
+| tb_property_water_usage | tb_log_property_water_usage |
+| tb_property_operation_day | tb_log_property_operation_day |
+| tb_investment_scenario | tb_log_investment_scenario |
 
 O processo de auditoria funciona através da integração entre tabelas, triggers e functions.
 

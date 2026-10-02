@@ -70,6 +70,10 @@ Armazena os usuários do sistema.
 - **is_active**: Indica se o usuário está ativo.
 - **is_admin**: Indica se o usuário é administrador.
 - **is_manager**: Indica se o usuário é gerente, para a versão comercial.
+  - ⚠️ Coluna antiga, nunca lida por nenhuma function/procedure. Desde a extensão comercial/industrial
+    (seção 12), o vínculo pessoa-organização passou a ser modelado de verdade por `tb_user_organization`,
+    que bate 1:1 com `is_manager` nos dados de teste atuais. As duas colunas descrevem o mesmo fato hoje;
+    unificação registrada como pendência, ainda não implementada.
 
 ---
 
@@ -84,6 +88,11 @@ Representa os imóveis cadastrados no sistema.
 - **classification_id (FK)**: Referência para `tb_property_classification`.
 - **address_id (FK)**: Referência para `tb_address`.
 - **registration_date**: Data de cadastro.
+- **organization_id (FK, opcional)**: Referência para `tb_organization` (seção 12). `NULL` = imóvel
+  residencial de pessoa física (comportamento original, preservado); preenchido = unidade de uma
+  organização (perfil comercial/industrial).
+- **built_area_m2 (opcional)**: Área construída em m², usada para ranking de eficiência (litros/m²) na
+  camada de BI (`camada-bi.md`).
 
 ---
 
@@ -98,7 +107,7 @@ imóveis comerciais).
 ### 📌 Atributos
 - **id (PK)**: Identificador da categoria.
 - **name**: Nome da categoria (único).
-  - Valores: `RESIDENCIAL_NORMAL`, `RESIDENCIAL_SOCIAL`, `RESIDENCIAL_FAVELA`, `RESIDENCIAL_ESPECIAL`, `COMERCIAL_NORMAL_INDUSTRIAL`, `COMERCIAL_ESPECIAL`, `COMERCIAL_ENTIDADE_ASSISTENCIA_SOCIAL`, `PUBLICA_COM_CONTRATO`
+  - Valores permitidos: `RESIDENCIAL_NORMAL`, `RESIDENCIAL_SOCIAL`, `RESIDENCIAL_FAVELA`, `RESIDENCIAL_ESPECIAL`, `COMERCIAL_NORMAL_INDUSTRIAL`, `COMERCIAL_ESPECIAL`, `COMERCIAL_ENTIDADE_ASSISTENCIA_SOCIAL`, `PUBLICA_COM_CONTRATO`
 - **group_name**: Grupo da categoria.
   - Valores permitidos: `RESIDENCIAL`, `COMERCIAL`
 
@@ -170,10 +179,126 @@ Define em quais dias da semana cada hábito ocorre.
 ### 📌 Atributos
 - **id (PK)**: Identificador.
 - **user_habit_id (FK)**: Referência para `tb_user_habit`.
+- **day_of_week_id (FK)**: Referência para `tb_day_of_week`.
 
 ---
 
-## 🗄️ 12. Tabela: `tb_backup_restore_log`
+## 🏭 12. Extensão comercial/industrial
+
+Tabelas adicionadas para o perfil comercial/industrial (unidades operadas por uma organização, não por
+pessoa física direto). Não existe diferenciação de papel/hierarquia dentro da organização (gestor,
+supervisor etc.) — decisão de escopo, não lacuna. Detalhamento completo de origem, grão e uso na camada de
+BI em `camada-bi.md`.
+
+### 🏢 12.1. Tabela: `tb_organization`
+
+Empresa dona de uma ou mais unidades (`tb_property.organization_id`).
+
+#### 📌 Atributos
+- **id (PK)**: Identificador da organização.
+- **corporate_name**: Razão social.
+- **trade_name**: Nome fantasia.
+- **cnpj**: CNPJ (14 dígitos, único).
+- **business_segment**: Segmento do negócio.
+  - Valores permitidos: `VAREJO`, `INDUSTRIA`, `CONDOMINIO`, `FACILITIES`
+- **declared_unit_count**: Quantidade de unidades declarada no cadastro (opcional).
+- **registration_date**: Data de cadastro.
+
+---
+
+### 🔗 12.2. Tabela: `tb_user_organization`
+
+Relacionamento N:N entre usuários e organizações — mesmo padrão de `tb_user_property`, sem papel/
+hierarquia.
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do relacionamento.
+- **user_id (FK)**: Referência para `tb_user`.
+- **organization_id (FK)**: Referência para `tb_organization`.
+- **association_date**: Data de vinculação.
+
+---
+
+### ⚙️ 12.3. Tabela: `tb_property_operational_profile`
+
+Dados operacionais extras que só existem quando o cadastro industrial da unidade está completo — por isso
+é uma extensão 1:1 de `tb_property` (chave primária igual à chave estrangeira), não uma tabela com `id`
+próprio. Nem toda `tb_property` tem uma linha aqui.
+
+#### 📌 Atributos
+- **property_id (PK, FK)**: Referência para `tb_property`. Mesma coluna serve como chave primária e
+  estrangeira (extensão 1:1).
+- **main_water_source**: Fonte principal de água da unidade.
+  - Valores permitidos: `CONCESSIONARIA`, `POCO_ARTESIANO`, `CISTERNA`, `REUSO`
+
+---
+
+### ⏰ 12.4. Tabela: `tb_property_shift`
+
+Turnos de funcionamento reais da unidade (podem ser vários por propriedade).
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do turno.
+- **property_id (FK)**: Referência para `tb_property`.
+- **start_time**: Horário de início.
+- **end_time**: Horário de término (deve ser depois do início).
+
+---
+
+### 🚿 12.5. Tabela: `tb_water_usage_type`
+
+Tipos de uso da água na operação industrial (lookup).
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do tipo.
+- **name**: Nome do tipo (único).
+  - Valores permitidos: `LIMPEZA`, `CONSUMO_HUMANO`, `PROCESSO_PRODUTIVO`, `IRRIGACAO`
+- **description**: Descrição opcional.
+
+---
+
+### 🔗 12.6. Tabela: `tb_property_water_usage`
+
+Relacionamento N:N entre propriedades e tipos de uso da água.
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do relacionamento.
+- **property_id (FK)**: Referência para `tb_property`.
+- **water_usage_type_id (FK)**: Referência para `tb_water_usage_type`.
+
+---
+
+### 📆 12.7. Tabela: `tb_property_operation_day`
+
+Dias da semana em que a unidade opera — reaproveita `tb_day_of_week`, já existente.
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do relacionamento.
+- **property_id (FK)**: Referência para `tb_property`.
+- **day_of_week_id (FK)**: Referência para `tb_day_of_week`.
+
+---
+
+### 💰 12.8. Tabela: `tb_investment_scenario`
+
+Cenário de investimento (CAPEX) — reforma hidráulica, reuso de água cinza, captação de chuva. Dado de
+referência estático, não depende de telemetria. Valores pesquisados (mercado brasileiro, contexto
+industrial/comercial), não fictícios.
+
+#### 📌 Atributos
+- **id (PK)**: Identificador do cenário.
+- **organization_id (FK, opcional)**: Referência para `tb_organization`. `NULL` = cenário genérico, não
+  ligado a uma empresa específica.
+- **name**: Nome do cenário.
+- **investment_value**: Valor do investimento (≥ 0).
+- **reduction_pct**: Percentual de redução de consumo esperado (0-100).
+- **annual_savings_value**: Economia anual esperada (≥ 0).
+- **payback_months**: Prazo de retorno em meses (opcional, ≥ 0).
+- **description**: Descrição opcional.
+
+---
+
+## 🗄️ 13. Tabela: `tb_backup_restore_log`
 
 Registra cada execução do teste de restauração de backup, uma linha por
 tabela verificada — ver `backup-recuperacao.md` para o procedimento.
@@ -190,7 +315,7 @@ tabela verificada — ver `backup-recuperacao.md` para o procedimento.
 
 ---
 
-## 🧾 13. Tabela: `tb_last_water_bill`
+## 🧾 14. Tabela: `tb_last_water_bill`
 
 Guarda a última conta de água conhecida de cada usuário, usada nas
 estimativas de gasto do app.
@@ -204,7 +329,7 @@ estimativas de gasto do app.
 
 ---
 
-## 🤖 14. Tabela: `tb_log_rpa`
+## 🤖 15. Tabela: `tb_log_rpa`
 
 Registra cada execução do RPA que migra dado do banco legado (Primeiro
 Ano) para este banco.
@@ -222,7 +347,7 @@ Ano) para este banco.
 
 ---
 
-## 📚 15. Tabela: `tb_data_catalog`
+## 📚 16. Tabela: `tb_data_catalog`
 
 Catálogo técnico de metadados do schema — uma linha por coluna de cada
 tabela funcional, usado pra governança de dados (classificação de
@@ -237,4 +362,3 @@ espelhos automáticos das tabelas principais.
 - **description**: Descrição da coluna.
 - **business_rule**: Regra de negócio associada à coluna, quando houver.
 - **access_level**: Classificação de sensibilidade — `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL` (este último para PII/LGPD, ex. e-mail, telefone, senha, data de nascimento).
-- **day_of_week_id (FK)**: Referência para `tb_day_of_week`.

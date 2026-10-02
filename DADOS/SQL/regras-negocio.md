@@ -94,3 +94,27 @@ Todas as roles seguem o prefixo: sys_
 sys_devops  
 sys_analyst  
 ---
+
+## 4.6 📊 Prefixos da camada de BI (Data Mart)
+
+Objetos dos schemas `silver`, `gold` e `dw` (modelagem dimensional / star schema) seguem prefixos próprios,
+diferentes das tabelas operacionais do schema `public`. `stage` é exceção: os nomes lá espelham exatamente
+o nome da coleção/documento de origem (hoje, do MongoDB), sem prefixo `dm_`/`ft_`.
+
+- `dm_` → tabela de dimensão, nos schemas `silver` e `gold`
+- `ft_` → tabela de fato, nos schemas `silver` e `gold`
+- `vw_` → view analítica, no schema `dw`
+
+✔ Exemplos:
+silver.dm_property  
+gold.dm_property  
+gold.dm_date  
+silver.ft_consumption_daily  
+gold.ft_consumption_daily  
+dw.vw_ft_property_ranking  
+stage.consumption_summary (sem prefixo - espelha o nome da coleção Mongo)
+
+As demais regras deste documento (maiúsculas nos registros, inglês sem acento nos objetos, `chk_`/`uq_`/`fk_`
+nas constraints) valem normalmente para os objetos da camada de BI. Detalhamento completo da arquitetura em
+`camada-bi.md`.
+---

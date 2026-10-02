@@ -56,7 +56,55 @@ Exemplo:
 GRANDE_SP
 ```
 
-### 3. fn_get_current_region_rate()
+### 3. fn_get_property_classification()
+
+####  Descrição
+
+A função retorna o nome da categoria de classificação de um imóvel (ex.: `RESIDENCIAL_NORMAL`,
+`COMERCIAL_NORMAL_INDUSTRIAL`), para não precisar repetir o `JOIN` com `tb_property_classification` em
+toda consulta que precisa dessa informação.
+
+#### Assinatura
+
+```sql
+fn_get_property_classification(
+    p_property_id INTEGER
+)
+```
+
+#### Retorno
+
+Retorna o nome da categoria.
+
+Exemplo:
+```
+COMERCIAL_NORMAL_INDUSTRIAL
+```
+
+---
+
+### 4. fn_get_property_classification_group()
+
+####  Descrição
+
+A função retorna o grupo mais amplo de uma categoria de imóvel (`RESIDENCIAL` ou `COMERCIAL`), usado
+principalmente pelo motor de detecção de vazamento para regras que só valem pra um dos dois grupos.
+
+#### Assinatura
+
+```sql
+fn_get_property_classification_group(
+    p_property_id INTEGER
+)
+```
+
+#### Retorno
+
+Retorna o grupo da categoria (`RESIDENCIAL` ou `COMERCIAL`).
+
+---
+
+### 5. fn_get_current_region_rate()
 
 ####  Descrição
 
@@ -78,7 +126,7 @@ Retorna o valor do metro cúbico da água.
 
 ---
 
-### 4. fn_user_can_estimate()
+### 6. fn_user_can_estimate()
 
 ####  Descrição
 
@@ -109,7 +157,7 @@ fn_user_can_estimate(
 
 ## Functions organizacionais
 
-As functions de 5 a 11 dão suporte ao perfil organizacional (usuário vinculado a uma empresa via
+As functions de 7 a 13 dão suporte ao perfil organizacional (usuário vinculado a uma empresa via
 `tb_user_organization`, em vez de dono de imóvel residencial via `tb_user_property`). Elas existem porque
 o `delta-artificial-intelligence` (Agente de Previsão) fazia essa resolução em várias consultas SQL
 separadas, uma conexão por consulta; mover a lógica pra cá reduz isso a chamadas prontas, no mesmo papel
@@ -118,7 +166,7 @@ comportamento residencial não foi alterado por nenhuma delas.
 
 ---
 
-### 5. fn_user_access_kind()
+### 7. fn_user_access_kind()
 
 #### Descrição
 
@@ -142,7 +190,7 @@ fn_user_access_kind(
 
 ---
 
-### 6. fn_user_organization_properties()
+### 8. fn_user_organization_properties()
 
 #### Descrição
 
@@ -164,7 +212,7 @@ Tabela com `property_id`, `name`, `city`, `state` — uma linha por propriedade.
 
 ---
 
-### 7. fn_organization_can_estimate()
+### 9. fn_organization_can_estimate()
 
 #### Descrição
 
@@ -187,7 +235,7 @@ fn_organization_can_estimate(
 
 ---
 
-### 8. fn_organization_consumption_history()
+### 10. fn_organization_consumption_history()
 
 #### Descrição
 
@@ -210,7 +258,7 @@ Tabela com `full_date`, `total_liters` — uma linha por dia com consumo agregad
 
 ---
 
-### 9. fn_organization_last_billed_period()
+### 11. fn_organization_last_billed_period()
 
 #### Descrição
 
@@ -234,7 +282,7 @@ tiverem telemetria alguma.
 
 ---
 
-### 10. fn_organization_effective_rate()
+### 12. fn_organization_effective_rate()
 
 #### Descrição
 
@@ -258,7 +306,7 @@ Valor da tarifa efetiva em R$/m³, ou `NULL` quando não há consumo na janela i
 
 ---
 
-### 11. fn_organization_forecast_context()
+### 13. fn_organization_forecast_context()
 
 #### Descrição
 
@@ -345,11 +393,12 @@ Além de criar o imóvel, ela também realiza automaticamente o vínculo entre u
 
 ```sql
 sp_register_property(
-    p_user_id INTEGER,
-    p_name VARCHAR(100),
-    p_type VARCHAR(20),
-    p_classification VARCHAR(20),
-    p_address_id INTEGER
+    IN p_user_id INTEGER,
+    IN p_name VARCHAR(100),
+    IN p_type VARCHAR(20),
+    IN p_classification VARCHAR(50),
+    IN p_address_id INTEGER,
+    OUT v_property_id INTEGER
 )
 ```
 #### Funcionamento
@@ -362,9 +411,13 @@ A procedure executa:
 * obtenção do id gerado;
 * criação do relacionamento entre usuário e propriedade;
 
+#### Retorno
+
+`v_property_id` — o `id` da propriedade recém-criada, via parâmetro `OUT`.
+
 ---
 
-### 2. sp_disable_user()
+### 3. sp_disable_user()
 
 ####  Descrição
 
@@ -391,6 +444,31 @@ A procedure executa:
 
 ---
 
+### 4. sp_update_property_classification()
+
+####  Descrição
+
+A procedure atualiza a categoria de classificação de um imóvel já cadastrado (ex.: de
+`RESIDENCIAL_NORMAL` pra `RESIDENCIAL_SOCIAL`). A mudança fica registrada automaticamente pelo trigger de
+auditoria da tabela `tb_property` (`trg_log_property`), sem precisar de lógica extra aqui.
+
+#### Assinatura
+
+```sql
+sp_update_property_classification(
+    p_property_id INTEGER,
+    p_classification VARCHAR(50)
+)
+```
+#### Funcionamento
+A procedure executa:
+
+* verificação se o imóvel existe;
+* resolução do nome da categoria informada pro `id` correspondente em `tb_property_classification`;
+* atualização de `tb_property.classification_id`.
+
+---
+
 ### Resumo
 #### Functions Implementadas
 
@@ -398,6 +476,8 @@ A procedure executa:
 |---|---|---|
 | `fn_user_is_active()` | Function | Verifica se um usuário está ativo antes da execução de operações do sistema. |
 | `fn_get_property_region()` | Function | Retorna a região associada a uma propriedade através do relacionamento entre imóvel, endereço e região. |
+| `fn_get_property_classification()` | Function | Retorna o nome da categoria de classificação de um imóvel. |
+| `fn_get_property_classification_group()` | Function | Retorna o grupo (RESIDENCIAL/COMERCIAL) da categoria de um imóvel. |
 | `fn_get_current_region_rate()` | Function | Consulta a tarifa de água vigente de uma região e categoria de imóvel considerando o período de validade cadastrado. |
 | `fn_user_can_estimate()` | Function | Verifica se um usuário possui todos os requisitos necessários para geração de estimativas de consumo. |
 | `fn_user_access_kind()` | Function | Resolve se o usuário é residencial, organizacional ou nenhum dos dois. |
@@ -417,5 +497,6 @@ A procedure executa:
 | `sp_change_region_rate()` | Procedure | Atualiza tarifas de uma região e categoria de imóvel mantendo o histórico de valores e controle de vigência. |
 | `sp_register_property()` | Procedure | Realiza o cadastro de uma propriedade e cria automaticamente o vínculo com o usuário responsável. |
 | `sp_disable_user()` | Procedure | Desativa usuários e seus dispositivos relacionados mantendo os dados históricos. |
+| `sp_update_property_classification()` | Procedure | Atualiza a categoria de classificação de um imóvel já cadastrado. |
 
 ---

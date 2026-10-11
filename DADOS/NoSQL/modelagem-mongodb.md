@@ -34,8 +34,8 @@ A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separa
 
 | Database             | Conteúdo                                                               | Padrão de carga                                            |
 |----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
-| `db_delta_telemetry` | `pulses_raw`, `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
-| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback` | Leitura predominante, escrita esporádica (ação do usuário) |
+| `db_delta_telemetry` | `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback`, `weather_daily` | Leitura predominante, escrita esporádica (ação do usuário) |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
 > de acesso: a credencial que a API usa para ingestão de telemetria não precisa (e não deve) ter acesso ao
@@ -45,53 +45,15 @@ A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separa
 
 ## 3. Database: `db_delta_telemetry`
 
-### 3.1. `pulses_raw`
+### 3.1. `consumption_summary`
 
-Recebe o payload bruto enviado pelo dispositivo a cada janela de 5 (ou 10) minutos, incluindo o array
-detalhado de pulsos captados pelo sensor.
-
-| Campo                    | Tipo             | Obrigatório | Descrição                                        |
-|--------------------------|------------------|-------------|--------------------------------------------------|
-| `_id`                    | ObjectId         | Sim         | Identificador do documento                       |
-| `device_id`              | string           | Sim         | Identificador do dispositivo (ESP32/Arduino)     |
-| `sent_at`                | timestamp        | Sim         | Momento do envio do pacote                       |
-| `window_minutes`         | int              | Não         | Duração da janela de acumulação                  |
-| `total_pulses`           | int              | Não         | Total de pulsos detectados na janela             |
-| `pulses[]`               | array de objetos | Não         | Histórico detalhado de cada pulso                |
-| `pulses[].pulsed_at`     | timestamp        | Sim         | Horário estimado do pulso                        |
-| `pulses[].ms_since_boot` | long             | Sim         | `millis()` do dispositivo no momento do pulso    |
-| `pulses[].delta_ms`      | int              | Sim         | Intervalo desde o pulso anterior na mesma janela |
-
-```json
-{
-  "_id": { "$oid": "60c72b2f9b1d8b2bad723a11" },
-  "device_id": "ESP32-SP-0912",
-  "sent_at": "2026-07-17T17:10:00Z",
-  "window_minutes": 5,
-  "total_pulses": 3,
-  "pulses": [
-    { "pulsed_at": "2026-07-17T17:05:12Z", "ms_since_boot": 3452210, "delta_ms": 0 },
-    { "pulsed_at": "2026-07-17T17:05:14Z", "ms_since_boot": 3453210, "delta_ms": 1000 },
-    { "pulsed_at": "2026-07-17T17:06:45Z", "ms_since_boot": 3545210, "delta_ms": 92000 }
-  ]
-}
-```
-
-> ⚠️ **Coleção volátil por design.** `pulses_raw` existe apenas para alimentar a IA em tempo (quase) real e
-> servir de janela de auditoria/debug de curto prazo. Ela **não é o repositório de auditoria de longo prazo**
-> — esse papel é do armazenamento frio (AWS S3 / Delta Lake), lido periodicamente pelo Databricks. Ver
-> seção 5 para o índice TTL que expira esses documentos automaticamente.
-
-### 3.2. `consumption_summary`
-
-Documento consolidado e leve, gerado pelo back-end após o processamento do `pulses_raw` pela IA. É a
-fonte de dados que o aplicativo consulta para montar gráficos de consumo.
+Documento consolidado e leve, calculado pelo hardware e enviado diretamente para `consumption_summary`. A API associa o usuário e persiste a janela; a detecção de anomalias consome os resumos depois da ingestão. É a fonte dos gráficos e do histórico de consumo do aplicativo.
 
 | Campo                | Tipo      | Obrigatório | Descrição                             |
 |----------------------|-----------|-------------|---------------------------------------|
 | `_id`                | ObjectId  | Sim         | Identificador do documento            |
 | `device_id`          | string    | Sim         | Dispositivo de origem                 |
-| `user_id`            | string    | Não         | Usuário dono do dispositivo           |
+| `user_id` | int | Sim | Usuário dono do dispositivo (referência ao PostgreSQL) |
 | `window_started_at`  | timestamp | Sim         | Início da janela resumida             |
 | `window_finished_at` | timestamp | Sim         | Fim da janela resumida                |
 | `consumption_liters` | double    | Sim         | Volume total consumido na janela      |
@@ -102,7 +64,7 @@ fonte de dados que o aplicativo consulta para montar gráficos de consumo.
 {
   "_id": { "$oid": "60c72b2f9b1d8b2bad723a12" },
   "device_id": "ESP32-SP-0912",
-  "user_id": "60c72b2f9b1d8b2bad723456",
+  "user_id": 212,
   "window_started_at": "2026-07-17T17:05:00Z",
   "window_finished_at": "2026-07-17T17:10:00Z",
   "consumption_liters": 14.4,
@@ -123,7 +85,7 @@ fonte de dados que o aplicativo consulta para montar gráficos de consumo.
 Esta é a coleção **permanente** do banco de telemetria: não tem TTL e é ela quem sustenta o histórico do
 app e a exportação diária para as tabelas de dashboard no PostgreSQL.
 
-### 3.3. `device_status`
+### 3.2. `device_status`
 
 Documento único por dispositivo (padrão *upsert*), atualizado a cada ping. Alimenta o painel administrativo
 de saúde do hardware.
@@ -281,12 +243,82 @@ referência lógica, não uma *foreign key* imposta pelo banco.
 
 ---
 
+### 4.5. `weather_daily`
+
+Histórico meteorológico permanente em `db_delta_app`: um documento agrupa até 24 observações horárias por localização e dia. Não há TTL.
+
+#### Campos do schema atual
+
+| Campo | Tipo BSON | Obrigatório | Regra |
+| --- | --- | --- | --- |
+| `_id` | objectId | Gerado pelo MongoDB | Identificador |
+| `location` | object | Sim | Exige `city`, `state` e `country`, todos string |
+| `weather_date` | date | Não | Data de referência normalizada para o início do dia |
+| `hours` | array de objetos | Sim | No máximo 24 itens; pode estar vazio |
+| `samples` | int | Sim | Entre 0 e 24 |
+| `created_at` | date | Sim | Criação do documento |
+| `updated_at` | date | Não | Última atualização |
+
+Todos os campos abaixo são obrigatórios em cada item de `hours`:
+
+| Campo | Tipo BSON | Regra |
+| --- | --- | --- |
+| `hour` | int | De 0 a 23 |
+| `observed_at` | date | Momento da observação |
+| `temperature_c` | double, int, long ou decimal | Temperatura em °C |
+| `feels_like_c` | double, int, long ou decimal | Sensação térmica em °C |
+| `humidity_percent` | int, long, double ou decimal | De 0 a 100 |
+| `rain_mm` | double, int, long ou decimal | Maior ou igual a zero |
+| `wind_speed_mps` | double, int, long ou decimal | Vento em m/s, maior ou igual a zero |
+| `condition` | string | Sem enum definido no validator |
+
+`date`, `wind_speed_m_s`, `wind_gust_m_s`, pressão, direção do vento e códigos meteorológicos não fazem parte dos campos definidos no schema atual. O validator não declara `additionalProperties: false`, portanto campos extras não são automaticamente rejeitados.
+
+O produtor deve manter `samples == hours.length`, evitar horas repetidas e alinhar `observed_at` ao dia de referência. Essas relações não são verificadas pelo `$jsonSchema` atual. O schema também não exige `weather_date` nem um mínimo de observações.
+
+#### Exemplo para mongosh
+
+```javascript
+db.weather_daily.insertOne({
+  location: { city: "São Paulo", state: "SP", country: "BR" },
+  weather_date: ISODate("2026-09-27T00:00:00Z"),
+  hours: [{
+    hour: NumberInt(0),
+    observed_at: ISODate("2026-09-27T00:00:00Z"),
+    temperature_c: 18.2,
+    feels_like_c: 18.0,
+    humidity_percent: NumberInt(82),
+    rain_mm: 0.0,
+    wind_speed_mps: 2.1,
+    condition: "Clouds"
+  }],
+  samples: NumberInt(1),
+  created_at: ISODate("2026-09-27T00:01:00Z")
+});
+
+db.weather_daily.find({
+  "location.country": "BR",
+  "location.state": "SP",
+  "location.city": "São Paulo",
+  weather_date: {
+    $gte: ISODate("2026-09-01T00:00:00Z"),
+    $lt: ISODate("2026-10-01T00:00:00Z")
+  }
+}).sort({ weather_date: -1 });
+```
+
+#### Índice: divergência pendente
+
+O script de índices ainda cria `idx_location_date_unique`, único, sobre `{ "location.country": 1, "location.state": 1, "location.city": 1, date: -1 }`. O schema e o seed usam `weather_date`. Portanto, o índice atual não garante unicidade por `weather_date`: documentos sem `date` para a mesma localização podem colidir no índice mesmo em dias diferentes.
+
+A intenção é garantir um documento por localização e dia, mas isso depende de alinhar o índice a `weather_date`. Esta atualização é documental e não modifica o script nem os índices de um banco existente.
+
+---
+
 ## 5. Índices e Configurações de Coleção
 
 | Coleção               | Índice                                  | Tipo                                    | Justificativa                                                                                                                                                                                                                                                                        |
 |-----------------------|-----------------------------------------|-----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `pulses_raw`          | `{ sent_at: 1 }`                        | **TTL** (`expireAfterSeconds: 604800`)  | Expira o dado bruto após 7 dias. Contém o volume mais pesado de escrita do sistema; sem expiração automática, estoura o limite do cluster gratuito (M0/512 MB) em pouco tempo. A auditoria de longo prazo é responsabilidade do armazenamento frio (S3/Delta Lake), não deste banco. |
-| `pulses_raw`          | `{ device_id: 1, sent_at: -1 }`         | Composto                                | Suporta consultas de debug/reprocessamento por dispositivo dentro da janela de 7 dias em que o dado ainda existe.                                                                                                                                                                    |
 | `consumption_summary` | `{ user_id: 1, window_started_at: -1 }` | Composto                                | Este é o índice mais crítico do database de telemetria: sustenta a leitura do histórico/gráfico de consumo do usuário no app, sempre ordenado por tempo.                                                                                                                             |
 | `consumption_summary` | `{ device_id: 1 }`                      | Simples                                 | Consultas administrativas e de suporte por dispositivo, independente do usuário.                                                                                                                                                                                                     |
 | `device_status`       | `{ device_id: 1 }`                      | **Único**                               | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas.                                                                                          |
@@ -306,11 +338,8 @@ A separação entre `db_delta_telemetry` e `db_delta_app` isola dois perfis de c
 diferentes — escrita massiva e constante vs. leitura esporádica orientada a usuário — e permite aplicar
 *custom roles* distintas por database, reduzindo a superfície de ataque caso uma credencial vaze.
 
-**Por que `pulses_raw` e `consumption_summary` não têm relação de chave (PK/FK)?**
-Foi uma decisão deliberada, não uma omissão. `pulses_raw` tem TTL de 7 dias; se `consumption_summary`
-referenciasse o `_id` de um pulso bruto, esse ponteiro ficaria órfão assim que o TTL expirasse. A "chave" real
-entre as duas coleções é temporal: `device_id` + intervalo de tempo (`window_started_at`/`window_finished_at`),
-que é também como o Databricks/Spark consulta o armazenamento frio para fins de auditoria.
+**Por que o hardware envia resumos de consumo?**
+O hardware consolida as medições antes do envio, reduzindo o volume de dados. O MongoDB recebe diretamente as janelas em `consumption_summary`, com retenção permanente e sem coleção intermediária de pulsos ou TTL de sete dias.
 
 **Por que `chat_sessions` embute as mensagens em vez de uma coleção `chat_messages` separada?**
 Uma coleção com um documento por mensagem cresceria rápido demais e exigiria uma consulta com
@@ -328,4 +357,6 @@ pequena, mas que evita tratamento especial nessa única coleção.
 
 ## 7. Diagrama de Referência
 
-![Modelagem Delta](modelagem-delta.png)
+Fluxo atual de telemetria: **hardware → resumo da janela → API → `consumption_summary` → consultas do app e detecção de anomalias**. `device_status` mantém o estado atual do dispositivo.
+
+O antigo arquivo `modelagem-delta.png` é uma referência histórica e não representa o contrato atual; consulte as tabelas deste documento.

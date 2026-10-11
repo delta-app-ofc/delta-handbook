@@ -50,7 +50,8 @@ dispensando o uso de prefixos como tb_, já que o contexto de documento é impl�
 
 ✔ Exemplos:
 
-pulses_raw
+device_status
+weather_daily
 consumption_summary
 client_preferences
 chat_sessions
@@ -104,8 +105,7 @@ idx_client_preferences_user_id_uq
 - Formato:
     ttl_<collection>_<campo_data>
 
-✔ Exemplos:
-ttl_pulses_raw_sent_at
+Essa convenção só se aplica quando uma retenção temporária for definida. Os scripts atuais de telemetria e de `weather_daily` não criam índices TTL: os resumos de consumo e o histórico climático são permanentes.
 
 ---
 
@@ -117,3 +117,9 @@ role_devops
 role_bi_analyst  
 
 ---
+
+## 6. Contratos de telemetria e clima
+
+O hardware consolida o consumo e envia diretamente para `consumption_summary`. Não existe armazenamento intermediário de pulsos no modelo atual. Os campos e tipos estão em [Modelagem MongoDB](modelagem-mongodb.md).
+
+`weather_daily` agrupa até 24 observações por dia e localização, usa `weather_date` e `wind_speed_mps`, e mantém `samples` entre 0 e 24. O produtor mantém a contagem consistente com `hours`. O índice ainda usa `date`; a divergência e seus efeitos estão documentados na modelagem.

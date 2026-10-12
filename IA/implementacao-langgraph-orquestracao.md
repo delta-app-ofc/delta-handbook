@@ -6,7 +6,7 @@ Implementar o fluxo de orquestração multiagente usando **LangGraph** — uma b
 
 ## Contexto
 
-Antes do LangGraph, cada requisição ia diretamente para um agente fixo. Com o LangGraph, o sistema decide dinamicamente qual(is) agente(s) deve(m) responder com base na intenção detectada na pergunta. Uma pergunta sobre hábitos vai para o HabitsAgent; uma análise cruzada de consumo + vazamento vai para dois agentes ao mesmo tempo.
+Antes do LangGraph, cada requisição ia diretamente para um agente fixo. Com o LangGraph, o sistema decide dinamicamente qual(is) agente(s) deve(m) responder com base na intenção detectada na pergunta. Uma pergunta sobre hábitos vai para o HabitsAgent; uma análise cruzada de consumo + vazamento vai para dois agentes — executados em sequência dentro do nó `execute`.
 
 ---
 
@@ -96,16 +96,23 @@ Usa `llm_rapido` para classificar a intenção e escolher os agentes. O modelo r
 
 ### Parsing robusto do JSON
 
-O LLM pode retornar texto antes ou depois do JSON. O parser tenta carregar o texto completo e, se falhar, extrai o primeiro `{...}` encontrado:
+O LLM pode retornar texto antes ou depois do JSON. O parser tenta carregar o texto completo e, se falhar, extrai o primeiro objeto `{...}` encontrado usando `find`/`index` para localizar abertura e fechamento correspondentes:
 
 ```python
 try:
     data = json.loads(content)
 except json.JSONDecodeError:
     start = content.find("{")
-    end = content.rfind("}") + 1
-    data = json.loads(content[start:end]) if start >= 0 and end > start else {}
+    # usa find do fechamento a partir do início para pegar o primeiro objeto,
+    # evitando incluir chaves de texto externo ao JSON
+    end = content.index("}", start) + 1 if start >= 0 else -1
+    try:
+        data = json.loads(content[start:end]) if start >= 0 else {}
+    except (json.JSONDecodeError, ValueError):
+        data = {}
 ```
+
+> **Limitação**: objetos JSON aninhados (ex.: `{"agents": ["habits"]}`) requerem rastreamento de profundidade para encontrar o `}` correto. O parser acima funciona para o contrato de roteamento, que não tem objetos aninhados.
 
 ### Registro de agentes
 
@@ -127,18 +134,22 @@ Itera sobre os agentes selecionados, instancia cada um com `load_agent` e execut
 
 ```python
 for name in selected:
-    agent = load_agent(name, user_id)  # importação dinâmica via AGENT_REGISTRY
-    internal = agent.run(question)
-    output = AgentOutput(
-        agent=name,
-        status="success",
-        answer=internal.response,
-        chart_data=internal.chart_data,
-    )
+    try:
+        agent = load_agent(name, user_id)  # importação dinâmica via AGENT_REGISTRY
+        internal = agent.run(question)
+        output = AgentOutput(
+            agent=name,
+            status="success",
+            answer=internal.response,
+            chart_data=internal.chart_data,
+        )
+    except Exception as exc:
+        output = AgentOutput(agent=name, status="error", answer="", warnings=[str(exc)])
+        state["warnings"].append(f"{name}: {exc}")
     results.append(output.model_dump())
 ```
 
-Erros em um agente não derrubam os outros — o nó registra o erro em `warnings` e continua.
+Erros em um agente não derrubam os outros — o nó captura a exceção, registra em `warnings` e continua para o próximo agente da lista.
 
 ---
 
@@ -174,13 +185,16 @@ def run_workflow(user_id: int, session_id: str, question: str) -> GraphState:
         "response": "",
         ...
     }
+    # thread_id inclui user_id para evitar colisão entre usuários diferentes
+    # que possam enviar o mesmo session_id (ex.: UUID gerado pelo cliente)
+    thread_id = f"{user_id}:{session_id}"
     return workflow.invoke(
         initial,
-        config={"configurable": {"thread_id": session_id}},
+        config={"configurable": {"thread_id": thread_id}},
     )
 ```
 
-O `thread_id` é obrigatório para o `MemorySaver` identificar qual sessão está sendo retomada.
+O `thread_id` composto (`user_id:session_id`) é obrigatório para o `MemorySaver` identificar qual sessão está sendo retomada sem risco de dois usuários lerem o checkpoint um do outro.
 
 ---
 

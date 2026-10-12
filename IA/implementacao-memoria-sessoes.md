@@ -18,7 +18,7 @@ Sem memória, cada mensagem começa do zero — o agente não sabe o que você p
 ```
 Conversa atual
   │
-  ├─ MongoDB (chat_sessions)
+  ├─ MongoDB (conversations)
   │    └─ histórico de mensagens da sessão ativa
   │
   └─ Ao encerrar a sessão:
@@ -76,7 +76,13 @@ Retornar lista vazia (em vez de um erro 404) é intencional: não revela ao soli
 
 ### `append_turn` — upsert MongoDB
 
+Antes de gravar, a função verifica se uma sessão existente pertence ao usuário correto. Isso impede que uma mensagem seja adicionada à sessão de outro usuário caso dois clientes enviem o mesmo `session_id`:
+
 ```python
+existing = _col().find_one({"session_id": session_id}, {"user_id": 1})
+if existing and existing.get("user_id") != user_id:
+    raise ValueError("session não pertence ao usuário")
+
 _col().update_one(
     {"session_id": session_id},
     {

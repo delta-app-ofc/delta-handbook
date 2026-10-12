@@ -143,12 +143,12 @@ Os identificadores (nomes de variáveis, funções) são em inglês; os prompts 
 
 Dois modelos configurados:
 
-| Variável | Modelo | Uso |
-|----------|--------|-----|
-| `llm_especialista` | Gemini 1.5 Pro (fallback: Llama via Groq) | Agentes especializados |
-| `llm_rapido` | Gemini 1.5 Flash | Router, resumos, contexto |
+| Variável | Modelo padrão | Uso |
+|----------|---------------|-----|
+| `llm_gemini` | `gemini-2.5-flash` (fallback: `openai/gpt-oss-120b` via Groq) | Agentes especializados |
+| `llm_rapido` | `openai/gpt-oss-20b` via Groq | Router, resumos, contexto |
 
-O fallback para Groq garante que, se a cota do Gemini acabar, a aplicação continua funcionando com outro provedor.
+Os modelos efetivos são lidos das variáveis de ambiente `GEMINI_MODEL`, `GROQ_SPECIALIST_MODEL` e `GROQ_FAST_MODEL`; os valores acima são os defaults definidos em `app/config.py`. O fallback para Groq garante que, se a cota do Gemini acabar ou o modelo estiver indisponível, a aplicação continua funcionando com outro provedor.
 
 ---
 

@@ -10,11 +10,13 @@ A API é a porta de entrada para o chatbot do Delta. Toda requisição do app We
 
 ---
 
-## Arquivos implementados
+## Estrutura planejada
+
+Os arquivos abaixo estão reservados no repositório mas ainda não têm implementação ativa — a API completa é um componente pendente (ver `AGENTS.md`).
 
 ```
 app/
-├── main.py          ← ponto de entrada da aplicação
+├── main.py          ← ponto de entrada da aplicação (vazio)
 ├── schemas.py       ← contratos de dados (request/response)
 └── routes/
     ├── health.py    ← verificação de disponibilidade
@@ -85,12 +87,12 @@ O endpoint `/chat` é o coração da API. O fluxo completo de uma requisição �
 ```
 POST /chat
   │
-  ├─ 1. validate_input()        ← guardrail de entrada
+  ├─ 1. validate_input()        ← guardrail: anon. PII + detecta injection
   ├─ 2. session_id = uuid4()    ← gera se não informado
-  ├─ 3. run_workflow()          ← LangGraph executa os agentes
-  ├─ 4. validate_output()       ← guardrail de saída
-  ├─ 5. append_turn() x2        ← salva no MongoDB (human + assistant)
-  └─ 6. return ChatResponse     ← resposta ao cliente
+  ├─ 3. run_workflow()          ← LangGraph executa os agentes (recebe mensagem anonimizada)
+  ├─ 4. validate_output()       ← guardrail: redige PII da resposta
+  ├─ 5. append_turn() x2        ← salva no MongoDB (msg original + resposta revisada)
+  └─ 6. return ChatResponse     ← retorna resposta revisada ao cliente
 ```
 
 ```python
@@ -101,17 +103,17 @@ def chat(req: ChatRequest):
         raise HTTPException(status_code=422, detail=guard["reason"])
 
     session_id = req.session_id or str(uuid.uuid4())
-    state = run_workflow(user_id=req.user_id, session_id=session_id, question=req.message)
+    state = run_workflow(user_id=req.user_id, session_id=session_id, question=guard["message"])
 
-    out_guard = validate_output(state["response"])
+    out_guard = validate_output(state["response"], pii_map=guard["pii_map"])
     if not out_guard["ok"]:
         raise HTTPException(status_code=500, detail=out_guard["reason"])
 
-    append_turn(session_id, req.user_id, "human", req.message)
-    append_turn(session_id, req.user_id, "assistant", state["response"])
+    append_turn(session_id, req.user_id, "human", req.message)          # original
+    append_turn(session_id, req.user_id, "assistant", out_guard["response"])  # revisada
 
     return ChatResponse(
-        response=state["response"],
+        response=out_guard["response"],
         agent_used=state.get("agent_used", ""),
         session_id=session_id,
         chart_data=state.get("chart_data"),

@@ -6,106 +6,43 @@ dividindo as responsabilidades entre MongoDB, Redis e PostgreSQL.
 OBS.: Este documento **não** abrange a modelagem de todos os dados que transitarão na aplicação, apenas as informações de telemetria IoT.
 
 ## Diagrama de Arquitetura de Fluxo de Dados
-![img.png](diagrama-infra.png)
+Fluxo atual: **hardware → janela consolidada → API → MongoDB (`consumption_summary`) → app / detecção / agregações**.
+
+O arquivo `diagrama-infra.png` pertence ao desenho anterior e não representa o contrato atualizado; use o fluxo acima e a modelagem oficial.
 
 ## 1. Comunicação de Borda (Arduino Uno R4 Wifi/ESP32-C3 Super Mini)
 Para mitigar problemas de concorrência e sobrecarga no servidor de aplicação, 
 o hardware do Arduino consolidará as medições magnéticas localmente em lotes temporais (janelas de 5 a 10 minutos) 
 e utilizará uma estratégia de escalonamento (Load Leveling/Jittering) para envio das requisições.
 
-### 1.1. Payload do Arduino para a API (JSON bruto via HTTP POST)
-Este é o formato de dados enxuto transmitido pelo microcontrolador. O cabeçalho da requisição deve conter o cabeçalho Authorization: Bearer <TOKEN_DE_SEGURANCA_DO_DISPOSITIVO> para autenticação na API.
+### 1.1. Payload consolidado do hardware
+
+O hardware calcula o consumo antes do envio e transmite diretamente uma janela destinada a `consumption_summary`. A API autentica o dispositivo, associa o `user_id` cadastrado e converte datas e números para os tipos BSON do validator.
+
 ```json
 {
-  "device_id": "ARD-R4-SP-0912",
-  "sent_at": "2026-06-21T17:10:00Z",
-  "window_size_minutes": 5,
-  "total_pulses": 6,
-  "pulses_history": [
-    {
-      "pulsed_at": "2026-06-21T17:05:12Z",
-      "ms_since_boot": 3452210,
-      "delta_ms": 0            // Primeiro pulso da janela
-    },
-    {
-      "pulsed_at": "2026-06-21T17:05:14Z",
-      "ms_since_boot": 3453210,
-      "delta_ms": 1000         // 3453210 - 3452210 = 1 segundo
-    },
-    {
-      "pulsed_at": "2026-06-21T17:06:45Z",
-      "ms_since_boot": 3545210,
-      "delta_ms": 92000        // 3545210 - 3453210 = 1 min e 32 segundos
-    },
-    {
-      "pulsed_at": "2026-06-21T17:07:01Z",
-      "ms_since_boot": 3559210,
-      "delta_ms": 14000        // 3559210 - 3545210 = 14 segundos
-    },
-    {
-      "pulsed_at": "2026-06-21T17:09:20Z",
-      "ms_since_boot": 3698210,
-      "delta_ms": 139000       // 3698210 - 3559210 = 2 min e 19 segundos
-    },
-    {
-      "pulsed_at": "2026-06-21T17:09:55Z",
-      "ms_since_boot": 3733210,
-      "delta_ms": 35000        // 3733210 - 3698210 = 35 segundos
-    }
-  ]
-}
-```
-
-#### Descrição dos Campos:
-- device_id: Identificador único do hardware registrado no banco SQL.
-- sent_at: Horário exato que o Arduino finalizou a contagem e iniciou o envio (padrão ISO 8601 UTC).
-- window_size_minutes: Tempo de amostragem configurado no firmware do Arduino.
-- total_pulses: Soma física de pulsos magnéticos detectados pela porta de interrupção do hardware no período.
-- pulses_history: Array de histórico de cada pulso captado pelo Arduino.
-- pulses_history.pulsed_at: Horário exato da captação do pulso específico.
-- pulses_history.ms_since_boot: Milissegundos que se passaram desde o início do funcionamento do Arduino.
-- pulses_history.delta_ms: Milissegundos que se passaram desde o último pulso.
-
-## 2. Processamento e Consolidação no Back-end
-Conforme validado no desenho de arquitetura, o Back-end assume a responsabilidade de processar o payload imediatamente após a autenticação.
-
-### Justificativa de Engenharia de Dados:
-Decisão de Projeto: Em vez de armazenar arrays complexos de timestamps individuais para cada pulso 
-(o que inflaria o armazenamento e tornaria as consultas matemáticas lentas), o Back-end calcula 
-e consolida o volume métrico antes da persistência.
-
-Assumindo que `1 pulso = 1 litro` (ou a proporção calibrada do hidrômetro), o Back-end converte pulsos diretamente em volume utilizável, 
-simplificando as análises estatísticas da IA e o cálculo do ranking.
-
-### 2.1. Payload Consolidado enviado aos Bancos de Dados
-```json{
-  "user_id": "60c72b2f9b1d8b2bad723456",
-  "device_id": "ARD-R4-SP-0912",
+  "device_id": "ESP32-SP-0912",
   "window_started_at": "2026-06-21T17:05:00Z",
   "window_finished_at": "2026-06-21T17:10:00Z",
-  "liter_consumption": 14,
+  "consumption_liters": 14.0,
   "lpm_average": 2.8
 }
 ```
+
+## 2. Ingestão no Back-end
+
+A conversão dos pulsos em litros é responsabilidade do hardware, conforme a calibração do hidrômetro. Não há persistência intermediária de pulsos brutos. A API persiste `device_id` (string), `user_id` (int), início/fim da janela (date), `consumption_liters` (double) e, quando enviado, `lpm_average` (double). `anomaly_detected` é opcional e pode ser atualizado pela detecção de anomalias após a ingestão.
+
+O contrato de persistência está em [Modelagem MongoDB](NoSQL/modelagem-mongodb.md). Os exemplos representam a decisão de arquitetura, sem comprovar uma integração HTTP ou firmware executados.
 
 ## 3. Infraestrutura e Modelagem MongoDB (NoSQL)
 O MongoDB é o nosso banco de ingestão de alta performance (write-heavy), responsável por armazenar todo 
 o histórico analítico e logs que alimentarão o motor de inteligência artificial.
 
 ### 3.1. Collections Necessárias
-#### A. Collection: leituras_historico (Armazenamento em Time-Series)
-Otimizada usando a funcionalidade de Time-Series Collections nativa do MongoDB (versão 5.0+) para reduzir espaço em disco e acelerar queries cronológicas.
+#### A. Collection: `consumption_summary`
 
-```javascript
-// Script de criação da Collection otimizada para Time-Series
-db.createCollection("leituras_historico", {
-   timeseries: {
-      timeField: "data_fim_leitura",
-      metaField: "device_id",
-      granularity: "minutes"
-   }
-});
-```
+Coleção convencional com `$jsonSchema` e índices por usuário/tempo e dispositivo. Guarda permanentemente as janelas consolidadas pelo hardware, sem TTL. Os scripts atuais não a criam como Time-Series. `device_status` mantém o estado atual de cada dispositivo. Consulte a [modelagem oficial](NoSQL/modelagem-mongodb.md) para os campos e índices.
 
 #### B. Collection: historico_ia_treino
 Armazena as conclusões e padrões de rotina gerados periodicamente pela inteligência artificial para cada usuário.
@@ -188,7 +125,7 @@ de dados cadastrais e o consumo consolidado para os Dashboards Web.
 
 ### 5.1. DDL Crítico para Dashboards e Relatórios Rápidos
 #### Tabela: dashboard_consumo_diario
-Tabela atualizada por um processo assíncrono (Cron Job / Background Worker) que lê a massa de dados brutos do MongoDB uma vez ao dia e salva o resumo estruturado no PostgreSQL para consulta instantânea do Frontend Web.
+Tabela atualizada por um processo assíncrono (Cron Job / Background Worker) que lê as janelas consolidadas de `consumption_summary` uma vez ao dia e salva o resumo estruturado no PostgreSQL para consulta instantânea do Frontend Web.
 
 ```sql
 CREATE TABLE dashboard_consumo_diario (
@@ -227,6 +164,6 @@ CREATE TABLE alertas_vazamentos (
 ## 🛠️ Resumo Técnico das Responsabilidades
 | Tecnologia | Responsabilidade Principal | Justificativa Técnica |
 |------------|---------------------------|-----------------------|
-| MongoDB    | Dados brutos, histórico analítico, IA e os alertas de vazamento reais (`alerts_history` — ver aviso da seção 4.2). | Time-Series Collections para compactação e indexação temporal eficiente. |
+| MongoDB    | Janelas consolidadas de consumo, histórico analítico, IA e os alertas de vazamento reais (`alerts_history` — ver aviso da seção 4.2). | Coleções convencionais com validators e índices definidos nos scripts MongoDB. |
 | Redis      | Rankings Web e controle de Sessões/TTL. Cache de limites da IA é design antigo, não implementado (ver aviso da seção 4.2). | Uso de Sorted Sets para ordenação sem CPU-bound e verificação direta em memória RAM. |
 | PostgreSQL | Cadastro (CRUD) e Tabelas de Consumo Consolidado. Auditoria de Alertas é design antigo, não implementado (ver aviso da seção 4.2). | Indexes compostos nas chaves estrangeiras e datas. Dados agregados de forma assíncrona. |

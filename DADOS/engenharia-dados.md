@@ -75,10 +75,10 @@ O MongoDB armazena:
 
 ### 📟 Dados de sensores (ESP32)
 - device_id
-- timestamp
-- pulsos do hidrômetro
-- vazão instantânea
-- consumo em tempo real
+- `window_started_at` e `window_finished_at`
+- `consumption_liters`, calculado no hardware
+- `lpm_average`, quando informado
+- janelas consolidadas enviadas diretamente para `consumption_summary`
 
 ### 📊 Eventos do sistema
 - detecção de vazamentos — implementado em `delta-business-rules/detection/`
@@ -86,7 +86,7 @@ O MongoDB armazena:
   `DADOS/NoSQL/modelagem-mongodb.md`)
 - picos de consumo
 - logs de comunicação
-- dados de integração com APIs externas (ex: clima)
+- dados de integração com APIs externas: `weather_daily` em `db_delta_app`, com `weather_date` e observações horárias (ver [modelagem MongoDB](NoSQL/modelagem-mongodb.md))
 
 ---
 
@@ -94,7 +94,7 @@ O MongoDB armazena:
 
 - Base de consultas do chatbot
 - Agregações de consumo em tempo real
-- Histórico bruto de leituras
+- Histórico permanente das janelas consolidadas de consumo
 
 ---
 

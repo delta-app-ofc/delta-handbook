@@ -89,6 +89,7 @@ A API roda no repositório `delta-redis-database` (FastAPI + redis-py). Todos os
 | `GET` | `/get-ranking` | `organizationId`, `period` (YYYY-MM), `criterion` (perm2\|consumo), `limit?` | Ranking completo com `withoutArea` |
 | `GET` | `/get-position` | `organizationId`, `propertyId`, `period`, `criterion` | Posição, total e score de uma unidade |
 | `GET` | `/get-best` | `organizationId`, `period`, `criterion` | Primeira colocada (card "Unidade mais eficiente") |
+| `POST` | `/sync` | — | Faz login na delta-api-postgres, busca unidades e consumo e popula o Redis |
 
 ---
 
@@ -98,13 +99,11 @@ A API roda no repositório `delta-redis-database` (FastAPI + redis-py). Todos os
 [ETL bi_etl.py]
       │ roda às 03:00, atualiza gold.ft_consumption_daily
       ▼
-[sync_from_postgres.py]
-      │ GET /delta/property → filtra COMERCIAL_*
-      │ GET /delta/analytics/consumption-daily/{id}
-      │ POST /save-property + POST /save-consumption
-      ▼
-[API Redis — delta-redis-database]
-      │ grava Hash de consumo
+[POST /sync — delta-redis-database]
+      │ POST /delta/auth/login → obtém JWT
+      │ GET /delta/property (Authorization: Bearer) → filtra COMERCIAL_*
+      │ GET /delta/analytics/consumption-daily/{id} (Authorization: Bearer)
+      │ grava Hash de propriedade + consumo
       │ recalcula scores → ZADD nos Sorted Sets (pipeline atômico)
       ▼
 [Redis Cloud — Sorted Sets]
@@ -126,6 +125,6 @@ O Redis é apenas camada de consulta: todos os dados podem ser reconstruídos re
 | Segmentação | Por organização e mês; apenas unidades COMERCIAL_* |
 | Cobertura mínima | 50% dos dias fechados do mês com leitura |
 | Retenção | 13 meses |
-| Fonte dos dados | `delta-api-postgres` (endpoints `/delta/property` e `/delta/analytics/consumption-daily/{id}`) |
+| Fonte dos dados | `delta-api-postgres` via `POST /sync`; autenticação JWT com `POSTGRES_API_EMAIL` e `POSTGRES_API_PASSWORD` |
 | Dia corrente | Gravado, ignorado no cálculo até fechar |
 | Desempate | Lexicográfico pelo member (zero-padded) — equivale a crescente por `propertyId` |

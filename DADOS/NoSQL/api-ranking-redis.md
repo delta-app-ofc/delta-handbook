@@ -53,7 +53,7 @@ Os IDs usados são os mesmos do PostgreSQL: `propertyId` = `tb_property.id`, `or
 | `org:{organizationId}:properties` | Set | IDs de todas as unidades da organização |
 | `consumption:{propertyId}:{YYYY-MM}` | Hash | campo = dia (`01`..`31`), valor = litros do dia |
 | `ranking:org:{organizationId}:{YYYY-MM}:perm2` | Sorted Set | member = propertyId com zeros à esquerda, score = L/m²·dia |
-| `ranking:org:{organizationId}:{YYYY-MM}:consumo` | Sorted Set | member = propertyId com zeros à esquerda, score = litros totais |
+| `ranking:org:{organizationId}:{YYYY-MM}:consumo` | Sorted Set | member = propertyId com zeros à esquerda, score = média diária de litros |
 
 ### Regras de escrita
 
@@ -121,7 +121,7 @@ O Redis é apenas camada de consulta: todos os dados podem ser reconstruídos re
 | Assunto | Decisão |
 |---|---|
 | Critério padrão | `perm2` (L/m²·dia), menor = melhor |
-| Critério secundário | `consumo` (litros totais do mês) |
+| Critério secundário | `consumo` (média diária de litros) |
 | Segmentação | Por organização e mês; apenas unidades COMERCIAL_* |
 | Cobertura mínima | 50% dos dias fechados do mês com leitura |
 | Retenção | 13 meses |

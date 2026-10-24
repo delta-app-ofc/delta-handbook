@@ -150,16 +150,29 @@ O agente nunca deverá retornar informações sensíveis, como senha ou credenci
 
 ### Agente 5 — Hábitos
 Responsável por:
-- consultar e analisar hábitos
-- ver a frequência e dias da semaan dos hábitos
+- cadastrar novos hábitos de consumo de água (quando o usuário solicitar);
+- consultar e analisar hábitos já cadastrados;
+- verificar frequência semanal e dias da semana dos hábitos;
+- estimar o impacto hídrico de um hábito em litros por semana/mês;
+- consultar condições climáticas para hábitos ao ar livre (lavar carro, regar plantas, lavar quintal).
+
+O catálogo de hábitos disponíveis é fixo: **BANHO LONGO, LAVAR QUINTAL, LAVAR ROUPA, REGAR PLANTAS, LAVAR CARRO, LAVAR LOUÇA**. Hábitos fora do catálogo não são aceitos — o agente informa o que está disponível.
 
 Perguntas que responde:
 
 - "Quais são meus hábitos cadastrados?"
 - "Com que frequência eu lavo roupa?"
 - "Quais hábitos tenho na segunda-feira?"
+- "Adiciona lavar carro, 2x por semana, nas segundas e sextas."
+- "Quanto de água eu gasto regando as plantas toda semana?"
+- "Qual o melhor dia para lavar o carro essa semana?"
 
-**Fontes de dados**: PostgreSQL.
+**Fontes de dados:**
+- PostgreSQL: tabelas `habits` e `habit_days` (leitura e cadastro).
+- MongoDB: coleção `weather_daily` (histórico meteorológico por localização).
+- Open-Meteo (API externa gratuita, sem chave): previsão do tempo para os próximos dias.
+
+**Limitação conhecida:** as tools de clima (`get_weather_history`, `get_weather_forecast`) dependem da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 
 ### Agente 6 — RAG
 Responsável por consultar conhecimento externo antes de gerar determinadas respostas (ex.: dúvidas gerais sobre conservação de água, tarifas públicas, dicas de uso consciente). Teria que fazer a diferenciação entre perfil RESIDENCIAL e COMERCIAL. Usaria processamento por chucking -> recuperação por similaridade -> resposta com citação (para atender o requisito de identificabilidade das fontes) 
@@ -277,23 +290,26 @@ Exemplos de validação:
 
 O Projeto Delta utilizará **MCP (Model Context Protocol)** e **A2A (Agent-to-Agent)** como mecanismos de integração com recursos externos e outros agentes.
 
-### MCP — Integração com API de informações climáticas
+### Integração com API de informações climáticas
 
-O **MCP** será utilizado para disponibilizar ao sistema informações de uma **API externa de clima**, relacionada à funcionalidade **API do Tempo** prevista no Projeto Delta.
+O Agente de Hábitos consulta dados meteorológicos de duas formas:
+
+1. **Histórico (MongoDB):** a coleção `weather_daily` armazena dados climáticos por localização e data. O agente lê essa coleção diretamente pela tool `get_weather_history`.
+2. **Previsão (Open-Meteo):** API pública e gratuita, sem chave de API necessária. O agente chama os endpoints de geocodificação e previsão diária diretamente pela tool `get_weather_forecast`.
 
 | Aspecto | Descrição |
 |---|---|
-| **Agente consumidor** | Agente de Consumo e Previsão|
-| **Sistema externo** | API externa de informações meteorológicas |
-| **Protocolo** | MCP (Model Context Protocol) |
-| **Informações consultadas** | Temperatura, condição climática, probabilidade de chuva e previsão meteorológica |
-| **Finalidade** | Utilizar informações climáticas como contexto adicional para analisar padrões de consumo e auxiliar nas recomendações ao usuário |
-| **Benefício** | Permite disponibilizar dados meteorológicos externos aos agentes de forma padronizada, sem acoplar diretamente a lógica da API de clima ao agente |
-| **Situação** | Integração definida como parte da arquitetura do Projeto Delta |
+| **Agente consumidor** | Agente de Hábitos |
+| **Fontes** | MongoDB `weather_daily` (histórico) + Open-Meteo (previsão) |
+| **Informações consultadas** | Temperatura, chuva acumulada, condição, vento |
+| **Finalidade** | Recomendar dias para hábitos ao ar livre e explicar variações sazonais |
+| **Situação** | Implementado em `app/tools/habits/tools.py` |
+
+A integração via **MCP** para dados climáticos permanece como opção arquitetural futura — permite trocar o provedor sem alterar as tools. A implementação atual não usa MCP para clima.
 
 **Exemplo de utilização:**
 
-> O sistema identifica um aumento no consumo de água e consulta, por meio do MCP, informações meteorológicas externas. Caso seja identificada uma temperatura elevada ou um período de baixa ocorrência de chuvas, essas informações poderão ser utilizadas como contexto adicional na análise do consumo.
+> O usuário pergunta qual o melhor dia para lavar o carro. O agente consulta a previsão via Open-Meteo e recomenda os dias sem chuva intensa.
 
 ---
 

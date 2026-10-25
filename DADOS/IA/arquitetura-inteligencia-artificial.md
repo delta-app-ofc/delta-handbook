@@ -168,11 +168,10 @@ Perguntas que responde:
 - "Qual o melhor dia para lavar o carro essa semana?"
 
 **Fontes de dados:**
-- PostgreSQL: tabelas `habits` e `habit_days` (leitura e cadastro).
-- MongoDB: coleção `weather_daily` (histórico meteorológico por localização).
-- Open-Meteo (API externa gratuita, sem chave): previsão do tempo para os próximos dias.
+- PostgreSQL: tabelas `tb_habit`, `tb_user_habit`, `tb_user_habit_day` e `tb_day_of_week` (leitura e cadastro).
+- MongoDB: coleção `weather_daily` (histórico meteorológico por localização, alimentada por outro componente do projeto; o agente apenas lê).
 
-**Limitação conhecida:** as tools de clima (`get_weather_history`, `get_weather_forecast`) dependem da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
+**Limitação conhecida:** a tool de clima (`get_weather_history`) depende da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 
 ### Agente 6 — RAG
 Responsável por consultar conhecimento externo antes de gerar determinadas respostas (ex.: dúvidas gerais sobre conservação de água, tarifas públicas, dicas de uso consciente). Teria que fazer a diferenciação entre perfil RESIDENCIAL e COMERCIAL. Usaria processamento por chucking -> recuperação por similaridade -> resposta com citação (para atender o requisito de identificabilidade das fontes) 
@@ -292,15 +291,12 @@ O Projeto Delta utilizará **MCP (Model Context Protocol)** e **A2A (Agent-to-Ag
 
 ### Integração com API de informações climáticas
 
-O Agente de Hábitos consulta dados meteorológicos de duas formas:
-
-1. **Histórico (MongoDB):** a coleção `weather_daily` armazena dados climáticos por localização e data. O agente lê essa coleção diretamente pela tool `get_weather_history`.
-2. **Previsão (Open-Meteo):** API pública e gratuita, sem chave de API necessária. O agente chama os endpoints de geocodificação e previsão diária diretamente pela tool `get_weather_forecast`.
+O Agente de Hábitos consulta o histórico meteorológico no MongoDB: a coleção `weather_daily` armazena dados climáticos por localização e data, e o agente a lê pela tool `get_weather_history`. A ingestão desses dados não é feita pelo agente.
 
 | Aspecto | Descrição |
 |---|---|
 | **Agente consumidor** | Agente de Hábitos |
-| **Fontes** | MongoDB `weather_daily` (histórico) + Open-Meteo (previsão) |
+| **Fontes** | MongoDB `weather_daily` (histórico) |
 | **Informações consultadas** | Temperatura, chuva acumulada, condição, vento |
 | **Finalidade** | Recomendar dias para hábitos ao ar livre e explicar variações sazonais |
 | **Situação** | Implementado em `app/tools/habits/tools.py` |
@@ -309,7 +305,7 @@ A integração via **MCP** para dados climáticos permanece como opção arquite
 
 **Exemplo de utilização:**
 
-> O usuário pergunta qual o melhor dia para lavar o carro. O agente consulta a previsão via Open-Meteo e recomenda os dias sem chuva intensa.
+> O usuário pergunta qual o melhor dia para lavar o carro. O agente consulta o histórico recente de chuva em `weather_daily` e informa se a semana tem sido chuvosa, sem prever o tempo futuro.
 
 ---
 

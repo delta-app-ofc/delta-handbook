@@ -348,6 +348,106 @@ Uma linha com: `access_kind`, `match_status`, `resolved_property_ids`, `candidat
 
 ---
 
+## Functions de hábitos e localização (Agente de Hábitos)
+
+As functions de 14 a 17 são usadas pelo Agente de Hábitos do `delta-artificial-intelligence`. Elas existem
+para o agente não montar `SELECT` e `INSERT` soltos: a lógica fica no banco, num só lugar, e o código da IA
+só chama a function.
+
+---
+
+### 14. fn_user_habits()
+
+#### Descrição
+
+Lista os hábitos cadastrados pelo usuário, com os dias da semana de cada um.
+
+#### Assinatura
+
+```sql
+fn_user_habits(
+    p_user_id INTEGER
+)
+```
+
+#### Retorno
+
+Tabela com `name`, `category`, `frequency`, `days` (lista de dias), `start_time`, `end_time` e
+`estimated_liters` — uma linha por hábito, ordenada pelo nome. Vazia se o usuário não tem hábitos.
+
+---
+
+### 15. fn_user_habits_by_day()
+
+#### Descrição
+
+Lista os hábitos do usuário que acontecem em um dia da semana. O dia não diferencia maiúsculas de minúsculas.
+
+#### Assinatura
+
+```sql
+fn_user_habits_by_day(
+    p_user_id INTEGER,
+    p_day     VARCHAR
+)
+```
+
+#### Retorno
+
+Tabela com `name`, `frequency`, `start_time`, `end_time` e `estimated_liters`, ordenada pelo horário de
+início (hábitos sem horário por último).
+
+---
+
+### 16. fn_user_location()
+
+#### Descrição
+
+Devolve a cidade e o estado do primeiro imóvel (menor `id` em `tb_user_property`) do usuário.
+
+#### Assinatura
+
+```sql
+fn_user_location(
+    p_user_id INTEGER
+)
+```
+
+#### Retorno
+
+Tabela com `city` e `state`. Vazia se o usuário não tem imóvel cadastrado, como acontece com usuários
+organizacionais.
+
+---
+
+### 17. fn_create_user_habit()
+
+#### Descrição
+
+Cadastra um hábito para o usuário e vincula os dias da semana, numa única operação: se algo falhar,
+nada é gravado.
+
+#### Assinatura
+
+```sql
+fn_create_user_habit(
+    p_user_id    INTEGER,
+    p_habit_name VARCHAR,
+    p_frequency  INTEGER,
+    p_days       VARCHAR[] DEFAULT ARRAY[]::VARCHAR[]
+)
+```
+
+#### Retorno
+
+O `id` do registro criado em `tb_user_habit`. A function interrompe com erro quando:
+
+* o hábito não existe em `tb_habit`;
+* o usuário já possui esse hábito;
+* algum dia informado não existe em `tb_day_of_week`.
+
+---
+
 ## Procedures
 
 ---
@@ -487,6 +587,10 @@ A procedure executa:
 | `fn_organization_last_billed_period()` | Function | Soma consumo/custo do último mês fechado, com fallback pro histórico disponível. |
 | `fn_organization_effective_rate()` | Function | Calcula a tarifa efetiva (R$/m³) numa janela de dias, a partir do consumo real. |
 | `fn_organization_forecast_context()` | Function | Compõe as 6 functions organizacionais acima num único round-trip para o Agente de Previsão. |
+| `fn_user_habits()` | Function | Lista os hábitos do usuário com os dias da semana. |
+| `fn_user_habits_by_day()` | Function | Lista os hábitos do usuário em um dia da semana. |
+| `fn_user_location()` | Function | Devolve cidade e estado do primeiro imóvel do usuário. |
+| `fn_create_user_habit()` | Function | Cadastra um hábito do usuário e vincula os dias da semana. |
 
 ---
 

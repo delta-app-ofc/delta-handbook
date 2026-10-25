@@ -1,144 +1,124 @@
-# **📘 DevOps — Validação de Pull Requests e Roteamento de Times**
+# DevOps — Checks e fluxo de Pull Requests
 
-Esta documentação descreve o funcionamento, a arquitetura e a configuração do ecossistema de CI/CD do **Projeto Delta** voltado para a governança de Pull Requests (PRs). O objetivo desta automação é garantir que nenhuma alteração de código seja integrada sem a descrição adequada, preenchimento correto dos checklists organizacionais e a atribuição automática dos times revisores responsáveis.
+Este documento descreve os checks compartilhados do Projeto Delta para Pull Requests. O workflow central fica no repositório `.github`; cada repositório satélite chama esse workflow por meio de um arquivo local em `.github/workflows/`.
 
-## **🎯 1. Visão Geral do Fluxo**
+## 1. Disparo do fluxo
 
-A automação opera de forma reativa e centralizada sempre que um Pull Request é **aberto (opened)** ou **editado (edited)** em qualquer repositório da organização. O fluxo segue três etapas sequenciais obrigatórias:
+O workflow padrão dos repositórios satélites, como `.github/workflows/trigger_actions.yml`, é executado nestes eventos:
 
-```markdown
-[Abertura/Edição do PR]   
-          │  
-          ▼  
-┌──────────────────────────────────┐  
-│  1. Validação de Checklists      │ ──► Falhou? ──► Comenta no PR & Barra o Merge (sys.exit(1))  
-└──────────────────────────────────┘  
-          │ Passou!  
-          ▼  
-┌──────────────────────────────────┐  
-│  2. Validação da Descrição       │ ──► Menos de 30 chars úteis? ──► Barra o Merge (sys.exit(1))  
-└──────────────────────────────────┘  
-          │ Passou!  
-          ▼  
-┌──────────────────────────────────┐  
-│  3. Roteamento de Times (Review) │ ──► Executa 'gh pr edit' adicionando os revisores mapeados  
-└──────────────────────────────────┘  
-          │  
-          ▼  
-[Pipeline Liberado (sys.exit(0))]
+- `opened`: a PR foi aberta;
+- `synchronize`: novos commits foram enviados para a branch;
+- `reopened`: a PR foi reaberta;
+- `edited`: o título ou a descrição da PR foi editado.
+
+Esse workflow chama `delta-app-ofc/.github/.github/workflows/main.yml@main`. O workflow central é reutilizável (`workflow_call`) e organiza dois jobs independentes. O repositório `.github` também possui um workflow local, `local_checks.yml`, que executa as mesmas verificações em PRs abertas contra ele próprio.
+
+O workflow chamador fornece o segredo `GH_TOKEN` — nos repositórios satélites, por meio de `DELTA_ORG_AUTOMATION_TOKEN` — para os scripts consultarem e atualizarem a PR e solicitarem revisores. O Super-Linter recebe o `GITHUB_TOKEN` do próprio GitHub Actions.
+
+## 2. Visão do pipeline
+
+Os jobs de qualidade e governança são iniciados em paralelo. Dentro do job de governança, as etapas são sequenciais:
+
+```text
+Pull Request (opened / synchronize / reopened / edited)
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+┌────────────────────────┐  ┌──────────────────────────┐
+│ Qualidade e sintaxe    │  │ Governança da PR         │
+│ Super-Linter           │  │ 1. Validar commits        │
+└────────────────────────┘  │ 2. Validar .gitignore    │
+                            │ 3. Validar descrição e   │
+                            │    checklists da PR       │
+                            │ 4. Adicionar revisores    │
+                            └──────────────────────────┘
 ```
 
-## **📂 2. Arquitetura Centralizada (Repositório .github)**
+Se uma etapa do job de governança falhar, as etapas seguintes desse job não são executadas. O job de qualidade continua independente.
 
-Para evitar a replicação de scripts em múltiplos repositórios do ecossistema (como delta-database, serviços backend e aplicações frontend), adotou-se o padrão de **Repositório Central de Organização** (.github).
+## 3. Qualidade e sintaxe do código
 
-### **Estrutura de Pastas no Repositório .github**
+O job `code-quality` usa o Super-Linter (`super-linter/slim@v8.7.0`) para analisar os arquivos alterados na PR. Ele não analisa o repositório inteiro (`VALIDATE_ALL_CODEBASE: false`) e consolida o resultado em um status (`MULTI_STATUS: false`).
 
-```plaintext
-.github/
-├── .github/
-├── └── workflows/
-│       └── main.yml  # Workflow do GitHub Actions herdado globalmente
-├── profile/  
-├── scripts/  
-│   ├── route_checks.py          # Script Python com a inteligência de validação e roteamento  
-│   └── route_reviewers.py       # Script Python com a lógica de roteamento de revisores
+Na configuração atual, estão habilitadas verificações para:
+
+- **Segurança e integridade:** Gitleaks e marcadores de conflito de merge;
+- **GitHub e configuração:** GitHub Actions, JSON, YAML e XML;
+- **Python:** Ruff;
+- **Java;**
+- **JavaScript e TypeScript;**
+- **Web:** HTML e CSS;
+- **Banco de dados:** SQL.
+
+O Super-Linter verifica problemas de lint, formatação e sintaxe cobertos pelos validadores habilitados. Ele **não executa os testes do projeto, não substitui builds ou compilação específicos e não prova que a alteração não introduz bugs**. Cada repositório deve manter seus próprios testes e verificações de build quando aplicável.
+
+A configuração também faz o workflow falhar quando encontra uma configuração inválida de eventos do GitHub Actions. Em caso de falha, consulte o resumo do Super-Linter e os logs para identificar o validador e os arquivos apontados.
+
+## 4. Governança da Pull Request
+
+O job `pr-checks` baixa o código da PR e os scripts centralizados do repositório `.github`. Em seguida, executa estas etapas na ordem:
+
+### 4.1 Validar commits
+
+O script `scripts/validate_commits.py` verifica os títulos dos commits entre a branch base e a branch da PR. O formato esperado é Conventional Commits, com os tipos Delta:
+
+```text
+feat: adiciona consulta de consumo
+fix(api): corrige validação do usuário
+refactor: reorganiza camada de serviço
+docs: atualiza instruções do projeto
+test: adiciona testes para autenticação
+style: remove espaços em branco
 ```
 
-*Nota de Implementação:* Quando o workflow é disparado em um repositório satélite (ex: delta-database), o GitHub Actions realiza o download temporário do repositório .github em uma pasta isolada chamada central-scripts para conseguir executar o interpretador Python sem expor ou poluir o diretório do projeto principal. Esse processo é executado a partir de um .github/workflows/*.yml que centraliza a lógica de execução de workflow do repositório central da organização, mas cada repositório possui invidualmente um .github/workflows/*.yml que ativa o actions.
+O escopo entre parênteses e o marcador de breaking change (`!`) são opcionais. Na versão atualmente publicada em `main`, commits de merge são excluídos dessa análise, mas títulos como `Initial Commit` ainda são analisados e falham por não seguirem o formato permitido. Após a validação passar, o script marca automaticamente no corpo da PR o item de Conventional Commits do checklist. Se algum commit analisado não seguir o padrão, a etapa falha e informa os títulos inválidos.
 
-## **⚙️ 3. Configuração do Workflow (main.yml)**
+### 4.2 Validar `.gitignore` e arquivos de ambiente
 
-Este arquivo de workflow fica localizado na pasta .github/workflows/ no repositório central. Ele é responsável por gerenciar o ciclo de vida da execução, solicitar as credenciais corretas e baixar tanto o projeto atual quanto o repositório centralizador de scripts.
+O script `scripts/validate_gitignore.py` roda em **toda PR**, mesmo quando o arquivo `.gitignore` não foi alterado. Ele:
 
-### **Trecho Principal da Execução do Workflow:**
-```yaml
-steps:  
-    # 1. Baixa o código do projeto onde o PR foi aberto (ex: delta-database)  
-    - name: Checkout do código do projeto  
-      uses: actions/checkout@v4
+1. compara o `.gitignore` do projeto com as regras mínimas do arquivo `.github/.gitignore` central, exigindo que elas apareçam na ordem definida; regras adicionais são permitidas;
+2. consulta os arquivos rastreados pelo Git e falha se encontrar arquivos de ambiente protegidos versionados;
+3. em caso de falha, imprime o conteúdo completo do `.gitignore` padrão para orientar a correção.
 
-    # 2. Baixa o repositório centralizador de scripts (.github) na pasta temporária 'central-scripts'  
-    - name: Checkout dos scripts globais (.github)  
-      uses: actions/checkout@v4  
-      with:  
-        repository: '${{ github.repository_owner }}/.github'  
-        path: 'central-scripts'
+Na versão atualmente publicada em `main`, `.env.example`, `.env.sample` e `.env.template` são nomes permitidos. Um arquivo `.env` ou outro nome iniciado por `.env.` — incluindo `.env.test` — é considerado protegido e não pode estar rastreado. Depois de passar pelas duas verificações, o script marca automaticamente no corpo da PR o item que declara a proteção das variáveis de ambiente.
 
-    # 3. Executa o script Python apontando para a pasta temporária de scripts  
-    - name: Executar script de validação e roteamento  
-      env:  
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
-        PR_BODY: ${{ github.event.pull_request.body }}  
-        PR_URL: ${{ github.event.pull_request.html_url }}  
-        ORG_NAME: ${{ github.repository_owner }}  
-      run: python ./central-scripts/scripts/route_checks.py
-```
+### 4.3 Validar descrição e checklists da PR
 
-## **🧠 4. Funcionamento do Script**
+O script `scripts/route_checks.py` verifica se a descrição contém:
 
-O script Python é modularizado em três principais pilares lógicos para garantir flexibilidade e manutenibilidade.
+- pelo menos um módulo ou escopo impactado selecionado;
+- pelo menos um tipo de PR selecionado;
+- pelo menos uma opção de uso de IA respondida;
+- os itens obrigatórios do checklist marcados;
+- 30 ou mais caracteres úteis na seção de descrição, sem contar as instruções fixas do template.
 
-### **4.1 Validação de Caixas de Seleção (route_checks.py -> check_options)**
+O item de Conventional Commits é validado e marcado automaticamente pela etapa 4.1. O item **“O código foi devidamente testado e não causa novos bugs” continua sendo preenchido manualmente**: o Super-Linter não executa os testes específicos de cada projeto. Marque-o somente após realizar as verificações adequadas à alteração.
 
-Valida de forma rigorosa se os blocos de opções do template foram devidamente respondidos. Ela utiliza o método any() e all() para as seguintes condições:
+### 4.4 Adicionar revisores
 
-* **Escopo/Módulo Impactado:** Mínimo de 1 item marcado (any).  
-* **Tipo de PR (Conventional Commits):** Mínimo de 1 item marcado (any).  
-* **Uso de Inteligência Artificial:** Mínimo de 1 item marcado (any).  
-* **Checks de Rigor Técnico (Mandatórios):** Todos os itens obrigatoriamente marcados (all).
+Depois que as validações anteriores passam, `scripts/route_reviewers.py` lê os módulos selecionados e solicita revisão aos times correspondentes da organização. O mapeamento entre módulos e times fica no próprio script centralizado.
 
-### **4.2 Validação Inteligente da Descrição (route_checks.py -> check_description)**
+A solicitação de revisão não equivale a uma aprovação. Regras de proteção da branch e aprovações exigidas são configuradas separadamente no GitHub.
 
-A validação de conteúdo real de descrição utiliza expressões regulares para extrair o texto digitado entre as seções, expurgando as formatações e orientações fixas do template.
+## 5. O que faz o check ser obrigatório
 
-#### Isolamento da seção de Descrição usando Regex  
-```python
-match = re.search(r"## 📄 Descrição(.*?)## ✨ Tipo de PR", str_pr_body, re.DOTALL)
-```
+Um check vermelho mostra que a execução falhou. Para impedir o merge, o repositório também precisa exigir os checks correspondentes nas regras de proteção da branch ou no ruleset. A configuração dessas regras é feita no GitHub e não pelo workflow reutilizável.
 
-#### Remoção de sintaxe Markdown que polui a contagem de caracteres reais  
-```python
-clean_text = raw_description.replace(">", "").replace("\n", "").replace("*", "")
-```
+## 6. Resolução de problemas
 
-#### Expurgo das frases instrutivas padrões do template  
-```python
-template_phrases = [
-    r"Descreva o que foi implementado.",  
-    r"2° ANO: Lembre-se de registrar qual Requisito Funcional (RF) do documento de Engenharia de Software está sendo atendido."  
-]  
-for phrase in template_phrases:  
-    clean_text = re.sub(phrase, "", clean_text, flags=re.IGNORECASE)
+| Sintoma | O que verificar |
+| --- | --- |
+| **Falha em “Qualidade e sintaxe do código”** | Abra o resumo do Super-Linter, identifique o validador e corrija os arquivos apontados. As mensagens indicam o problema; o workflow não aplica correções automaticamente. |
+| **Falha em “Validar commits”** | Confira cada título de commit listado e ajuste-o ao formato Conventional Commits e aos tipos permitidos pelo Delta. |
+| **Falha em “Validar .gitignore”** | Compare o arquivo com o conteúdo padrão impresso no log. Remova do versionamento arquivos de ambiente protegidos e mantenha as exceções permitidas. |
+| **Falha em “Validar checks da PR”** | Revise os módulos, tipo de PR, uso de IA, checklist obrigatório e a descrição com pelo menos 30 caracteres úteis. O item sobre testes continua manual. |
+| **Os revisores não foram adicionados** | Confirme o módulo marcado, o mapeamento do time em `route_reviewers.py` e as permissões do token de automação. A atribuição só ocorre se as etapas anteriores passarem. |
 
-# Contagem final de caracteres reais (Mínimo de 30 caracteres)  
-character_count = len(clean_text.strip())
-```
+## 7. Fontes de configuração
 
-### **4.3 Roteamento Dinâmico de Times (route_reviewers.py -> assign_teams)**
-
-Caso o PR passe em todas as validações anteriores, o script mapeia os checkboxes do escopo e utiliza a ferramenta de linha de comando oficial do GitHub (gh cli) para adicionar os times correspondentes de forma transparente.
-```python
-mapping = {  
-    "- [x] Backend (Java": "back-primeiro",  
-    "- [x] Frontend (HTML": "front-primeiro",  
-    "- [x] API REST (Spring Boot)": "back-segundo",  
-    "- [x] Aplicação Dinâmica (React": "front-segundo",  
-    "- [x] Infraestrutura / Pipeline de CI/CD": "sys_devops"  
-}
-
-for template_text, team_slug in mapping.items():  
-    if template_text.lower() in body_lower:  
-        full_team = f"{org_name}/{team_slug}"  
-        # Solicita revisão para o time via CLI do GitHub no ambiente do runner  
-        subprocess.run(["gh", "pr", "edit", pr_url, "--add-reviewer", full_team])
-
-```
-
-## **🛠️ 5. Guia de Resolução de Problemas (Troubleshooting)**
-
-| **Sintoma**                                             | **Causa Provável**                                                                                                          | **Solução**                                                                                                                                                                                         |
-|---------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Pipeline falha por arquivo não encontrado**           | O caminho configurado no .yml não condiz com a estrutura do repositório central.                                            | Verifique se o caminho no workflow aponta exatamente para ./central-scripts/scripts/route_checks.py (ou route_reviewers.py). Garanta que a pasta do script no repositório central se chama scripts. |
-| **O checklist passa, mas os times não são adicionados** | O token temporário do GitHub Actions não tem permissões suficientes para interagir com o PR ou com os times da organização. | Certifique-se de que o bloco permissions: pull-requests: write está explicitado no arquivo de workflow .yml.                                                                                        |
-| **Times marcados como revisores inexistentes**          | O slug mapeado no dicionário do Python não existe na organização do GitHub.                                                 | Confirme se o nome do time no GitHub bate exatamente com a chave mapeada (ex: gestao-2ano).                                                                                                         |
+- Workflow reutilizável: `.github/.github/workflows/main.yml`, no repositório central `.github`.
+- Workflow local do repositório central: `.github/.github/workflows/local_checks.yml`.
+- Workflow chamador dos repositórios satélites: `.github/workflows/trigger_actions.yml`.
+- Scripts de validação e roteamento: `.github/scripts/`.
+- `.gitignore` mínimo de referência: `.github/.gitignore`.

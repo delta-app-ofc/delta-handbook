@@ -150,16 +150,28 @@ O agente nunca deverá retornar informações sensíveis, como senha ou credenci
 
 ### Agente 5 — Hábitos
 Responsável por:
-- consultar e analisar hábitos
-- ver a frequência e dias da semaan dos hábitos
+- cadastrar novos hábitos de consumo de água (quando o usuário solicitar);
+- consultar e analisar hábitos já cadastrados;
+- verificar frequência semanal e dias da semana dos hábitos;
+- estimar o impacto hídrico de um hábito em litros por semana/mês;
+- consultar o histórico recente de clima para contextualizar hábitos ao ar livre (lavar carro, regar plantas, lavar quintal). O agente não faz previsão do tempo.
+
+O catálogo de hábitos disponíveis é fixo: **BANHO LONGO, LAVAR QUINTAL, LAVAR ROUPA, REGAR PLANTAS, LAVAR CARRO, LAVAR LOUÇA**. Hábitos fora do catálogo não são aceitos — o agente informa o que está disponível.
 
 Perguntas que responde:
 
 - "Quais são meus hábitos cadastrados?"
 - "Com que frequência eu lavo roupa?"
 - "Quais hábitos tenho na segunda-feira?"
+- "Adiciona lavar carro, 2x por semana, nas segundas e sextas."
+- "Quanto de água eu gasto regando as plantas toda semana?"
+- "Choveu muito nos últimos dias na minha região?"
 
-**Fontes de dados**: PostgreSQL.
+**Fontes de dados:**
+- PostgreSQL: o agente não faz SELECT direto; chama as functions `fn_user_habits()`, `fn_user_habits_by_day()`, `fn_user_location()` e `fn_create_user_habit()` (ver `DADOS/SQL/otimizacao.md`), que leem e gravam em `tb_habit`, `tb_user_habit`, `tb_user_habit_day` e `tb_day_of_week`.
+- MongoDB: coleção `weather_daily` (histórico meteorológico por localização, alimentada por outro componente do projeto; o agente apenas lê).
+
+**Limitação conhecida:** a tool de clima (`get_weather_history`) depende da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 
 ### Agente 6 — RAG
 Responsável por consultar conhecimento externo antes de gerar determinadas respostas (ex.: dúvidas gerais sobre conservação de água, tarifas públicas, dicas de uso consciente). Teria que fazer a diferenciação entre perfil RESIDENCIAL e COMERCIAL. Usaria processamento por chucking -> recuperação por similaridade -> resposta com citação (para atender o requisito de identificabilidade das fontes) 
@@ -277,23 +289,23 @@ Exemplos de validação:
 
 O Projeto Delta utilizará **MCP (Model Context Protocol)** e **A2A (Agent-to-Agent)** como mecanismos de integração com recursos externos e outros agentes.
 
-### MCP — Integração com API de informações climáticas
+### Integração com API de informações climáticas
 
-O **MCP** será utilizado para disponibilizar ao sistema informações de uma **API externa de clima**, relacionada à funcionalidade **API do Tempo** prevista no Projeto Delta.
+O Agente de Hábitos consulta o histórico meteorológico no MongoDB: a coleção `weather_daily` armazena dados climáticos por localização e data, e o agente a lê pela tool `get_weather_history`. A ingestão desses dados não é feita pelo agente.
 
 | Aspecto | Descrição |
 |---|---|
-| **Agente consumidor** | Agente de Consumo e Previsão|
-| **Sistema externo** | API externa de informações meteorológicas |
-| **Protocolo** | MCP (Model Context Protocol) |
-| **Informações consultadas** | Temperatura, condição climática, probabilidade de chuva e previsão meteorológica |
-| **Finalidade** | Utilizar informações climáticas como contexto adicional para analisar padrões de consumo e auxiliar nas recomendações ao usuário |
-| **Benefício** | Permite disponibilizar dados meteorológicos externos aos agentes de forma padronizada, sem acoplar diretamente a lógica da API de clima ao agente |
-| **Situação** | Integração definida como parte da arquitetura do Projeto Delta |
+| **Agente consumidor** | Agente de Hábitos |
+| **Fontes** | MongoDB `weather_daily` (histórico) |
+| **Informações consultadas** | Temperatura, chuva acumulada, condição, vento |
+| **Finalidade** | Contextualizar hábitos ao ar livre com o clima recente, sem prever o tempo futuro |
+| **Situação** | Implementado no repositório `delta-artificial-intelligence` (`app/tools/habits/tools.py`) |
+
+A integração via **MCP** para dados climáticos permanece como opção arquitetural futura — permite trocar o provedor sem alterar as tools. A implementação atual não usa MCP para clima.
 
 **Exemplo de utilização:**
 
-> O sistema identifica um aumento no consumo de água e consulta, por meio do MCP, informações meteorológicas externas. Caso seja identificada uma temperatura elevada ou um período de baixa ocorrência de chuvas, essas informações poderão ser utilizadas como contexto adicional na análise do consumo.
+> O usuário pergunta se choveu muito nos últimos dias na região dele. O agente consulta o histórico recente em `weather_daily` e resume a chuva acumulada. Como não há previsão, ele não recomenda um dia futuro.
 
 ---
 

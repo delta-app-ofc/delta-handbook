@@ -38,6 +38,8 @@ Armazena os tipos de hábitos de consumo de água.
 - **id (PK)**: Identificador do hábito.
 - **name**: Nome do hábito.
   - Valores permitidos: `BANHO LONGO`, `LAVAR QUINTAL`, `LAVAR ROUPA`, `REGAR PLANTAS`, `LAVAR CARRO`, `LAVAR LOUÇA`
+- **category**: Categoria do hábito.
+  - Valores permitidos: `HIGIENE E CUIDADOS`, `LIMPEZA`, `JARDINAGEM`
 - **description**: Descrição opcional do hábito.
 
 ---
@@ -52,6 +54,8 @@ Armazena os endereços dos imóveis cadastrados.
 - **cep**: CEP (8 dígitos numéricos).
 - **city**: Cidade.
 - **state**: Estado.
+- **latitude** *(opcional)*: Latitude geográfica do endereço (entre -90 e 90).
+- **longitude** *(opcional)*: Longitude geográfica do endereço (entre -180 e 180).
 
 ---
 
@@ -168,7 +172,9 @@ Relaciona usuários aos seus hábitos de consumo.
 - **user_id (FK)**: Referência para `tb_user`.
 - **habit_id (FK)**: Referência para `tb_habit`.
 - **frequency**: Frequência do hábito (> 0).
-
+- **start_time** *(opcional)*: Horário de início do hábito.
+- **end_time** *(opcional)*: Horário de término do hábito. Obrigatório quando `start_time` informado; deve ser depois do início.
+- **estimated_liters** *(opcional)*: Estimativa de litros consumidos por execução do hábito.
 
 ---
 

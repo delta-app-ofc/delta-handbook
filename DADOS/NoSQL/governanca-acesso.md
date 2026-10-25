@@ -10,7 +10,6 @@ Coleções atualmente planejadas e implementadas nos schemas dos clusters NoSQL:
 
 ### Cluster 1: Telemetria (`db_delta_telemetry`)
 
-* `pulses_raw`
 * `consumption_summary`
 * `device_status`
 
@@ -20,6 +19,7 @@ Coleções atualmente planejadas e implementadas nos schemas dos clusters NoSQL:
 * `alerts_history`
 * `chat_sessions`
 * `chat_feedback`
+* `weather_daily`
 
 > **Nota de Arquitetura:** No MongoDB, todas as Custom Roles são registradas centralmente no banco `admin`, porém seus privilégios (escopo de atuação) aplicam-se especificamente às coleções de cada banco de dados (`db_delta_telemetry` ou `db_delta_app`).
 
@@ -33,7 +33,7 @@ Coleções atualmente planejadas e implementadas nos schemas dos clusters NoSQL:
 
 Permissões:
 
-* Gravação de dados brutos de sensores (ESP32) e cálculo/atualização de resumos
+* Gravação dos resumos calculados pelo hardware em `consumption_summary` e atualização de `device_status`
 * `find`, `insert`, `update` em todas as coleções do banco `db_delta_telemetry`
 * Sem permissão de exclusão (`delete`) nem alteração estrutural de índices
 
@@ -45,7 +45,7 @@ Permissões:
 
 * Acesso exclusivo e restrito à coleção `consumption_summary`
 * `find` e `createIndex` na coleção `consumption_summary`
-* Sem acesso às coleções de dados brutos (`pulses_raw`, `device_status`, etc.) ou escrita de dados
+* Sem acesso a `device_status` ou permissão de escrita de dados
 
 ---
 
@@ -97,7 +97,7 @@ Permissões:
 
 * Acesso exclusivo e restrito à coleção `alerts_history`
 * `find` e `createIndex` na coleção `alerts_history`
-* Sem acesso às outras coleções do database (`client_preferences`, `chat_history`, `chat_feedback`.) ou escrita de dados
+* Sem acesso às outras coleções do database (`user_preferences`, `chat_sessions`, `chat_feedback`, `weather_daily`) ou escrita de dados
 
 ---
 

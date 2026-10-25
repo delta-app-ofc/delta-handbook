@@ -10,7 +10,7 @@ Documentação resumida do script `script-dataload.sql`, responsável por popula
 |---|---|---:|---|
 | 1 | `tb_region` | 5 | Valores fixos: GRANDE_SP, LINS, PRESIDENTE_PRUDENTE, ADAMANTINA_PIRAPOZINHO, BRAGANCA_PAULISTA |
 | 2 | `tb_day_of_week` | 7 | Valores fixos: SEGUNDA a DOMINGO |
-| 3 | `tb_habit` | 6 | Valores fixos com descrição |
+| 3 | `tb_habit` | 6 | Valores fixos com descrição e categoria (`HIGIENE E CUIDADOS`, `LIMPEZA`, `JARDINAGEM`) |
 | 4 | `tb_property_classification` | 8 | Valores fixos, grupos RESIDENCIAL/COMERCIAL |
 | 5 | `tb_address` | 156 | CEP plausível por região (zonas de São Paulo) · inclui os endereços das 6 unidades comerciais/industriais novas |
 | 6 | `tb_user` | 201 | 200 usuários aleatórios + 1 admin fixo |
@@ -18,7 +18,7 @@ Documentação resumida do script `script-dataload.sql`, responsável por popula
 | 8 | `tb_user_property` | 148 | Associação usuário ↔ imóvel residencial - **não** 150: usuários 2 e 15 (gestores de organização) tiveram o vínculo residencial removido, ver `camada-bi.md` seção 9 |
 | 9 | `tb_device` | 155 | 150 residenciais + 5 industriais (3 com telemetria real vinculada - ver `camada-bi.md` seção 8) |
 | 10 | `tb_region_rate` | 40 | 5 regiões × 8 categorias de imóvel, vigência única a partir de 2026-01-01 |
-| 11 | `tb_user_habit` | 400 | Hábitos associados a usuários (frequência 1–7), 2 hábitos por usuário em média |
+| 11 | `tb_user_habit` | 400 | Hábitos associados a usuários (frequência 1–7), 2 hábitos por usuário em média · `start_time`, `end_time` e `estimated_liters` preenchidos por hábito via UPDATE após o INSERT |
 | 12 | `tb_user_habit_day` | 400 | 1 dia da semana por hábito de usuário |
 | 13 | `tb_last_water_bill` | 200 | 1 conta por usuário "normal" (ids 1–200), meses de JAN/2025 a JUN/2025. Admin (id 201) não possui conta, pois não tem imóvel associado |
 

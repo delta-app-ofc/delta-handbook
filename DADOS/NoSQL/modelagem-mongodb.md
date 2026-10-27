@@ -184,7 +184,7 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
 | Campo                        | Tipo             | Obrigatório | Descrição                                              |
 |------------------------------|------------------|-------------|--------------------------------------------------------|
 | `_id`                        | ObjectId         | Sim         | Identificador da sessão                                |
-| `user_id`                    | timestamp        | Sim         | Usuário dono da sessão                                 |
+| `user_id`                    | int              | Sim         | Usuário dono da sessão (referência ao ID do PostgreSQL) |
 | `started_at`                 | timestamp        | Sim         | Início da sessão                                       |
 | `last_activity_at`           | timestamp        | Sim         | Última interação                                       |
 | `is_open`                    | bool             | Não         | Sessão aceita novas mensagens                          |

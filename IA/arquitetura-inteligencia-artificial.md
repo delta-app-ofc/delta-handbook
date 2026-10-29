@@ -358,6 +358,10 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 - **Autenticação:** todas as rotas, exceto `/health`, exigem `Authorization: Bearer <JWT>`, assinado com HS256 e
   com os claims `sub` (o `user_id`) e `exp`. O `user_id` vem somente do token, nunca do corpo ou da URL. O
   back-end precisa emitir o token com o segredo `JWT_SECRET` compartilhado com a API de IA.
+- **Claim `sub`:** por padrão do JWT, `sub` é uma string. A API a converte para inteiro positivo antes de consultar
+  `chat_sessions.user_id`; um `sub` que não seja um inteiro positivo resulta em 401.
+- **Campos de data:** na resposta de `GET /sessions`, `created_at` vem de `started_at` e `updated_at` vem de
+  `last_activity_at` da sessão. A ordem da lista usa `last_activity_at`.
 - **`session_id`:** é o `_id` da sessão em texto e sempre criado pelo servidor; um id que o servidor não
   devolveu (ou que é de outro usuário) responde 404.
 - **Título, prévia e ícone:** gerados por um modelo de linguagem rápido na primeira troca de mensagens e gravados

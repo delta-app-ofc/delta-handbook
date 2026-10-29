@@ -14,7 +14,7 @@ A representação de `Settings` omite chaves, senhas e URIs de conexão. Erros d
 
 | `APP_ENV` | Comportamento |
 | --- | --- |
-| `development` (padrão) | Pode usar os serviços descartáveis definidos em [`docker-compose.dev.yml`](../docker-compose.dev.yml): PostgreSQL local e as duas URIs Mongo locais. O fallback local só é aplicado quando a variável correspondente não foi informada. |
+| `development` (padrão) | Pode usar os serviços descartáveis definidos em `docker-compose.dev.yml`: PostgreSQL local e as duas URIs Mongo locais. O fallback local só é aplicado quando a variável correspondente não foi informada. |
 | `test` | Não usa defaults locais e não lê `.env`. Testes injetam valores sintéticos com `load_settings(environ=...)` ou `monkeypatch`; a suíte não precisa de banco, rede ou chave de LLM. |
 | `staging` / `production` | Não recebe URI local automaticamente. O componente precisa de configuração explícita antes de ser usado. Os nomes dos bancos Mongo mantêm os defaults `db_delta_app` e `db_delta_telemetry`. |
 
@@ -69,4 +69,4 @@ postgres_args = get_postgres_connection_args()
 
 Os validadores lançam `ConfigurationError` se o componente não estiver pronto. Eles verificam esquema de URI, variáveis obrigatórias, nomes e intervalos numéricos sem tentar conectar. `validate_config()` permanece disponível por compatibilidade para retornar uma lista agregada de problemas; chamadas isoladas devem usar o validador do componente correspondente.
 
-O arquivo [`tests/.env.example`](../tests/.env.example) documenta o modo de teste e não é carregado pela suíte. `tests/conftest.py` remove settings herdadas do processo, força `APP_ENV=test` e limpa o cache após cada caso.
+O arquivo `tests/.env.example` documenta o modo de teste e não é carregado pela suíte. `tests/conftest.py` remove settings herdadas do processo, força `APP_ENV=test` e limpa o cache após cada caso.

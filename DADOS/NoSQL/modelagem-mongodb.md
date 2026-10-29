@@ -184,12 +184,15 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
 | Campo                        | Tipo             | Obrigatório | Descrição                                              |
 |------------------------------|------------------|-------------|--------------------------------------------------------|
 | `_id`                        | ObjectId         | Sim         | Identificador da sessão                                |
-| `user_id`                    | timestamp        | Sim         | Usuário dono da sessão                                 |
+| `user_id`                    | int              | Sim         | Usuário dono da sessão (referência ao ID do PostgreSQL) |
 | `started_at`                 | timestamp        | Sim         | Início da sessão                                       |
 | `last_activity_at`           | timestamp        | Sim         | Última interação                                       |
 | `is_open`                    | bool             | Não         | Sessão aceita novas mensagens                          |
 | `is_active`                  | bool             | Não         | Sessão em atendimento no momento                       |
 | `is_deleted`                 | bool             | Não         | Soft delete (não remove o documento)                   |
+| `title`                      | string           | Não         | Título curto da conversa na lista de histórico (até 100 caracteres), gerado pela IA |
+| `preview`                    | string           | Não         | Frase-resumo da conversa na lista de histórico (até 200 caracteres), gerada pela IA |
+| `icon`                       | string           | Não         | Nome do ícone do assunto (até 40 caracteres), que o app converte em imagem |
 | `messages[]`                 | array de objetos | Não         | Mensagens da sessão, em ordem cronológica              |
 | `messages[].role`            | enum             | Sim         | `user` ou `bot`                                        |
 | `messages[].content_type`    | enum             | Sim         | Tipo do conteúdo da mensagem (`text`, `function`)      |
@@ -206,12 +209,21 @@ ficam embutidas em um array dentro do próprio documento (padrão *Bucket*).
   "is_open": false,
   "is_active": false,
   "is_deleted": false,
+  "title": "Consumo acima do normal",
+  "preview": "Fluxo contínuo de madrugada, possível vazamento",
+  "icon": "leak",
   "messages": [
     { "role": "user", "content_type": "text", "content": "Por que meu consumo subiu tanto ontem?", "sent_at": "2026-07-17T14:00:05Z", "api_status_code": 200 },
     { "role": "bot", "content_type": "text", "content": "Identifiquei um fluxo contínuo de 2.8 LPM de madrugada. Pode ser um vazamento.", "sent_at": "2026-07-17T14:00:12Z", "api_status_code": 200 }
   ]
 }
 ```
+
+> **Título, prévia e ícone.** Os três campos são opcionais e alimentam a lista de histórico do app. A API
+> de IA os gera com um modelo de linguagem na primeira troca de mensagens da sessão. Sem eles, o cliente usa o
+> início da primeira mensagem como título e o ícone `general`. Valores de `icon` produzidos hoje: `routine`,
+> `habits`, `summary`, `report`, `savings`, `leak`, `forecast`, `consumption`, `tips` e `general`; o banco não
+> restringe a lista, e um valor desconhecido deve ser exibido como `general`.
 
 > ⚠️ **Limite de tamanho do array.** Recomenda-se travar `messages[]` em, no máximo, 50–100 entradas por
 > sessão no código da aplicação. Ao atingir o limite, o back-end deve fechar a sessão (`is_open: false`) e abrir

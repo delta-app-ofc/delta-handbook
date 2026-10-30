@@ -17,6 +17,15 @@ da Grande SP (essas cobram a mesma tarifa entre si).
 - **name**: Nome da região.
   - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`
 
+### 🏙️ Tabela de apoio: `tb_city_region`
+
+Liga cada cidade atendida à sua região de tarifa. A API usa essa tabela para preencher `tb_address.region_id` a partir de `city` e `state`; cidade que não está nela não pode ser cadastrada. Detalhes, fontes e lista de cidades em [mapeamento-cidade-regiao.md](mapeamento-cidade-regiao.md).
+
+- **id (PK)**: Identificador do mapeamento.
+- **city**: Nome da cidade, como a API de CEP devolve (único junto com `state`).
+- **state**: UF com 2 letras maiúsculas.
+- **region_id (FK)**: Referência para `tb_region`.
+
 ---
 
 ## 📅 2. Tabela: `tb_day_of_week`
@@ -50,7 +59,7 @@ Armazena os endereços dos imóveis cadastrados.
 
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
-- **region_id (FK)**: Referência para `tb_region`.
+- **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` e `state` (ver `tb_city_region`); o aplicativo não envia esse campo.
 - **cep**: CEP (8 dígitos numéricos).
 - **city**: Cidade.
 - **state**: Estado.

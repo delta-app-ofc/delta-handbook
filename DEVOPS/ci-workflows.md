@@ -6,6 +6,7 @@ Esta página reúne o que os workflows de integração contínua executam e como
 
 | Repositório | O que o CI valida | Execução local |
 | --- | --- | --- |
+| `delta-api-postgres` | Suíte Maven existente em Java 17, executada em container com H2. Não comprova compatibilidade completa com PostgreSQL, schema e procedures oficiais ou integrações externas. | Na raiz: `docker compose -f docker-compose.test.yml config --quiet`, `docker compose -f docker-compose.test.yml run --build --rm tests`. Depois: `docker compose -f docker-compose.test.yml down`. |
 | `delta-api-mongo` | Suíte padrão Maven com Java 17. Os testes HTTP que precisam de MongoDB real são opt-in e não entram neste CI. | Java 17: `bash ./mvnw --batch-mode --no-transfer-progress test` (Linux/macOS) ou `mvnw.cmd test` (Windows). |
 | `delta-artificial-intelligence` | Instala dependências de desenvolvimento com Python 3.12, roda `pip check`, compila `app` e executa `tests/` com `APP_ENV=test`. Os testes atuais cobrem dois cenários isolados de previsão, sem bancos ou provedores externos. | `python -m pip install -r requirements-dev.txt`; defina `APP_ENV=test`; rode `python -m pip check`, `python -m compileall -q app` e `python -m unittest discover -s tests -v`. |
 | `delta-business-rules` | Suíte pytest em Python 3.12. Usa dados locais e não conecta a PostgreSQL, MongoDB ou Change Streams reais. | `python -m pip install -r requirements-dev.txt`; `python -m pytest -q`. |

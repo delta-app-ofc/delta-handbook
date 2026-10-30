@@ -115,6 +115,21 @@ imóveis comerciais).
 - **group_name**: Grupo da categoria.
   - Valores permitidos: `RESIDENCIAL`, `COMERCIAL`
 
+### 📚 Origem das categorias
+
+As categorias vêm da estrutura tarifária real da Sabesp, publicada pela ARSESP:
+
+- [Tabela Geral de Tarifas da Sabesp](http://www.arsesp.sp.gov.br/ArquivosRegulamentacao/Tarifas/Saneamento/tabela%20de%20tarifas-sabesp-geral.pdf) — versão mais antiga, usa o nome "Favela".
+- [Nota Técnica do 1º Reajuste Tarifário, URAE-1 Sudeste](https://www.arsesp.sp.gov.br/Documentosgerais/NT_1__REAJUSTE_TARIFARIO_DA_SABESP__Tarifa_Aplicacao___URAE1___assinado.pdf) — versão de 2026, tabelas por região no Anexo I, categoria chamada "Vulnerável".
+
+Diferenças entre o projeto e a fonte:
+
+- `RESIDENCIAL_FAVELA` segue o nome da tabela antiga; a de 2026 chama a mesma categoria de "Residencial Vulnerável".
+- `RESIDENCIAL_ESPECIAL` e `COMERCIAL_ESPECIAL` só têm tarifa publicada em alguns municípios do interior, não na Grande SP. Onde falta, a tarifa da categoria "Normal" é usada como aproximação (ver `tariffs/README.md` no `delta-business-rules`).
+- `PUBLICA_COM_CONTRATO` está no grupo `COMERCIAL` por decisão do projeto, não da Sabesp.
+
+Quem define a categoria de um imóvel é quem o cadastra: `sp_register_property` recebe o nome da categoria e `sp_update_property_classification` troca depois. O sistema não deduz a categoria. Na Sabesp real, quem enquadra o cliente é a própria Sabesp (a tarifa social, por exemplo, exige CadÚnico).
+
 ---
 
 ## 🔗 7. Tabela: `tb_user_property`

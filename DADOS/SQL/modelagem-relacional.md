@@ -15,15 +15,15 @@ da Grande SP (essas cobram a mesma tarifa entre si).
 ### 📌 Atributos
 - **id (PK)**: Identificador da região.
 - **name**: Nome da região.
-  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`
+  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`, `LITORAL`, `VALE_DO_RIBEIRA`, `INTERIOR`, `VALE_DO_PARAIBA`
 
-### 🏙️ Tabela de apoio: `tb_city_region`
+### 🏙️ Tabela de apoio: `tb_municipality`
 
-Liga cada cidade atendida à sua região de tarifa. A API usa essa tabela para preencher `tb_address.region_id` a partir de `city` e `state`; cidade que não está nela não pode ser cadastrada. Detalhes, fontes e lista de cidades em [mapeamento-cidade-regiao.md](mapeamento-cidade-regiao.md).
+Liga cada município atendido pela Sabesp ao seu grupo tarifário. A API usa essa tabela para preencher `tb_address.region_id` a partir de `city` (depois de conferir que `state` é `SP`); município que não está nela não pode ser cadastrado. Detalhes, fontes e lista de municípios em [mapeamento-cidade-regiao.md](mapeamento-cidade-regiao.md).
 
-- **id (PK)**: Identificador do mapeamento.
-- **city**: Nome da cidade, como a API de CEP devolve (único junto com `state`).
-- **state**: UF com 2 letras maiúsculas.
+- **id (PK)**: Identificador do município.
+- **name**: Nome do município, como a API de CEP devolve (único).
+- **ibge_code**: Código IBGE de 7 dígitos (único).
 - **region_id (FK)**: Referência para `tb_region`.
 
 ---
@@ -59,7 +59,7 @@ Armazena os endereços dos imóveis cadastrados.
 
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
-- **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` e `state` (ver `tb_city_region`); o aplicativo não envia esse campo.
+- **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` (ver `tb_municipality`); o aplicativo não envia esse campo.
 - **cep**: CEP (8 dígitos numéricos).
 - **city**: Cidade.
 - **state**: Estado.

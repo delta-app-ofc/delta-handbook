@@ -34,7 +34,7 @@ modelo nem de Juiz:
 | Memória de consumo por pergunta | sim | testes unitários | não (reduz idas ao banco; ganho depende do banco) |
 | Guarda em paralelo com contexto e roteador | sim | testes unitários e de grafo com modelos falsos | sim, antes e depois pela observabilidade: fase inicial de 2,6-3,5 s para 1,4-1,7 s |
 | Histórico lido uma vez | sim | testes unitários | não |
-| `OPENAI_FAST_REASONING_EFFORT` | sim (opcional, desligado) | testes de configuração | sim, com `gpt-6-luna`: **sem ganho relevante** nas chamadas rápidas |
+| Nível de raciocínio por papel (`OPENAI_FAST_REASONING_EFFORT` e `OPENAI_SPECIALIST_REASONING_EFFORT`) | sim, **ligado por padrão** (chamadas rápidas em `low`, especialistas em `high`) | testes de configuração e de escolha do modelo | `low` nas chamadas rápidas: sem ganho relevante em `gpt-6-luna`; `high` nos especialistas: **não medido** |
 | `POST /chat/stream` (SSE), com plano e progresso por tool | sim | testes de rota, de gerador e do grafo real; servidor real | sim: os rótulos não somam tempo; o primeiro chega em 0,3-0,4 s |
 | Tools em lote / em paralelo | **não** (avaliado e descartado) | — | sim, perfil de voltas do agente: ver "Tools em paralelo e tool em lote" |
 
@@ -142,14 +142,28 @@ chamada do roteador pode ter sido gasta à toa (aceito).
 
 **Como reverter.** Religar `guardrail_input → context → route` em série e chamar `validate_input` no nó de entrada.
 
-## 4. Menos raciocínio nas chamadas rápidas (só configuração)
+## 4. Nível de raciocínio por papel (configuração)
 
-`OPENAI_FAST_REASONING_EFFORT` (`none`, `low`, `medium`, `high`, `xhigh` ou `max`) define o nível de raciocínio
-**só** das chamadas rápidas (guarda, roteador, síntese e título da sessão) quando `LLM_PROVIDER=openai`. Sem a
-variável, vale `OPENAI_REASONING_EFFORT`, ou seja, **nada muda até a equipe ligar**. Nenhum modelo, prompt ou o Juiz
-foi alterado. **Resultado medido** (`gpt-6-luna`, 4 repetições): com `medium` a guarda levou 1,38 s e o roteador 1,11 s; com `low`,
-1,13 s e 1,34 s. **Sem diferença além do ruído**, então a recomendação é **não ligar** por enquanto. O efeito em
-custo (tokens de raciocínio) não foi medido.
+Decisão da equipe: as chamadas **leves** usam raciocínio baixo e os **agentes especialistas** usam raciocínio alto.
+Vale quando `LLM_PROVIDER=openai`.
+
+| Papel | Variável | Padrão | O que usa |
+| --- | --- | --- | --- |
+| Chamadas rápidas | `OPENAI_FAST_REASONING_EFFORT` | `low` | guarda de entrada, roteador, síntese e título da sessão |
+| Agentes especialistas | `OPENAI_SPECIALIST_REASONING_EFFORT` | `high` | consumo, previsão, vazamento e hábitos |
+| Demais usos (por exemplo, o Juiz) | `OPENAI_REASONING_EFFORT` | `medium` | **não foi alterado** |
+
+Os valores aceitos são `none`, `low`, `medium`, `high`, `xhigh` e `max`. Deixar uma das duas primeiras variáveis vazia
+faz o papel voltar a usar o `OPENAI_REASONING_EFFORT`. O Agente Juiz, o Jev, os modelos e os prompts não foram alterados.
+
+**O que se sabe pela medição** (`gpt-6-luna`, 4 repetições): com `low` a guarda levou 1,13 s e o roteador 1,34 s; com
+`medium`, 1,38 s e 1,11 s. **Sem diferença além do ruído**: `low` nas chamadas rápidas não reduz a latência de forma
+mensurável, embora também não prejudique o roteamento nos testes feitos.
+
+**O que não se mediu:** o efeito de `high` nos especialistas. O agente especialista já é de 55% a 70% do tempo da
+pergunta (as voltas do modelo e a redação da resposta); raciocínio mais alto tende a **aumentar o tempo e o custo**
+dessa parte. Meça antes e depois nos painéis de observabilidade (tempo do agente, tokens e custo por pergunta) e, se o
+custo ou o tempo não compensarem, volte para `medium` pela variável, sem mudar código.
 
 ## 5. Etapas por SSE: `POST /chat/stream`
 
@@ -313,8 +327,8 @@ Agente Juiz e Jev (timeout, payload, fallback, número de revisões), escolha e 
   > configurado por `DB_POOL_MIN_SIZE`, `DB_POOL_MAX_SIZE` e `DB_POOL_WAIT_SECONDS`; `workers × DB_POOL_MAX_SIZE`
   > deve ficar abaixo do `max_connections` do PostgreSQL. Ao recarregar settings, chame `close_pool()`.
 
-- [Settings](settings.md): incluir `DB_POOL_MIN_SIZE`, `DB_POOL_MAX_SIZE`, `DB_POOL_WAIT_SECONDS` e
-  `OPENAI_FAST_REASONING_EFFORT`.
+- [Settings](settings.md): incluir `DB_POOL_MIN_SIZE`, `DB_POOL_MAX_SIZE`, `DB_POOL_WAIT_SECONDS`,
+  `OPENAI_FAST_REASONING_EFFORT` e `OPENAI_SPECIALIST_REASONING_EFFORT`.
 - [API FastAPI](implementacao-api-fastapi.md): incluir a rota `POST /chat/stream` e o contrato dos eventos.
 - [Guardrails](implementacao-guardrails.md) e [orquestração LangGraph](implementacao-langgraph-orquestracao.md):
   registrar que a guarda de entrada passou a ser dividida em regras instantâneas e classificador LLM, e que este roda

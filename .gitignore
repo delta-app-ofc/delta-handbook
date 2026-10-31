@@ -133,3 +133,7 @@ desktop.ini
 # Arquivos locais do projeto
 # ============================================
 TASK*.md
+
+# Relatorios de testes e scanner
+reports/
+.scannerwork/

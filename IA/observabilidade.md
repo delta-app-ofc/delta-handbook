@@ -18,7 +18,27 @@ Os caminhos abaixo são do repositório `delta-artificial-intelligence`.
 | Projeção por linha de comando | `python -m scripts.cost_projection --pdf relatorio.pdf` |
 | LangSmith opcional | `app/observability/langsmith.py`, `scripts/langsmith_reconcile.py` |
 
-Só requisições de chat completo (`/chat` e as abas Chat e Juiz) são registradas. Cada registro fica na coleção `observability_requests` do MongoDB do app, sem pergunta, resposta ou `user_id`. Sem MongoDB, o painel usa os registros do processo atual; depois de uma falha de conexão o banco é ignorado por 60 s, para o painel não esperar o timeout a cada leitura.
+Só requisições de chat completo (`/chat` e as abas Chat e Juiz) são registradas. Cada registro fica na coleção `observability_requests` do MongoDB do app, sem pergunta nem resposta. Sem MongoDB, o painel usa os registros do processo atual; depois de uma falha de conexão o banco é ignorado por 60 s, para o painel não esperar o timeout a cada leitura.
+
+### A coleção `observability_requests`
+
+Ela é definida no repositório `delta-mongo-database` (schema com validador, índices e documentação em `collections/db_delta_app.md`), na branch `feat/colecao-observability-requests`. O papel `role_api_service` já tem permissão de escrita em `db_delta_app`. Os índices são:
+
+- TTL de 90 dias em `created_at`, para a coleção não crescer sem limite;
+- único em `request_id`;
+- `client` + `created_at`, para o custo por canal;
+- parcial em `user_hash` + `created_at`, para contar usuários distintos.
+
+O `user_id` nunca é gravado. O campo `user_hash` é um HMAC do usuário com o segredo `OBS_HASH_SECRET` (16 caracteres ou mais), não reversível; sem o segredo, a contagem de usuários distintos fica indisponível.
+
+### Cliente, usuários e custo por canal
+
+O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `web`. Sem o cabeçalho (ou com outro valor) o registro fica como `unknown`, e o console de testes é sempre `playground`. O app e a plataforma web precisam enviar esse cabeçalho em toda chamada ao `/chat`. Com ele, o painel mostra o custo por cliente, qual cliente mais gasta, os usuários distintos e as perguntas por usuário (medidas, não mais um cenário).
+
+### Embeddings e Jev no custo
+
+- **Embeddings** entram no custo: a API não devolve a contagem de tokens, então ela é estimada em 1 token a cada 4 caracteres do texto enviado. Preços (tarifa Standard, por 1 milhão de tokens de entrada): `gemini-embedding-001` US$ 0,15 e `gemini-embedding-2` US$ 0,20, na [página de preços do Gemini](https://ai.google.dev/gemini-api/docs/pricing) (leitura resumida, vale conferir). O custo aparece como o componente `embeddings`.
+- **Jev** (Typesafe) não passa pelo LangChain e eu não encontrei tabela pública de preço. O custo entra por avaliação do Juiz, com o valor de `OBS_JEV_COST_USD` (hoje 0). Informe o preço real do contrato para o custo total ficar correto.
 
 ## Definições
 
@@ -101,4 +121,7 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - **MongoDB Atlas e PostgreSQL reais**: o Atlas recusou a conexão (`SSL handshake failed`), provavelmente por IP não liberado na lista de acesso do cluster, e o PostgreSQL local não estava em execução. Por isso os agentes não leram dados reais e as três perguntas ficaram "parciais". A gravação no Atlas só foi validada num MongoDB local.
 - **Resolução real**: sem acesso aos bancos, nenhuma pergunta terminou como resolvida; a taxa de resolução, o custo por resolução e o ROI só são significativos com os bancos acessíveis.
 - **Preços do Groq e custo do Jev**: sem confirmação oficial (ver acima).
-- **Endpoints com Bearer** (`/observability/*`): dependem de `app/auth.py`, que ainda não está na `main` do repositório de IA; entram quando a autenticação for integrada.
+- **Endpoint administrativo**: o painel em produção deve ser um endpoint protegido por JWT com **papel de admin** (hoje a autenticação aceitaria qualquer usuário). Ele depende de `app/auth.py`, que ainda não está na `main` do repositório de IA, e de um claim de papel no token emitido pelo back-end; entra quando a autenticação for integrada. Até lá o painel existe só no console de testes.
+- **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
+- **Preço do Jev**: sem tabela pública; o custo fica em 0 até `OBS_JEV_COST_USD` ser preenchido.
+- **LangSmith em produção**: ele envia prompts e respostas para fora. Em produção, deixe desligado ou use só com amostragem e depois do guardrail que mascara dados pessoais. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.

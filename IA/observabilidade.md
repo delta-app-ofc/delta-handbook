@@ -38,7 +38,7 @@ O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `
 ### Embeddings e Jev no custo (sem estimativa)
 
 - **Embeddings**: a resposta do `embed_content` do Google **não traz o uso** (testei: só `embeddings` e a resposta HTTP). Por isso o texto enviado é contado com o método oficial `count_tokens`, que aceita o modelo de embedding (medido: 12 tokens para 51 caracteres). Se a contagem falhar, a chamada é marcada como "sem contagem" e **o custo dela não é estimado**. Preços por 1 milhão de tokens de entrada: `gemini-embedding-001` US$ 0,15 e `gemini-embedding-2` US$ 0,20, na [página de preços do Gemini](https://ai.google.dev/gemini-api/docs/pricing) (leitura resumida, vale conferir). O custo aparece como o componente `embeddings`.
-- **Jev** (Typesafe): a resposta da API traz `usage.input_tokens` e `usage.output_tokens`, que o `JudgeAgent` já lê, então o custo usa os tokens reais (medido: uma pergunta usou 15.961 tokens, US$ 0,00067). O preço é US$ 0,042 por milhão de tokens de entrada, com saída gratuita. **Esse preço vem de fontes secundárias** ([eesel.ai](https://www.eesel.ai/blog/typesafe-jev-pricing), e o roteiro da Etapa 7); não encontrei página oficial de preços da TypeSafe. Confirme com a TypeSafe ou no contrato antes de apresentar.
+- **Jev** (Typesafe): a resposta da API traz `usage.input_tokens` e `usage.output_tokens`, que o `JudgeAgent` já lê, então o custo usa os tokens reais (medido: uma pergunta usou 15.961 tokens, US$ 0,00067). O preço de entrada é o da [home da TypeSafe](https://typesafe.ai) (US$ 42 por bilhão de tokens, ou US$ 0,042 por milhão); o de saída não é publicado e é tratado como 0, como diz a aula (Etapa 7).
 
 ## Definições
 
@@ -67,32 +67,29 @@ Todas as variáveis são lidas e validadas em `app/config.py` (`get_observabilit
 | --- | --- | --- | --- | --- |
 | `gpt-6-luna` | 0,10 | 0,50 | [OpenAI, pricing](https://developers.openai.com/api/docs/pricing) | Oficial, lida em 31/10/2026. Cache de entrada 0,01. Acima de 272 mil tokens de entrada: 0,20 / 0,75 |
 | `gemini-2.5-flash` | 0,30 | 2,50 | [Google, pricing](https://ai.google.dev/gemini-api/docs/pricing) | Oficial; a saída inclui tokens de raciocínio. A leitura da página veio resumida, vale conferir o trecho |
-| `openai/gpt-oss-120b` | 0,15 | 0,60 | [Groq, pricing](https://groq.com/pricing) | **Não confirmada**: a página não exibe a tabela sem JavaScript. Valor de agregadores; o lançamento listava 0,15 / 0,75 |
-| `openai/gpt-oss-20b` | 0,075 | 0,30 | [Groq, pricing](https://groq.com/pricing) | **Não confirmada**, mesmo caso |
+| `openai/gpt-oss-120b` | 0,15 | 0,60 | [Groq, página do modelo](https://console.groq.com/docs/model/openai/gpt-oss-120b) | Oficial. Entrada em cache 0,075. A página não mostra data de atualização |
+| `openai/gpt-oss-20b` | 0,075 | 0,30 | [Groq, página do modelo](https://console.groq.com/docs/model/openai/gpt-oss-20b) | Oficial. Entrada em cache 0,037 |
+| `jev` (`jev-1.14.0`) | 0,042 | 0 | [TypeSafe, home](https://typesafe.ai) | Oficial para a entrada: "US$ 42 por bilhão de tokens de entrada" (US$ 0,042 por milhão é conversão). **O preço de saída não é publicado**: 0 vem da aula (Etapa 7) e de fontes de terceiros. A TypeSafe não tem página de preços (`/pricing` dá 404) nem limites publicados na documentação lida. Confirmar a saída em typesafe.ai/contact |
 
-O Groq só atua como fallback do especialista, então o impacto no custo total é pequeno. Para corrigir um preço sem alterar o código, use `OBS_PRICES_JSON`. O cenário pessimista da projeção multiplica o custo por 1,5. O custo do Jev e dos embeddings entra no total, com tokens contados (ver acima); o preço do Jev ainda não tem fonte oficial.
+O Groq só atua como fallback do especialista. Para corrigir um preço sem alterar o código, use `OBS_PRICES_JSON`.
 
 ### Custo de um atendimento humano
 
-`OBS_SUPPORT_COST_USD` = **6,0**, o extremo baixo da faixa de referência de mercado. Fontes, todas de blogs de fornecedores de atendimento (não são dados da Delta):
-
-- [StealthAgents, benchmarks de custo por ticket 2026](https://stealthagents.com/research/customer-support-cost-per-ticket-benchmarks-2026): mediana de US$ 13,50 por contato nos EUA (atribuída ao Gartner) e faixa de US$ 6 a 12 conforme geografia e complexidade;
-- [Lorikeet, custo por ticket](https://lorikeetcx.ai/articles/customer-service-cost-per-ticket): faixas por setor, de US$ 2,70 no varejo a US$ 60 em B2B;
-- MetricNet, citado pelas mesmas fontes: US$ 15,56 por ticket em help desk de TI.
-
-O valor para o Brasil provavelmente é menor. Se a equipe tiver o custo real de um atendimento, informe-o: ele muda o ROI na mesma proporção.
+`OBS_SUPPORT_COST_USD` = **8,01** por contato: pesquisa da Gartner com líderes de atendimento (2019), que mede o custo médio de canais atendidos por pessoas (telefone, chat ao vivo e e-mail) em [US$ 8,01](https://www.gartner.com/en/newsroom/press-releases/2019-09-25-gartner-says-only-9--of-customers-report-solving-thei), contra cerca de US$ 0,10 do autoatendimento. Não consegui abrir a página da Gartner diretamente; o valor vem do resumo e de cópias dela, então vale conferir. A própria Gartner publica depois uma [mediana de US$ 13,50](https://www.gartner.com/en/documents/5164231) por contato assistido. São valores de mercado, não dados da Delta nem do Brasil: se a equipe tiver o custo real de um atendimento, informe-o.
 
 ### Demais premissas
 
-| Variável | Padrão | Observação |
+| Variável | Padrão | Fonte e observação |
 | --- | --- | --- |
-| `OBS_QUESTIONS_PER_USER_WEEK` | 5 | **Sem fonte.** É um cenário, não um dado. O ideal é medir: contar mensagens por usuário por semana nas sessões do MongoDB depois de algumas semanas de uso |
-| `OBS_USD_TO_BRL` | 5,5 | Câmbio aproximado; atualize na data da apresentação |
-| `OBS_LATENCY_P95_LIMIT_MS` | 8000 | Limite do p95 do tempo total no SLO |
-| `OBS_ERROR_RATE_LIMIT` | 0.05 | Limite do índice de erros no SLO (entre 0 e 1) |
+| `OBS_USD_TO_BRL` | 5,4212 | PTAX de venda do Banco Central em 30/10/2026, pela [API Olinda do BCB](https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/aplicacao#!/recursos/CotacaoDolarDia). Atualize na data da apresentação |
+| `OBS_QUESTIONS_PER_USER_WEEK` | 0 (usar o medido) | **Não existe fonte externa confiável.** Sem valor definido, o relatório usa a taxa **medida** (perguntas por usuário ÷ semanas observadas), e só depois de 7 dias de dados; antes disso a projeção aparece como "n/d" |
+| `OBS_LATENCY_P95_LIMIT_MS` | 8000 | Meta de SLO definida pela equipe, não é referência externa |
+| `OBS_ERROR_RATE_LIMIT` | 0,05 | Meta de SLO definida pela equipe, não é referência externa |
 | `OBS_PRICES_JSON` | tabela interna | Sobrescreve preços, ex. `{"gpt-6-luna": [0.10, 0.50]}` |
 
-Limites: tokens vêm do que o provedor devolve; o custo real da fatura pode diferir (cache, lote, impostos). Com dados mockados, os números mostram o funcionamento, não o uso real.
+O **cenário base** da projeção usa o custo médio medido por requisição, e o **pessimista** usa o custo medido no **percentil 95** das requisições (antes era um fator de 1,5 sem fonte). Por isso o relatório só é confiável com muitas requisições: com poucas, a média e o p95 dependem de poucos pontos.
+
+Limites: tokens vêm do que o provedor devolve ou do `count_tokens`; o custo real da fatura pode diferir (cache, lote, impostos).
 
 ## LangSmith (opcional)
 
@@ -122,5 +119,5 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - **Preços do Groq e custo do Jev**: sem confirmação oficial (ver acima).
 - **Endpoint administrativo**: o painel em produção deve ser um endpoint protegido por JWT com **papel de admin** (hoje a autenticação aceitaria qualquer usuário). Ele depende de `app/auth.py`, que ainda não está na `main` do repositório de IA, e de um claim de papel no token emitido pelo back-end; entra quando a autenticação for integrada. Até lá o painel existe só no console de testes.
 - **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
-- **Preço do Jev**: US$ 0,042 por milhão de tokens vem de fontes secundárias; falta a confirmação oficial da TypeSafe.
+- **Preço de saída do Jev** e limites de uso: a TypeSafe não publica; confirmar em typesafe.ai/contact.
 - **LangSmith em produção**: ele envia prompts e respostas para fora. Em produção, deixe desligado ou use só com amostragem e depois do guardrail que mascara dados pessoais. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.

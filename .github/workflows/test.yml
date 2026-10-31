@@ -20,6 +20,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Instalar dependencias dos testes
+        run: python -m pip install -r requirements-dev.txt
+      - name: Testar o validador documental
+        run: python -m unittest discover -s tests -v
       - name: Validar documentos Markdown
         run: python scripts/validate_markdown.py
 

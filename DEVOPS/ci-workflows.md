@@ -31,7 +31,7 @@ Use Docker Engine e Docker Compose v2 ativos para os comandos que iniciam servi�
 
 | Repositório | O que o CI valida | Execução local |
 | --- | --- | --- |
-| `.github` | 44 testes de governanca e politica Sonar com APIs simuladas, incluindo filtro de gravidade, SHA, aprovacoes e YAML duplicado. | `python -m pip install -r requirements-dev.txt`; `python -m unittest discover -s tests -v`. |
+| `.github` | 46 testes de governanca e politica Sonar com APIs simuladas, incluindo filtro de gravidade, SHA, aprovacoes e YAML duplicado. | `python -m pip install -r requirements-dev.txt`; `python -m unittest discover -s tests -v`. |
 | `delta-business-intelligence` | Sintaxe dos scripts Python em `v1` com Python 3.9, sem executá-los ou conectar a bancos, Glue ou Databricks. | `python -m compileall -q v1`. |
 | `delta-handbook` | Valida documentos rastreados e testa o proprio script validador: UTF-8, conteudo vazio, conflitos, falha de leitura/Git. | `python -m pip install -r requirements-dev.txt`; `python tests/run_ci.py`; `python scripts/validate_markdown.py`. |
 | `delta-template-repository` | Sintaxe YAML, `LICENSE` e `.gitignore` não vazios e regras essenciais de ignore para `.env`, `node_modules`, `target` e a exceção `.env.example`. A análise YAML não verifica semântica do Actions. O repositório é um scaffold e ainda não contém aplicativo executável. | Com Ruby e Git: `ruby -e 'require "psych"; Dir.glob(".github/workflows/*.{yml,yaml}").each { |f| Psych.parse_file(f); puts "OK: #{f}" }'`; `test -s LICENSE && test -s .gitignore`; valide as regras com `git check-ignore --no-index`. |
@@ -42,7 +42,7 @@ A política compartilhada exige 100% dos testes aprovados e pelo menos 70% de co
 
 | Repositório | Evidência automatizada | Cobertura de linhas |
 | --- | --- | --- |
-| `delta-sql-database` | Testes de integração executam scripts em PostgreSQL temporário e verificam comportamentos com dados mínimos. | N/A para percentual de linhas SQL: o fluxo não instrumenta SQL. Os smokes continuam obrigatórios e verificam comportamento real do banco. |
+| `delta-sql-database` | Integra PostgreSQL temporario e testa bi_etl.py offline com adaptadores simulados. | Python ETL gera XML/JUnit; arquivos SQL sao validados por comportamento, sem cobertura de linhas SQL. Exigir ambos os checks. |
 | `delta-mongo-database` | Smoke em MongoDB temporário verifica validação e índices; Sonar analisa estaticamente os scripts JavaScript. | O runner `mongosh` não gera LCOV e não declara percentual. Isso não concede isenção automática para mudanças JavaScript: antes de alterá-los, a cobertura instrumentada deve ser compatibilizada com a política central. |
 | `delta-redis-database` | Testes pytest exercitam a aplicação Python contra Redis 7 descartável e produzem JUnit, XML de cobertura e relatório HTML. | Instrumentada para Python; o mínimo de 70% se aplica apenas às linhas Python novas ou alteradas, não ao repositório inteiro. |
 | `delta-neo4j-database` | Testes pytest instrumentam o loader Python com driver simulado; um job separado valida setup e seed em Neo4j temporário. | Instrumentada para `load_graph.py`; arquivos `.cypher` não são contabilizados como cobertura e não recebem percentual inventado. |

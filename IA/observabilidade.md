@@ -92,11 +92,13 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - Três chamadas reais de chat com Gemini (`LLM_PROVIDER=gemini`, perguntas de consumo, previsão e vazamento): tokens e custo foram capturados (23.075 tokens de entrada e 2.019 de saída, US$ 0,0045 no total, cerca de US$ 0,0015 por pergunta). As três terminaram como parciais e o p95 foi de 46,7 s, porque o MongoDB e o provedor falharam nesse ambiente.
 - LangSmith: os traces chegaram ao projeto `delta-ai` e `scripts.langsmith_reconcile` os leu (4 runs raiz, 27.576 tokens, US$ 0,0085 pelo cálculo do LangSmith).
 - Aba **Monitor** no navegador: cartões, gráficos e tabela de projeção renderizados com dados dessa chamada real.
+- **`gpt-6-luna` com uso real** (provedor padrão, OpenAI Responses): três perguntas custaram US$ 0,0019 no total, cerca de US$ 0,0006 por pergunta, com 15.332 tokens de entrada, 724 de saída e 5 chamadas ao modelo por pergunta, sem fallback. O custo bate com a tabela de preços (0,10 / 0,50).
+- **MongoDB local descartável** (`docker-compose.dev.yml`, porta 27018, base `delta_test_obs`, apagada ao final): a gravação em `observability_requests` e a leitura de volta funcionaram, e o registro não contém pergunta, resposta nem `user_id`.
+- **PDF** no estilo do relatório de BI: gerado e conferido página a página como imagem.
 
 **Pendente**
 
-- **MongoDB real**: a conexão com o Atlas falhou com `SSL handshake failed` neste ambiente, provavelmente por IP não liberado na lista de acesso do cluster. A gravação em `observability_requests` e a leitura de volta não foram validadas.
-- **`gpt-6-luna` com uso real**: o `.env` não tem `OPENAI_API_KEY`, então o custo real do provedor padrão não foi medido; só o preço foi conferido na página oficial.
-- **Resolução real**: a chamada de teste teve falhas de banco e de modelo, então ficou sem resolução; a taxa só é significativa com dados e provedores funcionando.
+- **MongoDB Atlas e PostgreSQL reais**: o Atlas recusou a conexão (`SSL handshake failed`), provavelmente por IP não liberado na lista de acesso do cluster, e o PostgreSQL local não estava em execução. Por isso os agentes não leram dados reais e as três perguntas ficaram "parciais". A gravação no Atlas só foi validada num MongoDB local.
+- **Resolução real**: sem acesso aos bancos, nenhuma pergunta terminou como resolvida; a taxa de resolução, o custo por resolução e o ROI só são significativos com os bancos acessíveis.
 - **Preços do Groq e custo do Jev**: sem confirmação oficial (ver acima).
 - **Endpoints com Bearer** (`/observability/*`): dependem de `app/auth.py`, que ainda não está na `main` do repositório de IA; entram quando a autenticação for integrada.

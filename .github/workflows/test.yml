@@ -22,3 +22,18 @@ jobs:
           python-version: '3.12'
       - name: Validar documentos Markdown
         run: python scripts/validate_markdown.py
+
+  report-ci:
+    name: Reportar resultado do CI na PR
+    if: always() && github.event_name == 'pull_request'
+    needs:
+      - documentos
+    uses: delta-app-ofc/.github/.github/workflows/report_ci.yml@3c58dc7de153e08f489708dea824fef2998ee948
+    with:
+      needs_results: ${{ toJSON(needs) }}
+    secrets:
+      DELTA_ORG_AUTOMATION_TOKEN: ${{ secrets.DELTA_ORG_AUTOMATION_TOKEN }}
+    permissions:
+      actions: read
+      issues: write
+      pull-requests: write

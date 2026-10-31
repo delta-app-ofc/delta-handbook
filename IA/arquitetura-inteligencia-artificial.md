@@ -344,6 +344,32 @@ Como candidato para essa integração, propõe-se o uso do **A2A Research Agent*
 
 Esses endpoints adicionais **não foram formalmente definidos** pela equipe e são sugestões alinhadas às necessidades de sessão, memória e observabilidade descritas neste documento.
 
+### Histórico de conversas e autenticação (implementado no `delta-artificial-intelligence`)
+
+O histórico de conversas da lista do app está implementado na API de IA sobre a coleção `chat_sessions`
+(ver `DADOS/NoSQL/modelagem-mongodb.md`). Essas rotas substituem a sugestão `GET /chat/history/{user_id}`:
+
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/sessions?limit=20&offset=0` | Lista as sessões do usuário, da mais recente à mais antiga, com `title`, `preview`, `icon`, `created_at`, `updated_at`, `is_open` e `total` |
+| `GET` | `/sessions/{session_id}/messages` | Mensagens de uma sessão do usuário |
+| `POST` | `/sessions/{session_id}/close` | Encerra a sessão e grava o resumo na memória de longo prazo |
+
+- **Autenticação:** todas as rotas, exceto `/health`, exigem `Authorization: Bearer <JWT>`, assinado com HS256 e
+  com os claims `sub` (o `user_id`) e `exp`. O `user_id` vem somente do token, nunca do corpo ou da URL. O
+  back-end precisa emitir o token com o segredo `JWT_SECRET` compartilhado com a API de IA.
+- **Claim `sub`:** por padrão do JWT, `sub` é uma string. A API a converte para inteiro positivo antes de consultar
+  `chat_sessions.user_id`; um `sub` que não seja um inteiro positivo resulta em 401.
+- **Campos de data:** na resposta de `GET /sessions`, `created_at` vem de `started_at` e `updated_at` vem de
+  `last_activity_at` da sessão. A ordem da lista usa `last_activity_at`.
+- **`session_id`:** é o `_id` da sessão em texto e sempre criado pelo servidor; um id que o servidor não
+  devolveu (ou que é de outro usuário) responde 404.
+- **Título, prévia e ícone:** gerados por um modelo de linguagem rápido na primeira troca de mensagens e gravados
+  em `title`, `preview` e `icon`.
+
+Status: implementado e testado com MongoDB real em banco descartável; a emissão do JWT pelo back-end e o limite de
+50–100 mensagens por sessão ainda não existem na API de IA.
+
 ---
 
 ## Observabilidade / SRE

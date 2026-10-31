@@ -35,10 +35,10 @@ O `user_id` nunca é gravado. O campo `user_hash` é um HMAC do usuário com o s
 
 O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `web`. Sem o cabeçalho (ou com outro valor) o registro fica como `unknown`, e o console de testes é sempre `playground`. O app e a plataforma web precisam enviar esse cabeçalho em toda chamada ao `/chat`. Com ele, o painel mostra o custo por cliente, qual cliente mais gasta, os usuários distintos e as perguntas por usuário (medidas, não mais um cenário).
 
-### Embeddings e Jev no custo
+### Embeddings e Jev no custo (sem estimativa)
 
-- **Embeddings** entram no custo: a API não devolve a contagem de tokens, então ela é estimada em 1 token a cada 4 caracteres do texto enviado. Preços (tarifa Standard, por 1 milhão de tokens de entrada): `gemini-embedding-001` US$ 0,15 e `gemini-embedding-2` US$ 0,20, na [página de preços do Gemini](https://ai.google.dev/gemini-api/docs/pricing) (leitura resumida, vale conferir). O custo aparece como o componente `embeddings`.
-- **Jev** (Typesafe) não passa pelo LangChain e eu não encontrei tabela pública de preço. O custo entra por avaliação do Juiz, com o valor de `OBS_JEV_COST_USD` (hoje 0). Informe o preço real do contrato para o custo total ficar correto.
+- **Embeddings**: a resposta do `embed_content` do Google **não traz o uso** (testei: só `embeddings` e a resposta HTTP). Por isso o texto enviado é contado com o método oficial `count_tokens`, que aceita o modelo de embedding (medido: 12 tokens para 51 caracteres). Se a contagem falhar, a chamada é marcada como "sem contagem" e **o custo dela não é estimado**. Preços por 1 milhão de tokens de entrada: `gemini-embedding-001` US$ 0,15 e `gemini-embedding-2` US$ 0,20, na [página de preços do Gemini](https://ai.google.dev/gemini-api/docs/pricing) (leitura resumida, vale conferir). O custo aparece como o componente `embeddings`.
+- **Jev** (Typesafe): a resposta da API traz `usage.input_tokens` e `usage.output_tokens`, que o `JudgeAgent` já lê, então o custo usa os tokens reais (medido: uma pergunta usou 15.961 tokens, US$ 0,00067). O preço é US$ 0,042 por milhão de tokens de entrada, com saída gratuita. **Esse preço vem de fontes secundárias** ([eesel.ai](https://www.eesel.ai/blog/typesafe-jev-pricing), e o roteiro da Etapa 7); não encontrei página oficial de preços da TypeSafe. Confirme com a TypeSafe ou no contrato antes de apresentar.
 
 ## Definições
 
@@ -88,7 +88,6 @@ O valor para o Brasil provavelmente é menor. Se a equipe tiver o custo real de 
 | --- | --- | --- |
 | `OBS_QUESTIONS_PER_USER_WEEK` | 5 | **Sem fonte.** É um cenário, não um dado. O ideal é medir: contar mensagens por usuário por semana nas sessões do MongoDB depois de algumas semanas de uso |
 | `OBS_USD_TO_BRL` | 5,5 | Câmbio aproximado; atualize na data da apresentação |
-| `OBS_JEV_COST_USD` | 0 | Custo do Jev por avaliação; ele não passa pelo LangChain, então é informado à mão |
 | `OBS_LATENCY_P95_LIMIT_MS` | 8000 | Limite do p95 do tempo total no SLO |
 | `OBS_ERROR_RATE_LIMIT` | 0.05 | Limite do índice de erros no SLO (entre 0 e 1) |
 | `OBS_PRICES_JSON` | tabela interna | Sobrescreve preços, ex. `{"gpt-6-luna": [0.10, 0.50]}` |
@@ -123,5 +122,5 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - **Preços do Groq e custo do Jev**: sem confirmação oficial (ver acima).
 - **Endpoint administrativo**: o painel em produção deve ser um endpoint protegido por JWT com **papel de admin** (hoje a autenticação aceitaria qualquer usuário). Ele depende de `app/auth.py`, que ainda não está na `main` do repositório de IA, e de um claim de papel no token emitido pelo back-end; entra quando a autenticação for integrada. Até lá o painel existe só no console de testes.
 - **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
-- **Preço do Jev**: sem tabela pública; o custo fica em 0 até `OBS_JEV_COST_USD` ser preenchido.
+- **Preço do Jev**: US$ 0,042 por milhão de tokens vem de fontes secundárias; falta a confirmação oficial da TypeSafe.
 - **LangSmith em produção**: ele envia prompts e respostas para fora. Em produção, deixe desligado ou use só com amostragem e depois do guardrail que mascara dados pessoais. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.

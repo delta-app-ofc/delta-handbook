@@ -111,13 +111,29 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - **`gpt-6-luna` com uso real** (provedor padrão, OpenAI Responses): três perguntas custaram US$ 0,0019 no total, cerca de US$ 0,0006 por pergunta, com 15.332 tokens de entrada, 724 de saída e 5 chamadas ao modelo por pergunta, sem fallback. O custo bate com a tabela de preços (0,10 / 0,50).
 - **MongoDB local descartável** (`docker-compose.dev.yml`, porta 27018, base `delta_test_obs`, apagada ao final): a gravação em `observability_requests` e a leitura de volta funcionaram, e o registro não contém pergunta, resposta nem `user_id`.
 - **PDF** no estilo do relatório de BI: gerado e conferido página a página como imagem.
+- **Atlas e PostgreSQL** (31/10/2026, depois de liberar o IP no Atlas e subir o Postgres do `docker-compose.dev.yml` com os scripts de `db/postgres-init/`): o `ping` dos dois clusters respondeu, e três perguntas reais com o `gpt-6-luna` terminaram com 2 sucessos e 1 parcial, p50 de 19,5 s e custo de US$ 0,0037 no total (US$ 0,0012 por pergunta, 5,7 chamadas ao modelo).
+- **Jev e embeddings com contagem real**: o Jev devolveu `usage` (15.961 tokens numa pergunta, US$ 0,00067) e o `count_tokens` do Google contou 12 tokens para um texto de 51 caracteres.
 
 **Pendente**
 
-- **MongoDB Atlas e PostgreSQL reais**: o Atlas recusou a conexão (`SSL handshake failed`), provavelmente por IP não liberado na lista de acesso do cluster, e o PostgreSQL local não estava em execução. Por isso os agentes não leram dados reais e as três perguntas ficaram "parciais". A gravação no Atlas só foi validada num MongoDB local.
-- **Resolução real**: sem acesso aos bancos, nenhuma pergunta terminou como resolvida; a taxa de resolução, o custo por resolução e o ROI só são significativos com os bancos acessíveis.
-- **Preços do Groq e custo do Jev**: sem confirmação oficial (ver acima).
-- **Endpoint administrativo**: o painel em produção deve ser um endpoint protegido por JWT com **papel de admin** (hoje a autenticação aceitaria qualquer usuário). Ele depende de `app/auth.py`, que ainda não está na `main` do repositório de IA, e de um claim de papel no token emitido pelo back-end; entra quando a autenticação for integrada. Até lá o painel existe só no console de testes.
-- **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
+- **Definição de resolução**: hoje conta como resolvida a resposta publicada sem erro e sem bloqueio do Juiz, o que inclui respostas do tipo "não consegui consultar a fonte". Na validação, a pergunta de consumo foi contada como resolvida mesmo sem ler os dados. A definição precisa exigir que as ferramentas tenham devolvido dados.
+- **Projeção**: só aparece depois de 7 dias de dados medidos (ver premissas); com poucas requisições o relatório mostra "n/d".
 - **Preço de saída do Jev** e limites de uso: a TypeSafe não publica; confirmar em typesafe.ai/contact.
+- **Preço da Gartner**: a página original não pôde ser aberta; o valor vem do resumo e de cópias. Conferir.
+- **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
+- **Coleção no cluster real**: `observability_requests` existe só nos scripts do `delta-mongo-database` (branch `feat/colecao-observability-requests`); falta aplicá-los no cluster do app.
+- **Área administrativa**: ver a seção seguinte.
 - **LangSmith em produção**: ele envia prompts e respostas para fora. Em produção, deixe desligado ou use só com amostragem e depois do guardrail que mascara dados pessoais. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.
+
+## Área administrativa (planejada)
+
+O painel de observabilidade existe só no console de testes da API de IA, que é desligado em produção. A decisão é levá-lo para um **perfil administrativo na plataforma web** (`delta-web-app`), que também terá o CRUD das tabelas do produto, como uma parte a mais do projeto. A tarefa está descrita no `TASK.md` da raiz do repositório web (arquivo local, ignorado pelo Git por convenção).
+
+Dependências:
+
+1. **Papel de administrador no JWT**, a combinar com quem emite o token no back-end.
+2. **Endpoint administrativo de observabilidade** na API de IA, protegido por esse papel. Depende de `app/auth.py`, que ainda não está na `main` do repositório de IA. Até lá não há endpoint com autenticação.
+3. **Cabeçalho `X-Client`** enviado pelo app e pela web.
+4. **Segredo `OBS_HASH_SECRET`** (16 caracteres ou mais) na API de IA, para contar usuários distintos.
+
+O relatório só é confiável com muitas requisições medidas; por isso essa área é urgente.

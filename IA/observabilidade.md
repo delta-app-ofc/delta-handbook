@@ -70,7 +70,7 @@ Todas as variáveis são lidas e validadas em `app/config.py` (`get_observabilit
 | `openai/gpt-oss-120b` | 0,15 | 0,60 | [Groq, pricing](https://groq.com/pricing) | **Não confirmada**: a página não exibe a tabela sem JavaScript. Valor de agregadores; o lançamento listava 0,15 / 0,75 |
 | `openai/gpt-oss-20b` | 0,075 | 0,30 | [Groq, pricing](https://groq.com/pricing) | **Não confirmada**, mesmo caso |
 
-O Groq só atua como fallback do especialista, então o impacto no custo total é pequeno. Para corrigir um preço sem alterar o código, use `OBS_PRICES_JSON`. O cenário pessimista da projeção multiplica o custo por 1,5. O custo do Jev (Typesafe) e dos embeddings não entra no cálculo: não encontrei tabela pública do Jev, então o custo total fica subestimado nessa parte.
+O Groq só atua como fallback do especialista, então o impacto no custo total é pequeno. Para corrigir um preço sem alterar o código, use `OBS_PRICES_JSON`. O cenário pessimista da projeção multiplica o custo por 1,5. O custo do Jev e dos embeddings entra no total, com tokens contados (ver acima); o preço do Jev ainda não tem fonte oficial.
 
 ### Custo de um atendimento humano
 

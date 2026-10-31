@@ -219,8 +219,8 @@ de IPv4). Uma medição minha inicial mostrou 24,6 s para a pergunta comercial, 
 cliente e o resto variação do provedor; com `127.0.0.1` a mesma pergunta levou 12,0 s. Meça com `127.0.0.1`.
 
 **Conclusão:** a IA completa leva de 8 a 12 s nestas perguntas, e o ganho que ainda existe está no agente especialista
-(modelo, número de voltas e tamanho da resposta) e na espera, não em banco nem em rótulos. A decisão sobre o experimento
-de tools em lote deve olhar o número de voltas do agente nos painéis.
+(modelo, número de voltas e tamanho da resposta) e na espera, não em banco nem em rótulos. O que isso significa para tools em lote
+e em paralelo está em "Tools em paralelo e tool em lote".
 
 ## Antes e depois pela observabilidade (A/B)
 

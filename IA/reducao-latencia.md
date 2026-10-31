@@ -1,6 +1,7 @@
 # Redução de latência do chat
 
-> **Estado:** implementado e testado na branch `feat/reduz-latencia-chat` do `delta-artificial-intelligence`,
+> **Estado:** implementado e testado na branch `feat/reduz-latencia-chat` do `delta-artificial-intelligence`
+> (feita em cima da `feat/observabilidade`, para medir pelos registros dela),
 > **ainda não mesclado na `main`**. Os caminhos de arquivo citados abaixo (como `app/data/db_postgres.py`) são desse
 > repositório. Até o merge, os documentos [Conexão PostgreSQL](postgres-connection.md) e
 > [Settings](settings.md) continuam descrevendo o comportamento anterior.
@@ -29,13 +30,13 @@ modelo nem de Juiz:
 
 | Item | Implementado | Testado | Medido |
 | --- | --- | --- | --- |
-| Pool de conexões PostgreSQL | sim | testes unitários, concorrência e PostgreSQL real (só leitura) | sim, localmente (tabela abaixo) |
+| Pool de conexões PostgreSQL | sim | testes unitários, concorrência e PostgreSQL real (só leitura) | sim: 34,1 → 5,4 ms por operação (local); no chat, tempo fora do modelo caiu de 0,09-0,42 s para 0,04-0,22 s |
 | Memória de consumo por pergunta | sim | testes unitários | não (reduz idas ao banco; ganho depende do banco) |
-| Guarda em paralelo com contexto e roteador | sim | testes unitários e de grafo com modelos falsos | sim, com `gpt-6-luna`: 2,5 s → 1,4 s no início da pergunta |
+| Guarda em paralelo com contexto e roteador | sim | testes unitários e de grafo com modelos falsos | sim, antes e depois pela observabilidade: fase inicial de 2,6-3,5 s para 1,4-1,7 s |
 | Histórico lido uma vez | sim | testes unitários | não |
 | `OPENAI_FAST_REASONING_EFFORT` | sim (opcional, desligado) | testes de configuração | sim, com `gpt-6-luna`: **sem ganho relevante** nas chamadas rápidas |
 | `POST /chat/stream` (SSE), com plano e progresso por tool | sim | testes de rota, de gerador e do grafo real; servidor real | sim: os rótulos não somam tempo; o primeiro chega em 0,3-0,4 s |
-| Tools em lote / em paralelo | **não** (avaliado) | — | **pendente**: ver "Experimento pendente" |
+| Tools em lote / em paralelo | **não** (avaliado e descartado) | — | sim, perfil de voltas do agente: ver "Tools em paralelo e tool em lote" |
 
 **Houve uma rodada pontual com a IA real** (`gpt-6-luna`), a pedido, descrita em "Medição com a IA real". Ela é
 pequena (uma execução por pergunta) e com bancos locais. A medição contínua de latência, tokens e custo deve ser feita
@@ -221,22 +222,70 @@ cliente e o resto variação do provedor; com `127.0.0.1` a mesma pergunta levou
 (modelo, número de voltas e tamanho da resposta) e na espera, não em banco nem em rótulos. A decisão sobre o experimento
 de tools em lote deve olhar o número de voltas do agente nos painéis.
 
-## Experimento pendente: consumo em lote e tools em paralelo
+## Antes e depois pela observabilidade (A/B)
 
-Pedido: avaliar se compensam e **medir antes de decidir**, com receio de o modelo alucinar números numa tool nova.
-Não foi implementado, porque depende de rodadas reais com o modelo, que ficaram para os painéis de observabilidade.
+Para saber se as mudanças diminuem mesmo a latência, as duas versões rodaram lado a lado com a IA real
+(`gpt-6-luna`) e foram comparadas **pelos registros que a própria observabilidade grava** (`observability_requests`:
+tempo total, tempo por nó, tempo por agente, chamadas de modelo, tokens e custo):
 
-- **Tools em paralelo na mesma volta do modelo** (`app/agents/_runtime.py`): cerca de 25 linhas; nenhuma tool nem
-  prompt muda. Só ajuda se o modelo emitir várias chamadas **na mesma volta**; se emitir uma por volta, o ganho é zero.
-  O pool (item 1) e a memória por pergunta (item 2) já são pré-requisitos satisfeitos.
-- **Tool em lote** (`get_consumption_by_unit`): uma consulta de leitura agrupada por unidade (sem criar função nem
-  view no banco), devolvendo totais por unidade **e o ranking já calculado em Python**, para o modelo só copiar. Cerca
-  de 150-200 linhas, com testes. Risco: mudar o que o agente chama.
-- **Como decidir** (regra proposta): medir, em 3-5 repetições de duas perguntas comerciais, o número de voltas e de
-  chamadas, tokens, latência e **acerto numérico** (resposta do modelo contra o total calculado direto no banco).
-  Adotar só se houver ganho relevante **e** zero divergência numérica. Caso contrário, não adotar.
-- A medição da linha de base já pode ser feita com esta entrega, pois o pool e a memória por pergunta reduzem o
-  custo de cada chamada.
+- **A (antes):** a `feat/observabilidade` sozinha.
+- **B (depois):** a mesma branch com as melhorias deste documento.
+- Quatro perguntas (hábitos, previsão, "qual unidade consumiu mais", "compare as unidades"), `POST /chat`, bancos locais
+  descartáveis. Duas baterias: a primeira (3 repetições) chamava sempre a A antes da B; como o cache de prefixo do
+  provedor poderia favorecer a segunda chamada, a segunda bateria (**4 repetições, 16 pares**) **alternou a ordem** a
+  cada repetição e fez um aquecimento por versão. Os números abaixo são da segunda.
+
+| Mediana, 16 requisições por versão | A (antes) | B (depois) | Variação |
+| --- | --- | --- | --- |
+| Tempo total no servidor | 11,5 s | 8,7 s | -25% |
+| Chamadas de modelo por pergunta | 5 | 5 | 0% |
+| Tokens por pergunta (entrada + saída) | 10.106 | 10.083 | 0% |
+| Custo por pergunta | US$ 0,00154 | US$ 0,00148 | -4% (ruído) |
+
+B foi mais rápida em **12 dos 16 pares** (diferença mediana de 2,7 s). Não houve viés de ordem a favor da B: quando a B
+rodou primeiro a vantagem foi maior (-3,2 s) do que quando rodou depois (-1,8 s).
+
+**De onde vem o ganho** (medianas por pergunta):
+
+| Parte | A | B | Ganho |
+| --- | --- | --- | --- |
+| Fase inicial (guarda + contexto + roteador) | 2,6 a 3,5 s | 1,4 a 1,7 s | cerca de **1,0 a 2,1 s**, de forma consistente |
+| Tempo fora do modelo no agente (tools e banco) | 0,09 a 0,42 s | 0,04 a 0,22 s | 0,05 a 0,30 s (pool e memória por pergunta; o banco é local) |
+| Tempo do próprio modelo no agente | varia | varia | sem mudança de código: **ruído do provedor** |
+
+Parte da diferença total (cerca de 1,3 s) está no tempo do modelo, que mudou entre as versões **sem mudança de código**
+nessa parte; ela **não** deve ser creditada a estas melhorias. O ganho que se explica por mecanismo é de cerca de
+**1,3 a 1,4 s por pergunta (12% a 15% do total)**: a guarda em paralelo e, bem menos, o pool e a memória por pergunta.
+Número de chamadas, tokens e custo ficaram iguais, como esperado, porque nada disso reduz trabalho do modelo.
+
+**Limites:** 16 pares por versão, uma conta residencial e uma comercial, bancos locais (em rede remota o pool e a memória
+por pergunta tendem a pesar mais), variação grande do provedor entre chamadas. O custo das duas baterias foi de
+**US$ 0,09** no total.
+
+## Tools em paralelo e tool em lote: avaliadas e não adotadas
+
+Pedido: descobrir se compensam, com receio de o modelo errar números numa tool nova. Com o que foi medido, **não foram
+adotadas**, e o código experimental da tool em lote foi descartado.
+
+**O que o agente faz hoje** (conta comercial, "qual unidade consumiu mais"; 4 execuções com a sequência registrada):
+três voltas do modelo. A **primeira** (1,2 a 2,1 s) chama `list_consumption_units`; a **segunda** (1,8 a 2,6 s) já
+chama `get_consumption_summary` **uma vez por unidade, as três na mesma volta**; a **terceira** (3,0 a 4,8 s) redige a
+resposta. Uma pergunta que mistura consumo e previsão chega a 25-27 s, com mais voltas.
+
+**Por que não:**
+
+- **Tools em paralelo:** o modelo já pede as leituras juntas, mas as tools somam só **0,1 a 0,4 s** (e 0,04 a 0,22 s com o
+  pool). Rodá-las em paralelo economizaria cerca de 0,1 s. Não justifica o código.
+- **Tool em lote** (`get_consumption_by_unit`, totais e ranking calculados em Python): ela só ganharia tempo se o modelo
+  **pulasse a volta que lista as unidades** e chamasse a tool em lote direto, economizando uma volta (cerca de 2 s).
+  Isso depende de o modelo mudar o jeito de chamar as tools, e a forma segura de conseguir isso é mudar o prompt do
+  agente de consumo, que está fora do escopo. Sem isso, a tool nova seria só mais uma opção, e adicionar tools aumenta a
+  superfície onde o modelo pode errar. A experiência foi encerrada por custo de requisições antes de testar.
+- **Onde está o tempo de verdade:** nas voltas do modelo (principalmente a de redigir a resposta, de 3 a 5 s). Reduzi-las
+  depende do prompt e do modelo, decisões da equipe fora desta mudança.
+
+Se a equipe decidir mexer no prompt do agente de consumo, a tool em lote vira uma opção real a testar (o desenho é
+simples: uma leitura por unidade com a mesma função de consumo, totais e ordem calculados em Python).
 
 ## Como medir antes e depois
 
@@ -287,5 +336,6 @@ Branch `feat/reduz-latencia-chat` (a partir de `feat/historico-conversas`):
   (`app/observability/progress.py`).
 - [x] Documentação (este arquivo, README e AGENTS.md).
 - [x] Rodada pontual com a IA real (`gpt-6-luna`): latência por etapa, guarda em paralelo e `low` (seção "Medição com a IA real").
+- [x] Comparação antes e depois pela observabilidade, com ordem alternada (seção "Antes e depois pela observabilidade").
+- [x] Tools em paralelo e em lote avaliadas e **descartadas**, com a evidência registrada.
 - [ ] Medição contínua de latência, tokens e custo: **pendente**, pelos painéis de observabilidade.
-- [ ] Tools em paralelo e tool em lote: **pendentes**, dependem dessa medição.

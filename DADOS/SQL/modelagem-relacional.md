@@ -200,6 +200,27 @@ Relaciona usuários aos seus hábitos de consumo.
 - **end_time** *(opcional)*: Horário de término do hábito. Obrigatório quando `start_time` informado; deve ser depois do início.
 - **estimated_liters** *(opcional)*: Estimativa de litros consumidos por execução do hábito.
 
+### 📏 Regra de repetição do hábito
+O mesmo usuário pode cadastrar o mesmo hábito mais de uma vez, para representar rotinas diferentes (por exemplo,
+"Banho longo" às 07:00 de segunda a sexta e às 20:00 no fim de semana). Por isso a tabela **não** tem mais
+`UNIQUE (user_id, habit_id)` (constraint `uq_tb_user_habit_user_habit`, removida).
+
+A regra que vale no lugar dela: o mesmo usuário **não pode ter o mesmo hábito, no mesmo dia da semana, com o
+mesmo horário de início**. Como o dia fica em `tb_user_habit_day`, um `UNIQUE` simples não consegue checar isso,
+então a regra é aplicada por triggers `BEFORE`:
+
+| Trigger | Tabela | Quando dispara |
+| --- | --- | --- |
+| `trg_check_user_habit_day_conflict` | `tb_user_habit_day` | ao inserir ou alterar um dia |
+| `trg_check_user_habit_conflict` | `tb_user_habit` | ao alterar `user_id`, `habit_id` ou `start_time` |
+
+Hábitos sem horário (`start_time` nulo) contam como "sem horário": dois hábitos iguais, sem horário, não podem
+dividir o mesmo dia. Em caso de conflito o banco lança a exceção
+`O usuário já possui esse hábito nesse dia e horário.`
+
+> Limitação conhecida: a checagem é feita por trigger, sem lock. Duas requisições simultâneas, do mesmo usuário,
+> hábito, dia e horário, poderiam passar juntas. Foi considerado improvável para o uso do projeto e não foi tratado.
+
 ---
 
 ## 📆 11. Tabela: `tb_user_habit_day`

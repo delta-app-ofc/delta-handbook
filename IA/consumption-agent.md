@@ -75,6 +75,13 @@ fn_user_can_estimate, pois descreve dados observados e não cria estimativas.
 Sem registros no MongoDB não há fallback: a view é alimentada pelo mesmo
 MongoDB (stage -> silver -> gold) e estaria igual ou mais atrasada.
 
+O Agente de Previsão segue o mesmo padrão para o histórico de consumo
+(tools get_consumption_history e calculate_forecast): MongoDB primeiro e, se ele
+estiver indisponível, a view diária. Conta, tarifa, região e elegibilidade
+(fn_user_can_estimate) continuam no PostgreSQL. Os agentes de vazamento e de
+hábitos não mudam: anomalias e alertas só existem no MongoDB (a view não guarda
+janelas nem alertas), e os hábitos são cadastrais, no PostgreSQL.
+
 A view guarda apenas totais diários, sem horário, e depende do ETL
 (silver.sp_load() e gold.sp_load()). No fallback residencial, a consulta usa os
 imóveis do usuário em tb_user_property; no organizacional, os IDs autorizados.

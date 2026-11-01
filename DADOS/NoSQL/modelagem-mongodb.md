@@ -337,7 +337,7 @@ Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleç�
 |-----------------------|-----------|-------------|---------------------------------------------------------------------------------------------|
 | `_id`                 | ObjectId  | Sim         | Identificador do documento                                                                  |
 | `request_id`          | string    | Sim         | Mesmo valor do cabeçalho `X-Request-ID`; único                                              |
-| `created_at`          | timestamp | Sim         | Fim da requisição; base do TTL                                                              |
+| `created_at`          | date (BSON) | Sim       | Fim da requisição; base do TTL. Precisa ser data BSON: texto não expira                      |
 | `mode`                | string    | Sim         | `chat` ou `judge`                                                                           |
 | `client`              | string    | Não         | `app`, `web`, `playground` ou `unknown` (cabeçalho `X-Client`)                              |
 | `user_hash`           | string    | Não         | HMAC do `user_id` com `OBS_HASH_SECRET`; só conta usuários distintos                        |
@@ -366,7 +366,7 @@ Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleç�
 {
   "_id": { "$oid": "61a8f9c2b9d1b2bad723c0a1" },
   "request_id": "9f1c2a7e0b3d4c5f8a6b1d2e3f4a5b6c",
-  "created_at": "2026-11-01T12:00:00Z",
+  "created_at": { "$date": "2026-11-01T12:00:00Z" },
   "mode": "chat",
   "client": "app",
   "outcome": "success",

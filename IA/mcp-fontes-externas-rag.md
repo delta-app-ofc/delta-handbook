@@ -166,6 +166,13 @@ e `QDRANT_API_KEY` quando exigida. `rag_documents` deve existir com vetor sem no
 3072 dimensões e distância Cosine. O serviço verifica o esquema antes de gerar
 embeddings e nunca apaga ou recria uma coleção incompatível.
 
+O vetor padrão pode aparecer na resposta do Qdrant tanto como `VectorParams`
+quanto como um mapa cuja única chave é `""`. As duas representações são aceitas;
+a chave vazia não indica, por si só, uma mudança para um vetor nomeado distinto.
+Mapas com nomes não vazios ou múltiplos vetores continuam sendo recusados.
+O ajuste de compatibilidade passou por 71 testes direcionados e por validação
+somente de leitura na coleção real, que permaneceu com os mesmos 58 pontos.
+
 Fontes locais e externas são separadas pelo identificador, revisão e modelo;
 a fonte externa usa `mcp:<source_id>`. Revisões antigas permanecem
 armazenadas, mas não entram na busca atual. A coleção de memória

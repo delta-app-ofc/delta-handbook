@@ -40,6 +40,9 @@ Ela deve existir com vetor sem nome, 3072 dimensões e distância Cosine. O
 serviço recusa esquema incompatível antes de gerar embeddings e nunca apaga
 ou recria essa coleção.
 
+A representação do vetor padrão como mapa `{"": VectorParams(...)}` também é
+compatível; ela não deve ser confundida com um vetor de nome não vazio.
+
 ## Recuperação, revisão e referência
 
 `search_knowledge_base(question, top_k=3)` consulta as regras do Delta.

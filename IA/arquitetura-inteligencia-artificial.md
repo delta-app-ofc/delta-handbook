@@ -174,15 +174,33 @@ Perguntas que responde:
 **Limitação conhecida:** a tool de clima (`get_weather_history`) depende da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 
 ### Agente 6 — RAG
-Responsável por consultar conhecimento externo antes de gerar determinadas respostas (ex.: dúvidas gerais sobre conservação de água, tarifas públicas, dicas de uso consciente). Teria que fazer a diferenciação entre perfil RESIDENCIAL e COMERCIAL. Usaria processamento por chucking -> recuperação por similaridade -> resposta com citação (para atender o requisito de identificabilidade das fontes) 
 
+Responsável por consultar documentação do produto e conhecimento externo antes
+de responder dúvidas gerais sobre conservação de água, tarifas públicas e uso
+consciente. A implementação da branch `feat/mcp-fontes-externas-rag` usa
+segmentação em trechos, recuperação por similaridade e resposta com citação.
+A consulta externa passa por MCP; as fontes abaixo já estavam propostas nesta
+seção antes dessa implementação.
 
-#### Fonte propostas
-> Documento de informações gerais do projeto;
-> Conteúdo público de órgãos de saneamento/concessionárias de água, ou material educativo sobre uso consciente da água:
-    - https://www.gov.br/mdr/pt-br/assuntos/seguranca-hidrica/projeto-sao-francisco/meio-ambiente-preservado/uso-consciente-da-agua
-    - https://www.epa.gov/watersense/start-saving
-    - https://www.epa.gov/watersense/types-facilities -> dicas de consumo de água para áreas comerciais -> teria que colocar no prompt para não indicar nada da watersense.
+O perfil confiável do backend determina a seleção: `residential` corresponde a
+RESIDENCIAL e `organizational` a COMERCIAL/organizacional. O modelo não altera
+esse perfil. Para contas comerciais, as orientações devem considerar a atividade
+e a instalação, sem presumir uma residência ou moradores.
+
+#### Fontes propostas e adotadas na branch
+
+- Documento de informações gerais do projeto, consultado na base local.
+- [Uso consciente da água — MIDR](https://www.gov.br/mdr/pt-br/assuntos/seguranca-hidrica/projeto-sao-francisco/meio-ambiente-preservado/uso-consciente-da-agua): fonte geral sobre conservação, disponível aos dois perfis.
+- [Start Saving — US EPA](https://www.epa.gov/watersense/start-saving): orientações para o perfil residencial.
+- [Types of Facilities — US EPA](https://www.epa.gov/watersense/types-facilities): orientações para áreas comerciais e institucionais.
+
+O prompt deve proibir recomendações e promoção de WaterSense, seus programas,
+selos, certificações, produtos, calculadoras e campanhas. As páginas EPA podem
+sustentar práticas gerais de eficiência, com citação da URL original, sem
+aplicar normas ou estatísticas estrangeiras como dados da conta brasileira.
+As páginas educativas não fornecem tarifas públicas vigentes; sem uma fonte
+tarifária específica, o agente deve informar a limitação, sem inventar valores.
+Veja [contratos, operação e evidências](mcp-fontes-externas-rag.md).
 
 
 ### Agente 7 — Juiz

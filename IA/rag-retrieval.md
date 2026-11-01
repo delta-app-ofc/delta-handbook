@@ -44,7 +44,11 @@ ou recria essa coleção.
 
 `search_knowledge_base(question, top_k=3)` consulta as regras do Delta.
 `search_external_knowledge(question, top_k=3, topic=None, source_id=None)`
-consulta as fontes públicas aprovadas, quando o MCP está habilitado. Top-k
+consulta as três fontes propostas (MIDR e EPA), quando o MCP está habilitado.
+A ferramenta construída pelo agente recebe o perfil confiável do backend e
+seleciona a fonte geral e a EPA residencial ou comercial, sem argumento livre
+de perfil para o modelo. O prompt proíbe recomendações WaterSense e mantém a
+URL original da EPA na referência. Top-k
 aceita valores de 1 a 20; tema e fonte são filtros exatos na busca externa.
 
 A preparação usa IDs estáveis por fonte, revisão, modelo e posição. Um lock
@@ -95,7 +99,7 @@ artificiais; não comprovam a qualidade semântica do Gemini ou acesso ao Qdrant
 remoto. Os provedores generativos, a avaliação e os bancos cadastrais do grafo
 são substituídos nos cenários de integração.
 
-A chamada real ao artigo público por MCP foi executada e está registrada no
+As chamadas reais às três fontes propostas por MCP foram executadas e está registrada no
 [guia de fontes externas](mcp-fontes-externas-rag.md). Ela não equivale à
 validação completa de memória persistente, bancos, embeddings e Juiz.
 A2A está fora do escopo por decisão de negócio em 01/11/2026.

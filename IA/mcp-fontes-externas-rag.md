@@ -45,23 +45,46 @@ Código na [branch de implementação](https://github.com/delta-app-ofc/delta-ar
 | `app/agents/rag.py` | Contexto das ferramentas e referências da resposta |
 | `scripts/check_mcp.py` | Diagnóstico real sem banco nem LLM |
 
-## Fonte inicial e limites de uso
+## Fontes especificadas no handbook e recorte por perfil
 
-O artigo abaixo foi escolhido durante esta implementação para validar a cadeia
-MCP → extração → RAG; ele não havia sido especificado como fonte no handbook.
-O estado entregue contém uma única página fixa e não oferece busca aberta na
-internet. O documento anterior descrevia MCP para clima e pesquisa externa
-como uma proposta A2A, posteriormente cancelada por decisão de negócio.
+As fontes educativas já constavam na seção **Agente 6 — RAG → Fonte propostas**
+do [documento de arquitetura anterior à implementação](https://github.com/delta-app-ofc/delta-handbook/blob/91ec3e5/IA/arquitetura-inteligencia-artificial.md#agente-6--rag).
+A primeira implementação deixou passar essa seção e escolheu um artigo do
+Senado. Essa escolha foi corrigida: o catálogo ativo agora contém as três
+fontes propostas originalmente, e o Senado não participa de novas consultas.
 
-O catálogo contém `senado-water-conservation`, tema `water_conservation`:
-[Uso racional da água, essencial para o futuro — Senado Notícias](https://www12.senado.leg.br/noticias/especiais/especial-cidadania/uso-racional-da-agua-essencial-para-o-futuro),
-publicado em **12/09/2005**. É material histórico de orientação geral, não previsão
-do tempo, notícia atual, tarifa vigente ou comprovação da situação da conta.
+| ID | Fonte | Perfil e tema |
+| --- | --- | --- |
+| `midr-water-conservation` | [Uso consciente da água — MIDR](https://www.gov.br/mdr/pt-br/assuntos/seguranca-hidrica/projeto-sao-francisco/meio-ambiente-preservado/uso-consciente-da-agua) | Geral, residencial e comercial; `water_conservation` |
+| `epa-residential-saving` | [Start Saving — US EPA](https://www.epa.gov/watersense/start-saving) | Residencial; `water_conservation` |
+| `epa-commercial-facilities` | [Types of Facilities — US EPA](https://www.epa.gov/watersense/types-facilities) | Comercial/organizacional; `commercial_efficiency` |
 
-Novas fontes exigem revisão de URL, título, tema, data e seletor do artigo no
-catálogo, além de testes da extração. A integração não é um buscador aberto nem
-um crawler. Páginas que exigem JavaScript, apresentam desafios de acesso ou mudam
-a estrutura podem ficar indisponíveis; não se indexa o menu como substituto.
+O perfil do backend `residential` representa RESIDENCIAL; `organizational`
+representa COMERCIAL/organizacional. `RagAgent` constrói a ferramenta com esse
+perfil confiável, que não é argumento disponível ao LLM. Cada consulta considera
+a fonte geral e a EPA aplicável ao perfil. Um filtro de fonte incompatível
+não consulta a outra categoria. Chamadas diretas sem perfil usam somente a
+fonte geral; perfis desconhecidos não recebem fontes específicas.
+
+O prompt exige orientações adequadas à instalação e à atividade, sem presumir
+moradores ou hábitos domésticos para uma conta comercial. As páginas da EPA
+são referência educativa estrangeira, não regras brasileiras nem comprovação
+da situação da conta. **Não recomendar ou promover WaterSense**, incluindo
+programas, selos, certificações, produtos, calculadoras ou campanhas. A URL
+original da EPA continua na citação para garantir a rastreabilidade.
+Essa é uma instrução ao modelo; testes controlados não comprovam cumprimento
+semântico em toda resposta gerada por um provedor real.
+
+As três páginas não fornecem uma tabela de tarifas públicas vigente. Sem
+fonte tarifária específica, o agente deve reconhecer a falta de dados e não
+inventar preços. A base documental do projeto continua sendo consultada pela
+ferramenta local. Não há pesquisa aberta na internet ou navegação automática
+pelos links dessas páginas.
+
+Novas fontes exigem revisão de URL, título, tema, audiência, idioma e seletor do
+artigo no catálogo, além de testes da extração. Páginas que exigem JavaScript,
+apresentam desafios de acesso ou mudam a estrutura podem ficar indisponíveis;
+não se indexa o menu como substituto.
 
 ## Contratos das ferramentas
 
@@ -69,11 +92,14 @@ a estrutura podem ficar indisponíveis; não se indexa o menu como substituto.
 
 | Ferramenta | Entrada | Saída |
 | --- | --- | --- |
-| `list_knowledge_sources` | `{}` | `sources`: IDs, títulos, URLs, temas e datas de publicação |
+| `list_knowledge_sources` | `{}` | `sources`: IDs, títulos, URLs, temas, audiências, idiomas e datas de publicação |
 | `read_knowledge_source` | `source_id` cadastrado | `status=ok` e `document`, ou `status=unavailable` com mensagem segura |
 
-`document` possui `source_id`, `title`, `url`, `topic`, `published_at`,
-`collected_at` com fuso, `revision` SHA-256 e `text`. O cliente verifica os
+`document` possui `source_id`, `title`, `url`, `topic`, `audiences`, `language`,
+`published_at`, `collected_at` com fuso, `revision` SHA-256 e `text`. A publicação
+é `null` quando a data não está confirmada, caso da página MIDR nesta entrega;
+a citação informa “não informada”. Para as duas páginas EPA, a data de criação
+confirmada nos metadados é 16/01/2017. O cliente verifica os
 metadados contra o catálogo e recalcula o hash antes de indexar. O texto deve
 ter entre 200 e 60.000 caracteres; o HTTP limita a resposta a 512.000 bytes.
 
@@ -86,7 +112,7 @@ search_external_knowledge(
     question="Como usar menos água no banho?",
     top_k=3,
     topic="water_conservation",             # opcional, igualdade exata
-    source_id="senado-water-conservation",   # opcional, igualdade exata
+    source_id="midr-water-conservation",   # opcional, igualdade exata
 )
 ```
 
@@ -124,7 +150,8 @@ incluindo inicialização e fechamento. Não há retries automáticos nessa cama
 O cache guarda somente textos públicos em RAM por processo e por fonte. Falhas
 não entram no cache; uma cópia vencida não é servida quando a fonte falha.
 `clear_source_cache()` descarta o cache; reiniciar também aplica novas configurações.
-Cada consulta sem cache abre e fecha seu subprocesso. Os clientes Gemini/Qdrant
+Cada leitura de fonte sem cache abre e fecha seu subprocesso; uma consulta
+residencial/comercial pode ler duas fontes, cada qual com seu prazo MCP. Os clientes Gemini/Qdrant
 continuam seguindo o ciclo de vida já implementado na API.
 
 A busca vetorial requer `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL`, `QDRANT_URL`
@@ -133,7 +160,7 @@ e `QDRANT_API_KEY` quando exigida. `rag_documents` deve existir com vetor sem no
 embeddings e nunca apaga ou recria uma coleção incompatível.
 
 Fontes locais e externas são separadas pelo identificador, revisão e modelo;
-a fonte externa usa `mcp:senado-water-conservation`. Revisões antigas permanecem
+a fonte externa usa `mcp:<source_id>`. Revisões antigas permanecem
 armazenadas, mas não entram na busca atual. A coleção de memória
 `session_summaries` não recebe documentos externos. A data de coleta no payload
 corresponde à cópia indexada, que pode ser anterior à última consulta HTTP se o
@@ -148,29 +175,39 @@ python -m pip install -r requirements-dev.txt
 
 # Acessa MCP e a página pública; não usa Qdrant ou provedor de linguagem.
 # O diagnóstico explícito funciona mesmo com MCP_EXTERNAL_ENABLED=false.
-python -m scripts.check_mcp
+python -m scripts.check_mcp --all
 
 # Suíte controlada: não precisa de credenciais nem de serviços remotos.
 $env:APP_ENV = 'test'
 python -m pytest tests/test_mcp_sources.py tests/test_external_rag.py tests/test_rag_workflow_integration.py -q
 ```
 
-Em **01/11/2026**, o diagnóstico executou com sucesso cliente → subprocesso MCP →
-HTTPS do Senado e recebeu **2.854 caracteres**, com hash de conteúdo
-`d6bc2d81e9289d96ff28fbe378d9b6fa192b6d39dfee3cfb8e2081108e3dfaff`.
-Essa é a revisão do texto extraído, não o hash do segmentador no índice.
+Em **01/11/2026**, `python -m scripts.check_mcp --all` executou com sucesso
+cliente → subprocesso MCP → HTTPS para as **três fontes propostas**:
 
-A regressão completa desta branch terminou com **250 testes aprovados e 53
-pulados**, sem falhas. A execução usou `APP_ENV=test` e
-`DELTA_TEST_MONGO_URI=mongodb://127.0.0.1:1`, para que os testes dependentes de
-MongoDB fossem pulados sem tocar bancos existentes. O resultado JUnit local
-fica em `reports/regression.xml` no checkout de implementação, sem versionar
-dados de execução. `git diff --check` e os links relativos dos guias passaram.
+| Fonte | Caracteres extraídos | Hash do texto |
+| --- | ---: | --- |
+| MIDR | 4.854 | `45063d295fa69e947cc4dc8efb668db2a29e77693667b48d9ce9909f3f8ce2e5` |
+| EPA residencial | 8.554 | `c832a32b403bc2c845d36c713013ee347185953b72412facae3dbbf668b9ae26` |
+| EPA comercial | 12.349 | `386daaac3cace5b64157d657331057a102c7f9574a27b4d6da6c0be1ee0f5bcc` |
+
+Esses são hashes dos textos extraídos, não os hashes do segmentador no índice.
+Os **62 testes direcionados** passaram, incluindo extração dos três seletores,
+contrato MCP, vínculo de perfil, tentativa de troca do perfil pelo modelo,
+falha parcial de fontes, rastreabilidade, contexto e Juiz no grafo.
+
+A regressão completa terminou com **261 testes aprovados e 53 pulados**, sem
+falhas. A execução usou `APP_ENV=test` e
+`DELTA_TEST_MONGO_URI=mongodb://127.0.0.1:1`, para pular os testes dependentes
+de MongoDB sem tocar bancos existentes. O JUnit local está em
+`reports/regression.xml` no checkout de implementação. `git diff --check` e
+a validação dos links relativos dos guias passaram.
+
 
 | Demanda | Evidência e limite |
 | --- | --- |
-| [Recuperação e citação no RAG](https://app.clickup.com/t/86e32aqn9) | Top-k, filtros exatos externos, contexto estruturado e lista de fontes; testes temáticos de ranking com embeddings controlados e Qdrant em memória. Qualidade semântica com Gemini real continua pendente. |
-| [Configuração MCP](https://app.clickup.com/t/86e32aqra) | Cliente/servidor stdio, contrato, variáveis, modelo de acesso local e chamada real à fonte pública executados. O escopo foi alterado de clima para conhecimento externo conforme orientação. |
+| [Recuperação e citação no RAG](https://app.clickup.com/t/86e32aqn9) | Top-k, filtros exatos externos, fontes vinculadas ao perfil confiável, contexto estruturado e lista de fontes; testes temáticos de ranking com embeddings controlados e Qdrant em memória. Qualidade semântica com Gemini real continua pendente. |
+| [Configuração MCP](https://app.clickup.com/t/86e32aqra) | Cliente/servidor stdio, contrato, variáveis, modelo de acesso local e chamadas reais às três fontes públicas executados. O escopo foi alterado de clima para conhecimento externo conforme orientação. |
 | [Integração de memória, RAG, guardrails, MCP e A2A](https://app.clickup.com/t/86e32arfe) | Testes do grafo preservam contexto e evidências, verificam memória de outro usuário, bloqueio de entrada maliciosa, anonimização, falha MCP e bloqueio por Juiz. MCP também passa pelo protocolo real com HTTP controlado. A2A foi excluído por decisão de negócio em 01/11/2026 e não compõe o aceite. A validação com todos os serviços reais continua pendente. |
 
 Os testes do grafo usam modelos e acesso Mongo/PostgreSQL substituídos e memória

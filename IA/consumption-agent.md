@@ -41,6 +41,10 @@ tem duração zero e retorna ausência sem chamar o leitor de consumo.
 
 ## Autorização e fontes
 
+O MongoDB (consumption_summary) é a fonte principal nos dois perfis. Se ele
+estiver indisponível, a leitura cai para a view diária
+dw.vw_ft_consumption_daily do PostgreSQL (ver "Fonte principal e fallback").
+
 O caminho residencial tem prioridade se o usuário também possuir outro vínculo.
 Ele consulta o histórico de consumption_summary no MongoDB apenas pelo
 user_id autenticado e por limites UTC de window_started_at. Só inclui
@@ -52,10 +56,30 @@ get_user_organization_properties. Sem seleção, a consulta agrega todas as
 unidades retornadas para o usuário. Uma seleção por property_id é conferida
 contra esse conjunto antes da consulta; nome exato tem prioridade sobre
 correspondência parcial. Nomes que continuam ambíguos pedem esclarecimento e
-não consultam consumo. Os registros vêm da view diária
-dw.vw_ft_consumption_daily; a consulta recebe somente os IDs autorizados.
-Esse caminho não chama fn_user_can_estimate, pois descreve dados observados e
-não cria estimativas.
+não consultam consumo. Os registros vêm do MongoDB pelos dispositivos dessas
+unidades: get_authorized_device_ids busca em tb_device os dispositivos dos
+IDs que o banco confirma como autorizados (fn_user_authorized_property_ids), e
+o MongoDB é consultado por device_id. O user_id gravado no documento pode faltar
+ou ser outro; a autorização vem dos dispositivos. Esse caminho não chama
+fn_user_can_estimate, pois descreve dados observados e não cria estimativas.
+
+## Fonte principal e fallback
+
+| Situação | Fonte usada |
+| --- | --- |
+| MongoDB responde (com ou sem registros) | MongoDB consumption_summary |
+| MongoDB indisponível: conexão, timeout ou configuração ausente | View dw.vw_ft_consumption_daily, com aviso na resposta |
+| Documento inválido ou dado inconsistente no MongoDB | Não troca de fonte; retorna inconsistent_data |
+| MongoDB e PostgreSQL indisponíveis | source_unavailable |
+
+Sem registros no MongoDB não há fallback: a view é alimentada pelo mesmo
+MongoDB (stage -> silver -> gold) e estaria igual ou mais atrasada.
+
+A view guarda apenas totais diários, sem horário, e depende do ETL
+(silver.sp_load() e gold.sp_load()). No fallback residencial, a consulta usa os
+imóveis do usuário em tb_user_property; no organizacional, os IDs autorizados.
+Os totais podem diferir um pouco do MongoDB, porque a view agrupa pela data UTC
+da leitura e o MongoDB, pelo dia local (America/Sao_Paulo).
 
 ## Granularidade e limites
 

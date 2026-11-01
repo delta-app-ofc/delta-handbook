@@ -154,7 +154,7 @@ Vale quando `LLM_PROVIDER=openai`.
 | Demais usos (por exemplo, o Juiz) | `OPENAI_REASONING_EFFORT` | `medium` | **não foi alterado** |
 
 Os valores aceitos são `none`, `low`, `medium`, `high`, `xhigh` e `max`. Deixar uma das duas primeiras variáveis vazia
-faz o papel voltar a usar o `OPENAI_REASONING_EFFORT`. O Agente Juiz, o Jev, os modelos e os prompts não foram alterados.
+faz o papel voltar a usar o `OPENAI_REASONING_EFFORT`. O Agente Juiz, o Jev (modelo de decisão da TypeSafe que o Juiz consulta para avaliar a resposta), os modelos e os prompts não foram alterados.
 
 **O que se sabe pela medição** (`gpt-6-luna`, 4 repetições): com `low` a guarda levou 1,13 s e o roteador 1,34 s; com
 `medium`, 1,38 s e 1,11 s. **Sem diferença além do ruído**: `low` nas chamadas rápidas não reduz a latência de forma
@@ -311,7 +311,7 @@ simples: uma leitura por unidade com a mesma função de consumo, totais e ordem
 
 ## Fora do escopo (decisão da equipe)
 
-Agente Juiz e Jev (timeout, payload, fallback, número de revisões), escolha e parâmetros de modelos e provedores
+Agente Juiz e Jev (modelo de decisão da TypeSafe usado pelo Juiz; timeout, payload, fallback, número de revisões), escolha e parâmetros de modelos e provedores
 (inclusive circuito aberto para falhas do provedor), prompt do agente de consumo, agentes em paralelo e `/playground`.
 
 ## Documentos a atualizar quando a mudança for mesclada

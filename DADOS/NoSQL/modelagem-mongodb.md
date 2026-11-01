@@ -35,7 +35,7 @@ A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separa
 | Database             | Conteúdo                                                               | Padrão de carga                                            |
 |----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
 | `db_delta_telemetry` | `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
-| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback`, `weather_daily` | Leitura predominante, escrita esporádica (ação do usuário) |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Leitura predominante, escrita esporádica (ação do usuário) |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
 > de acesso: a credencial que a API usa para ingestão de telemetria não precisa (e não deve) ter acesso ao
@@ -325,6 +325,61 @@ O script de índices ainda cria `idx_location_date_unique`, único, sobre `{ "lo
 
 A intenção é garantir um documento por localização e dia, mas isso depende de alinhar o índice a `weather_date`. Esta atualização é documental e não modifica o script nem os índices de um banco existente.
 
+### 4.6. `observability_requests`
+
+Uma linha por requisição de chat da API de IA (`delta-artificial-intelligence`), com custo estimado, tokens, latência por etapa e resultado. Alimenta o painel e o relatório de observabilidade (ver `IA/observabilidade.md`). **Não guarda pergunta, resposta nem `user_id`**: o usuário aparece só como `user_hash`, um HMAC com segredo do servidor, que serve para contar usuários distintos e não pode ser revertido.
+
+Ciclo de vida: **temporário**. Um índice TTL apaga cada documento 90 dias depois de `created_at`.
+
+Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleções de `db_delta_app`, sem permissão de índices). Os índices, inclusive o TTL, são criados pelo script `script-indexes.js` do repositório `delta-mongo-database`, executado por quem tem `role_devops_engineer`. O schema e os scripts estão na branch `feat/colecao-observability-requests` e ainda precisam ser aplicados no cluster do app.
+
+| Campo                 | Tipo      | Obrigatório | Descrição                                                                                   |
+|-----------------------|-----------|-------------|---------------------------------------------------------------------------------------------|
+| `_id`                 | ObjectId  | Sim         | Identificador do documento                                                                  |
+| `request_id`          | string    | Sim         | Mesmo valor do cabeçalho `X-Request-ID`; único                                              |
+| `created_at`          | date (BSON) | Sim       | Fim da requisição; base do TTL. Precisa ser data BSON: texto não expira                      |
+| `mode`                | string    | Sim         | `chat` ou `judge`                                                                           |
+| `client`              | string    | Não         | `app`, `web`, `playground` ou `unknown` (cabeçalho `X-Client`)                              |
+| `user_hash`           | string    | Não         | HMAC do `user_id` com `OBS_HASH_SECRET`; só conta usuários distintos                        |
+| `outcome`             | string    | Sim         | `success`, `partial`, `error` ou `rejected`                                                 |
+| `resolved`            | bool      | Não         | Resposta publicada sem erro e sem bloqueio do Juiz                                          |
+| `total_ms`            | number    | Sim         | Tempo total em milissegundos                                                                |
+| `overhead_ms`         | number    | Não         | Tempo fora das etapas do grafo                                                              |
+| `nodes_ms`            | object    | Não         | Tempo por etapa do grafo                                                                    |
+| `agents_ms`           | object    | Não         | Tempo por agente especialista                                                               |
+| `revisions`           | int       | Não         | Correções pedidas pelo Juiz                                                                 |
+| `input_tokens`        | number    | Não         | Tokens de entrada dos modelos de chat (devolvidos pelo provedor)                            |
+| `output_tokens`       | number    | Não         | Tokens de saída dos modelos de chat                                                         |
+| `embedding_tokens`    | number    | Não         | Tokens dos embeddings, contados pelo `count_tokens` do Google                               |
+| `embedding_uncounted` | int       | Não         | Embeddings sem contagem; o custo deles não é estimado                                       |
+| `jev_tokens`          | number    | Não         | Tokens de entrada do Jev, devolvidos pela API                                               |
+| `model_calls`         | int       | Não         | Chamadas aos modelos de chat                                                                |
+| `fallback_calls`      | int       | Não         | Chamadas ao modelo reserva                                                                  |
+| `by_component`        | object    | Não         | Chamadas, tokens, tempo e custo por componente do grafo                                     |
+| `llm_cost_usd`        | number    | Não         | Custo dos modelos de chat em USD                                                            |
+| `embedding_cost_usd`  | number    | Não         | Custo dos embeddings em USD                                                                 |
+| `jev_cost_usd`        | number    | Não         | Custo do Jev em USD                                                                         |
+| `cost_usd`            | number    | Sim         | Custo total estimado em USD                                                                 |
+| `unpriced_models`     | array     | Não         | Modelos usados sem preço cadastrado                                                         |
+
+```json
+{
+  "_id": { "$oid": "61a8f9c2b9d1b2bad723c0a1" },
+  "request_id": "9f1c2a7e0b3d4c5f8a6b1d2e3f4a5b6c",
+  "created_at": { "$date": "2026-11-01T12:00:00Z" },
+  "mode": "chat",
+  "client": "app",
+  "outcome": "success",
+  "resolved": true,
+  "total_ms": 8120.4,
+  "nodes_ms": { "context": 410.1, "execute": 6900.0, "judge": 500.3 },
+  "input_tokens": 5120,
+  "output_tokens": 240,
+  "model_calls": 5,
+  "cost_usd": 0.000666
+}
+```
+
 ---
 
 ## 5. Índices e Configurações de Coleção
@@ -339,6 +394,10 @@ A intenção é garantir um documento por localização e dia, mas isso depende 
 | `user_preferences`    | `{ user_id: 1 }`                        | **Único**                               | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`.                                                                                                                        |
 | `chat_sessions`       | `{ user_id: 1, last_activity_at: -1 }`  | Composto                                | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente.                                                                                                                                                                                                       |
 | `chat_sessions`       | `{ user_id: 1, is_open: 1 }`            | Composto                                | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova.                                                                                                                                                                                              |
+| `observability_requests` | `{ created_at: 1 }` (`expireAfterSeconds: 7776000`) | **TTL (90 dias)** | Evita crescimento sem limite; o painel só olha as últimas semanas |
+| `observability_requests` | `{ request_id: 1 }`                  | **Único**                               | Uma linha por requisição |
+| `observability_requests` | `{ client: 1, created_at: -1 }`      | Composto                                | Custo e uso por canal (app, web, playground) |
+| `observability_requests` | `{ user_hash: 1, created_at: -1 }`   | Composto (parcial, `user_hash` existe)  | Usuários distintos por semana |
 | `chat_feedback`       | `{ session_id: 1 }`                     | Simples                                 | Suporta o cruzamento (via `$lookup` em agregação) entre sessão e sua avaliação, usado em métricas de satisfação do bot.                                                                                                                                                              |
 
 ---

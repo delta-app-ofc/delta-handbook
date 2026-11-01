@@ -15,7 +15,16 @@ da Grande SP (essas cobram a mesma tarifa entre si).
 ### 📌 Atributos
 - **id (PK)**: Identificador da região.
 - **name**: Nome da região.
-  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`
+  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`, `LITORAL`, `VALE_DO_RIBEIRA`, `INTERIOR`, `VALE_DO_PARAIBA`
+
+### 🏙️ Tabela de apoio: `tb_municipality`
+
+Liga cada município atendido pela Sabesp ao seu grupo tarifário. A API usa essa tabela para preencher `tb_address.region_id` a partir de `city` (depois de conferir que `state` é `SP`); município que não está nela não pode ser cadastrado. Detalhes, fontes e lista de municípios em [mapeamento-cidade-regiao.md](mapeamento-cidade-regiao.md).
+
+- **id (PK)**: Identificador do município.
+- **name**: Nome do município, como a API de CEP devolve (único).
+- **ibge_code**: Código IBGE de 7 dígitos (único).
+- **region_id (FK)**: Referência para `tb_region`.
 
 ---
 
@@ -50,7 +59,7 @@ Armazena os endereços dos imóveis cadastrados.
 
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
-- **region_id (FK)**: Referência para `tb_region`.
+- **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` (ver `tb_municipality`); o aplicativo não envia esse campo.
 - **cep**: CEP (8 dígitos numéricos).
 - **city**: Cidade.
 - **state**: Estado.
@@ -114,6 +123,21 @@ imóveis comerciais).
   - Valores permitidos: `RESIDENCIAL_NORMAL`, `RESIDENCIAL_SOCIAL`, `RESIDENCIAL_FAVELA`, `RESIDENCIAL_ESPECIAL`, `COMERCIAL_NORMAL_INDUSTRIAL`, `COMERCIAL_ESPECIAL`, `COMERCIAL_ENTIDADE_ASSISTENCIA_SOCIAL`, `PUBLICA_COM_CONTRATO`
 - **group_name**: Grupo da categoria.
   - Valores permitidos: `RESIDENCIAL`, `COMERCIAL`
+
+### 📚 Origem das categorias
+
+As categorias vêm da estrutura tarifária real da Sabesp, publicada pela ARSESP:
+
+- [Tabela Geral de Tarifas da Sabesp](http://www.arsesp.sp.gov.br/ArquivosRegulamentacao/Tarifas/Saneamento/tabela%20de%20tarifas-sabesp-geral.pdf) — versão mais antiga, usa o nome "Favela".
+- [Nota Técnica do 1º Reajuste Tarifário, URAE-1 Sudeste](https://www.arsesp.sp.gov.br/Documentosgerais/NT_1__REAJUSTE_TARIFARIO_DA_SABESP__Tarifa_Aplicacao___URAE1___assinado.pdf) — versão de 2026, tabelas por região no Anexo I, categoria chamada "Vulnerável".
+
+Diferenças entre o projeto e a fonte:
+
+- `RESIDENCIAL_FAVELA` segue o nome da tabela antiga; a de 2026 chama a mesma categoria de "Residencial Vulnerável".
+- `RESIDENCIAL_ESPECIAL` e `COMERCIAL_ESPECIAL` só têm tarifa publicada em alguns municípios do interior, não na Grande SP. Onde falta, a tarifa da categoria "Normal" é usada como aproximação (ver `tariffs/README.md` no `delta-business-rules`).
+- `PUBLICA_COM_CONTRATO` está no grupo `COMERCIAL` por decisão do projeto, não da Sabesp.
+
+Quem define a categoria de um imóvel é quem o cadastra: `sp_register_property` recebe o nome da categoria e `sp_update_property_classification` troca depois. O sistema não deduz a categoria. Na Sabesp real, quem enquadra o cliente é a própria Sabesp (a tarifa social, por exemplo, exige CadÚnico).
 
 ---
 

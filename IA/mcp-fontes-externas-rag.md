@@ -66,6 +66,13 @@ a fonte geral e a EPA aplicável ao perfil. Um filtro de fonte incompatível
 não consulta a outra categoria. Chamadas diretas sem perfil usam somente a
 fonte geral; perfis desconhecidos não recebem fontes específicas.
 
+A aba RAG do playground também consulta o perfil do usuário fixo de teste no
+backend antes de construir o especialista. O processo precisa executar a branch
+de implementação com `MCP_EXTERNAL_ENABLED=true`. A aba isolada testa RAG e
+guardrails; Chat completo e Juiz exercitam também a avaliação antes da publicação.
+Os exemplos da aba e o painel de ferramentas permitem conferir a seleção de
+fontes e os trechos retornados. Não há seletor para substituir o perfil da conta.
+
 O prompt exige orientações adequadas à instalação e à atividade, sem presumir
 moradores ou hábitos domésticos para uma conta comercial. As páginas da EPA
 são referência educativa estrangeira, não regras brasileiras nem comprovação

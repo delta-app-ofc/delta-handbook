@@ -434,17 +434,24 @@ fn_create_user_habit(
     p_user_id    INTEGER,
     p_habit_name VARCHAR,
     p_frequency  INTEGER,
-    p_days       VARCHAR[] DEFAULT ARRAY[]::VARCHAR[]
+    p_days       VARCHAR[] DEFAULT ARRAY[]::VARCHAR[],
+    p_start_time TIME      DEFAULT NULL,
+    p_end_time   TIME      DEFAULT NULL
 )
 ```
+
+`p_start_time` e `p_end_time` são opcionais e permitem cadastrar o mesmo hábito em horários diferentes.
 
 #### Retorno
 
 O `id` do registro criado em `tb_user_habit`. A function interrompe com erro quando:
 
 * o hábito não existe em `tb_habit`;
-* o usuário já possui esse hábito;
+* o usuário já possui esse hábito no mesmo dia da semana e no mesmo horário de início (erro lançado pela
+  trigger `trg_check_user_habit_day_conflict`; o mesmo hábito em outro dia ou horário é permitido);
 * algum dia informado não existe em `tb_day_of_week`.
+
+A regra de conflito está descrita em `modelagem-relacional.md` (tabela `tb_user_habit`).
 
 ---
 
@@ -591,6 +598,8 @@ A procedure executa:
 | `fn_user_habits_by_day()` | Function | Lista os hábitos do usuário em um dia da semana. |
 | `fn_user_location()` | Function | Devolve cidade e estado do primeiro imóvel do usuário. |
 | `fn_create_user_habit()` | Function | Cadastra um hábito do usuário e vincula os dias da semana. |
+| `fn_check_user_habit_day_conflict()` | Function (trigger) | Barra o mesmo hábito, no mesmo dia e horário de início, ao inserir ou alterar um dia do hábito. |
+| `fn_check_user_habit_conflict()` | Function (trigger) | Mesma regra, ao alterar `user_id`, `habit_id` ou `start_time` de `tb_user_habit`. |
 
 ---
 

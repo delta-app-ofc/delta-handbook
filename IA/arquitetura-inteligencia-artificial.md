@@ -20,7 +20,7 @@ Essa documentação define a arquitetura Inicial: em definição incremental **c
 7. LangGraph para orquestração
 8. Controle de sessões por usuário
 9. Memória de longo prazo
-10. Integração MCP e/ou A2A
+10. Integração MCP; A2A excluído por decisão de negócio
 11. Mecanismos de mitigação de alucinações
 12. RAG em pelo menos 1 agente com fontes identificáveis na resposta, tando de arquivos locais quanto de fontes externas (pelo menos uma deve ser consumida)
 15. Agente juiz
@@ -65,7 +65,7 @@ A arquitetura inicial consiste em um modelo orquestrado por LangGraph, com múlt
 
 ![Desenho - Arquitetura](desenho-arquitetura.png)
 
-Fluxo resumido: o usuário interage via Web/Mobile → FastAPI identifica sessão e aplica guardrail de entrada → LangGraph roteia para o(s) agente(s) relevante(s), que usam LangChain para acessar o modelo de IA e as bases de dados (PostgreSQL/MongoDB/Redis) → o Agente Juiz valida a resposta → guardrail de saída → resposta retornada ao usuário. Observabilidade e integrações MCP/A2A atuam de forma transversal/futura.
+Fluxo resumido: o usuário interage via Web/Mobile → FastAPI identifica sessão e aplica guardrail de entrada → LangGraph roteia para o(s) agente(s) relevante(s), que usam LangChain para acessar o modelo de IA e as bases de dados (PostgreSQL/MongoDB/Redis) → o Agente Juiz valida a resposta → guardrail de saída → resposta retornada ao usuário. Observabilidade atua transversalmente; MCP fornece conhecimento externo ao RAG na branch de implementação. A2A foi excluído por decisão de negócio.
 
 ---
 
@@ -285,9 +285,9 @@ Exemplos de validação:
 
 ---
 
-## MCP e A2A
+## Integrações externas
 
-O Projeto Delta utilizará **MCP (Model Context Protocol)** e **A2A (Agent-to-Agent)** como mecanismos de integração com recursos externos e outros agentes.
+O Projeto Delta utiliza **MCP (Model Context Protocol)** para disponibilizar fontes externas ao RAG na branch de implementação. **A2A (Agent-to-Agent) não será adotado**, por decisão de negócio informada em 01/11/2026.
 
 ### MCP — Fontes externas de conhecimento para o RAG
 
@@ -302,7 +302,7 @@ Os trechos externos passam pela recuperação vetorial e seguem como evidências
 ao Juiz. Eles não definem regras do Delta nem comprovam condições particulares
 da residência ou organização. Contrato, configuração, validação real do MCP e
 limites estão no [guia de fontes externas para o RAG](mcp-fontes-externas-rag.md).
-A2A continua como integração proposta, descrita abaixo.
+A2A está fora do escopo por decisão de negócio, registrada abaixo.
 
 ### Histórico climático usado pelo Agente de Hábitos
 
@@ -327,27 +327,12 @@ o histórico do MongoDB.
 
 ---
 
-### A2A — Comunicação com agente externo de pesquisa (Proposta, sujeito a alteração)
+### A2A — Excluído por decisão de negócio
 
-O **A2A (Agent-to-Agent)** será utilizado como mecanismo de comunicação entre os agentes do Projeto Delta e um **agente externo especializado em pesquisa** -> https://github.com/IECC-NU/a2a-research-agent
-
-Como candidato para essa integração, propõe-se o uso do **A2A Research Agent**, um projeto open source que implementa um agente de pesquisa utilizando o protocolo A2A. O agente é especializado em realizar pesquisas externas, analisar resultados e fornecer informações acompanhadas de suas fontes.
-
-| Aspecto | Descrição |
-|---|---|
-| **Agente solicitante** | Agente RAG / Orquestrador |
-| **Agente externo candidato** | A2A Research Agent |
-| **Protocolo** | A2A (Agent-to-Agent) |
-| **Informações solicitadas** | Informações sobre uso consciente da água, conservação, eficiência hídrica, saneamento e outros conhecimentos gerais relacionados ao domínio do Projeto Delta |
-| **Finalidade** | Delegar pesquisas externas para um agente especializado e complementar o conhecimento utilizado pelo Agente RAG |
-| **Benefício** | Permite que o Projeto Delta se comunique com um agente independente por meio de um protocolo padronizado, sem incorporar diretamente toda a lógica de pesquisa ao próprio Agente RAG |
-| **Situação** | Integração proposta / candidata para implementação |
-
-**Exemplo de utilização:**
-
-> O usuário pergunta: "Quais são as principais formas de reduzir o consumo de água em uma residência?"
-
-> O Agente RAG identifica que a resposta pode se beneficiar de informações externas e solicita uma pesquisa ao A2A Research Agent. O agente externo realiza a pesquisa e retorna informações e respectivas fontes. O Agente RAG utiliza esse resultado como contexto para elaborar a resposta final, que posteriormente passa pelo Agente Juiz e pelos Guardrails.
+Em 01/11/2026, a pessoa responsável definiu que o Delta não terá integração
+A2A. A proposta anterior de comunicação com o A2A Research Agent foi cancelada.
+A2A não é requisito pendente de implementação ou validação desta entrega.
+O conhecimento externo tratado aqui é disponibilizado ao RAG por MCP.
 
 ---
 
@@ -470,11 +455,10 @@ projeto-delta-ai-api/
 │   │   └── rag_retriever.py
 │   │
 │   ├── integrations/
-│   │   ├── mcp/
-│   │   │   └── weather.py
-│   │   │
-│   │   └── a2a/
-│   │       └── research_agent.py
+│   │   └── mcp/
+│   │       ├── sources.py
+│   │       ├── server.py
+│   │       └── client.py
 │   │
 │   ├── guardrails/
 │   │   ├── entrada.py
@@ -527,7 +511,6 @@ projeto-delta-ai-api/
 
 * **`integrations/mcp/`** — catálogo de artigos públicos, servidor MCP local via stdio e cliente para alimentar a recuperação de conhecimento externo do RAG, na branch `feat/mcp-fontes-externas-rag`.
 
-* **`integrations/a2a/`** — integrações com agentes externos realizadas por meio do **Agent-to-Agent (A2A)**. Inicialmente, poderá conter a integração com o **A2A Research Agent**, proposto como agente externo especializado em pesquisa.
 
 * **`guardrails/`** — validações de segurança e controle das entradas e saídas dos agentes, incluindo proteção contra prompt injection, exposição de dados de outros usuários, informações internas e respostas que não estejam de acordo com as regras do sistema.
 
@@ -558,9 +541,9 @@ A implementação do Projeto Delta será realizada de forma incremental, prioriz
 | **Fase 8**  | **Sessões e memória:** implementação do controle de sessões dos usuários, histórico de conversas e memória de longo prazo, garantindo a manutenção do contexto entre diferentes interações.                                                                             |
 | **Fase 9**  | **RAG e conhecimento externo:** consolidação do Agente RAG, definição das fontes externas de conhecimento e implementação da recuperação de informações sobre uso consciente da água, conservação, eficiência hídrica e temas relacionados ao domínio do Projeto Delta. |
 | **Fase 10** | **Integração MCP:** disponibilização de fontes públicas de conhecimento para o RAG por meio de cliente/servidor MCP local. O escopo foi redirecionado de clima para dados externos; veja [contrato e evidências](mcp-fontes-externas-rag.md). |
-| **Fase 11** | **Integração A2A:** implementação e validação da comunicação com um agente externo por meio do protocolo Agent-to-Agent (A2A), utilizando inicialmente o A2A Research Agent como candidato para pesquisas externas.                                                     |
+| **Fase 11** | **A2A cancelado:** integração excluída por decisão de negócio em 01/11/2026; não compõe os critérios de aceite. |
 | **Fase 12** | **Endpoints complementares:** implementação e integração dos endpoints relacionados às sessões, histórico e demais recursos necessários para consumo da API pela aplicação Web/Mobile.                                                                                  |
 | **Fase 13** | **Observabilidade:** implementação do monitoramento da aplicação, incluindo métricas de latência, erros, chamadas aos modelos, consumo de recursos e custos, quando aplicável.                                                                                          |
-| **Fase 14** | **Testes integrados e validação final:** execução de testes envolvendo agentes, LangGraph, memória, RAG, guardrails, MCP, A2A e API, além da validação do fluxo completo do sistema.                                                                          
+| **Fase 14** | **Testes integrados e validação final:** agentes, LangGraph, memória, RAG, guardrails, MCP e API. A2A não se aplica por decisão de negócio. |
 
 > **Observação:** As fases não representam necessariamente etapas isoladas ou exclusivamente sequenciais. Algumas atividades poderão ocorrer em paralelo durante a implementação. A ordem apresentada representa a dependência arquitetural recomendada para a construção e validação progressiva do Projeto Delta.

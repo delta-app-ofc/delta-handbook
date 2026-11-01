@@ -97,7 +97,8 @@ são substituídos nos cenários de integração.
 
 A chamada real ao artigo público por MCP foi executada e está registrada no
 [guia de fontes externas](mcp-fontes-externas-rag.md). Ela não equivale à
-validação completa de memória persistente, bancos, embeddings, Juiz e A2A.
+validação completa de memória persistente, bancos, embeddings e Juiz.
+A2A está fora do escopo por decisão de negócio em 01/11/2026.
 
 Referências técnicas: [embeddings Gemini](https://ai.google.dev/gemini-api/docs/embeddings)
 e [Qdrant](https://qdrant.tech/documentation/).

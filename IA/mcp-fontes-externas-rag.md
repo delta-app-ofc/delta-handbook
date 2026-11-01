@@ -47,6 +47,12 @@ Código na [branch de implementação](https://github.com/delta-app-ofc/delta-ar
 
 ## Fonte inicial e limites de uso
 
+O artigo abaixo foi escolhido durante esta implementação para validar a cadeia
+MCP → extração → RAG; ele não havia sido especificado como fonte no handbook.
+O estado entregue contém uma única página fixa e não oferece busca aberta na
+internet. O documento anterior descrevia MCP para clima e pesquisa externa
+como uma proposta A2A, posteriormente cancelada por decisão de negócio.
+
 O catálogo contém `senado-water-conservation`, tema `water_conservation`:
 [Uso racional da água, essencial para o futuro — Senado Notícias](https://www12.senado.leg.br/noticias/especiais/especial-cidadania/uso-racional-da-agua-essencial-para-o-futuro),
 publicado em **12/09/2005**. É material histórico de orientação geral, não previsão
@@ -165,7 +171,7 @@ dados de execução. `git diff --check` e os links relativos dos guias passaram.
 | --- | --- |
 | [Recuperação e citação no RAG](https://app.clickup.com/t/86e32aqn9) | Top-k, filtros exatos externos, contexto estruturado e lista de fontes; testes temáticos de ranking com embeddings controlados e Qdrant em memória. Qualidade semântica com Gemini real continua pendente. |
 | [Configuração MCP](https://app.clickup.com/t/86e32aqra) | Cliente/servidor stdio, contrato, variáveis, modelo de acesso local e chamada real à fonte pública executados. O escopo foi alterado de clima para conhecimento externo conforme orientação. |
-| [Integração de memória, RAG, guardrails, MCP e A2A](https://app.clickup.com/t/86e32arfe) | Testes do grafo preservam contexto e evidências, verificam memória de outro usuário, bloqueio de entrada maliciosa, anonimização, falha MCP e bloqueio por Juiz. MCP também passa pelo protocolo real com HTTP controlado. A2A não foi implementado: sucesso/indisponibilidade A2A e validação com todos os serviços reais permanecem pendentes. |
+| [Integração de memória, RAG, guardrails, MCP e A2A](https://app.clickup.com/t/86e32arfe) | Testes do grafo preservam contexto e evidências, verificam memória de outro usuário, bloqueio de entrada maliciosa, anonimização, falha MCP e bloqueio por Juiz. MCP também passa pelo protocolo real com HTTP controlado. A2A foi excluído por decisão de negócio em 01/11/2026 e não compõe o aceite. A validação com todos os serviços reais continua pendente. |
 
 Os testes do grafo usam modelos e acesso Mongo/PostgreSQL substituídos e memória
 vetorial real em RAM. Eles comprovam o encadeamento dos componentes, não a
@@ -180,4 +186,4 @@ continua obrigatório. Nenhuma tarefa do ClickUp foi encerrada automaticamente.
 - [Transporte stdio](https://py.sdk.modelcontextprotocol.io/client/transports/).
 - [Saída estruturada das ferramentas](https://py.sdk.modelcontextprotocol.io/servers/structured-output/).
 - [Recuperação documental do Delta](rag-retrieval.md).
-- [Arquitetura e integração A2A proposta](arquitetura-inteligencia-artificial.md).
+- [Arquitetura e decisão de escopo das integrações](arquitetura-inteligencia-artificial.md).

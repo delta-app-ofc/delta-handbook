@@ -289,7 +289,22 @@ Exemplos de validação:
 
 O Projeto Delta utilizará **MCP (Model Context Protocol)** e **A2A (Agent-to-Agent)** como mecanismos de integração com recursos externos e outros agentes.
 
-### Integração com API de informações climáticas
+### MCP — Fontes externas de conhecimento para o RAG
+
+O escopo adotado para MCP é fornecer artigos públicos sobre uso consciente,
+conservação e eficiência hídrica ao Agente RAG. A implementação está na branch
+`feat/mcp-fontes-externas-rag` de `delta-artificial-intelligence`, ainda sujeita
+à revisão e ao merge. O cliente inicia um servidor MCP local via stdio; o
+servidor recebe somente o ID de uma fonte aprovada, sem perguntas ou dados da
+conta, e devolve texto com URL, título, publicação, coleta e revisão.
+
+Os trechos externos passam pela recuperação vetorial e seguem como evidências
+ao Juiz. Eles não definem regras do Delta nem comprovam condições particulares
+da residência ou organização. Contrato, configuração, validação real do MCP e
+limites estão no [guia de fontes externas para o RAG](mcp-fontes-externas-rag.md).
+A2A continua como integração proposta, descrita abaixo.
+
+### Histórico climático usado pelo Agente de Hábitos
 
 O Agente de Hábitos consulta o histórico meteorológico no MongoDB: a coleção `weather_daily` armazena dados climáticos por localização e data, e o agente a lê pela tool `get_weather_history`. A ingestão desses dados não é feita pelo agente.
 
@@ -301,7 +316,10 @@ O Agente de Hábitos consulta o histórico meteorológico no MongoDB: a coleçã
 | **Finalidade** | Contextualizar hábitos ao ar livre com o clima recente, sem prever o tempo futuro |
 | **Situação** | Implementado no repositório `delta-artificial-intelligence` (`app/tools/habits/tools.py`) |
 
-A integração via **MCP** para dados climáticos permanece como opção arquitetural futura — permite trocar o provedor sem alterar as tools. A implementação atual não usa MCP para clima.
+A implementação atual não usa MCP para clima. As demandas que originalmente
+citavam ferramentas climáticas foram redirecionadas, nesta entrega, para
+conhecimento externo do RAG. A consulta meteorológica abaixo continua lendo
+o histórico do MongoDB.
 
 **Exemplo de utilização:**
 
@@ -507,7 +525,7 @@ projeto-delta-ai-api/
   * `db_mongo.py` — acesso aos dados armazenados no MongoDB;
   * `rag_retriever.py` — recuperação de informações utilizadas pelo Agente RAG.
 
-* **`integrations/mcp/`** — integrações externas realizadas por meio do **Model Context Protocol (MCP)**. Inicialmente, será utilizada para disponibilizar informações de uma API externa de clima aos agentes do Projeto Delta.
+* **`integrations/mcp/`** — catálogo de artigos públicos, servidor MCP local via stdio e cliente para alimentar a recuperação de conhecimento externo do RAG, na branch `feat/mcp-fontes-externas-rag`.
 
 * **`integrations/a2a/`** — integrações com agentes externos realizadas por meio do **Agent-to-Agent (A2A)**. Inicialmente, poderá conter a integração com o **A2A Research Agent**, proposto como agente externo especializado em pesquisa.
 
@@ -539,7 +557,7 @@ A implementação do Projeto Delta será realizada de forma incremental, prioriz
 | **Fase 7**  | **API com FastAPI:** implementação da API REST e integração do fluxo de agentes com o endpoint `/chat`, permitindo a comunicação entre o frontend e o sistema de inteligência artificial.                                                                               |
 | **Fase 8**  | **Sessões e memória:** implementação do controle de sessões dos usuários, histórico de conversas e memória de longo prazo, garantindo a manutenção do contexto entre diferentes interações.                                                                             |
 | **Fase 9**  | **RAG e conhecimento externo:** consolidação do Agente RAG, definição das fontes externas de conhecimento e implementação da recuperação de informações sobre uso consciente da água, conservação, eficiência hídrica e temas relacionados ao domínio do Projeto Delta. |
-| **Fase 10** | **Integração MCP:** implementação da integração com a API externa de informações climáticas por meio do Model Context Protocol (MCP), disponibilizando dados meteorológicos aos agentes.                                                                                |
+| **Fase 10** | **Integração MCP:** disponibilização de fontes públicas de conhecimento para o RAG por meio de cliente/servidor MCP local. O escopo foi redirecionado de clima para dados externos; veja [contrato e evidências](mcp-fontes-externas-rag.md). |
 | **Fase 11** | **Integração A2A:** implementação e validação da comunicação com um agente externo por meio do protocolo Agent-to-Agent (A2A), utilizando inicialmente o A2A Research Agent como candidato para pesquisas externas.                                                     |
 | **Fase 12** | **Endpoints complementares:** implementação e integração dos endpoints relacionados às sessões, histórico e demais recursos necessários para consumo da API pela aplicação Web/Mobile.                                                                                  |
 | **Fase 13** | **Observabilidade:** implementação do monitoramento da aplicação, incluindo métricas de latência, erros, chamadas aos modelos, consumo de recursos e custos, quando aplicável.                                                                                          |

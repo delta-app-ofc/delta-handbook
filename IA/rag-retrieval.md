@@ -2,104 +2,102 @@
 
 ## Objetivo e escopo
 
-Esta primeira etapa prepara a base Markdown e recupera os trechos mais próximos
-da pergunta. Não gera respostas, não implementa o `RagAgent` e não modifica o
-roteamento, o Judge ou a memória de conversas.
+O Agente RAG recupera documentação local do produto e conhecimento externo sobre
+uso consciente da água, preservando os trechos e suas fontes até a avaliação do
+Juiz. A integração externa está na branch `feat/mcp-fontes-externas-rag` do
+repositório `delta-artificial-intelligence`, sujeita à revisão antes de merge.
 
-A fonte é o documento `IA/RAG/base-conhecimento-delta.md` do repositório
-`delta-handbook`. O caminho é passado explicitamente: o serviço não depende da
-estrutura de pastas dos outros repositórios nem copia o documento para cá.
+A fonte local implementada é `app/knowledge/delta-main-source.md`, configurável
+por `RAG_DOCUMENT_PATH` e incluída na imagem da aplicação. Caminhos relativos
+partem da raiz do repositório de IA. O agente não recebe caminhos livres do LLM.
+O antigo fluxo de CLI manual `scripts.rag` não está presente neste checkout:
+a ferramenta prepara automaticamente a revisão antes da consulta.
 
-## Como funciona
+Para fontes externas, consulte o [guia MCP/RAG](mcp-fontes-externas-rag.md), que
+registra o catálogo, os contratos, os filtros e a validação da chamada pública.
+O documento do produto e os artigos externos conservam identidades distintas.
 
-1. `#` identifica o documento, `##` identifica capítulos e `###` identifica
-   subtópicos. Cada corpo de seção vira um trecho, acompanhado da hierarquia
-   completa de títulos. Texto antes dos capítulos, incluindo versão e ressalvas,
-   também é preservado. Títulos sem corpo não geram vetores vazios.
-2. O texto enviado ao embedding contém títulos e conteúdo. Assim, por exemplo,
-   um subtópico de chuva mantém sua ligação ao capítulo de clima. Uma pergunta
-   busca todos os trechos e devolve os mais próximos, com seus respectivos
-   capítulos; não há classificação prévia que restrinja a busca a um só capítulo.
-3. `gemini-embedding-001` produz vetores de 3072 dimensões. Documentos usam
-   `RETRIEVAL_DOCUMENT`; a pergunta usa `RETRIEVAL_QUERY`. É um modelo textual,
-   adequado a esta etapa com Markdown. A integração usa a dependência existente
-   `langchain-google-genai`, com timeout HTTP de 30 segundos.
-4. Qdrant armazena os vetores com distância Cosine na coleção fixa
-   `rag_documents`, separada de `session_summaries`. Os metadados incluem fonte,
-   hash da revisão, modelo, hierarquia, texto e linhas inicial/final (inclusivas).
-5. A busca devolve até três trechos por padrão, com IDs, scores e metadados.
-   Similaridade não é probabilidade nem garantia de relevância. O limiar opcional
-   precisa ser calibrado com perguntas reais; nenhum limiar arbitrário é imposto.
+## Segmentação e modelo vetorial
 
-A separação reconhece títulos no início das linhas e ignora títulos dentro de
-blocos de código cercados por crases ou tils. Não separa pelo caractere `#`
-encontrado no meio de frases. Para evitar truncamento silencioso pelo provedor,
-seções acima de 6000 caracteres (corpo e títulos) são rejeitadas: subdivida-as
-com `###` na fonte. Esse limite conservador em caracteres não é um tokenizador.
-Títulos `####` e posteriores permanecem no corpo.
+A base local é segmentada por títulos `#`, `##` e `###`, preservando hierarquia,
+texto e linhas. Títulos sem corpo não viram vetores vazios; seções acima de
+6.000 caracteres devem ser subdivididas. Esta versão do parser não implementa
+tratamento especial de blocos de código cercados: não trate títulos dentro
+nesses blocos como comportamento validado.
 
-## Comandos
+O texto externo é extraído do artigo HTML e dividido em trechos de até 1.800
+caracteres. Títulos Markdown no conteúdo externo não são interpretados como
+estrutura. As linhas da citação se referem ao texto extraído normalizado,
+não ao HTML publicado. O texto enviado ao embedding inclui título e conteúdo.
 
-Execute na raiz de `delta-artificial-intelligence`. No workspace com os dois
-repositórios lado a lado:
+O serviço compartilha `GEMINI_EMBEDDING_MODEL` entre documentos e perguntas:
+`RETRIEVAL_DOCUMENT` para indexação, `RETRIEVAL_QUERY` para consulta e vetores
+de 3072 dimensões. O padrão dos settings é `gemini-embedding-001`. O modelo,
+a dimensão e os documentos indexados precisam permanecer compatíveis.
+
+A coleção fixa `rag_documents` é separada da memória `session_summaries`.
+Ela deve existir com vetor sem nome, 3072 dimensões e distância Cosine. O
+serviço recusa esquema incompatível antes de gerar embeddings e nunca apaga
+ou recria essa coleção.
+
+## Recuperação, revisão e referência
+
+`search_knowledge_base(question, top_k=3)` consulta as regras do Delta.
+`search_external_knowledge(question, top_k=3, topic=None, source_id=None)`
+consulta as fontes públicas aprovadas, quando o MCP está habilitado. Top-k
+aceita valores de 1 a 20; tema e fonte são filtros exatos na busca externa.
+
+A preparação usa IDs estáveis por fonte, revisão, modelo e posição. Um lock
+impede indexações simultâneas no mesmo processo. Quando uma revisão está
+completa, não gera novamente os embeddings dos documentos; se está incompleta,
+a próxima chamada tenta completá-la. Revisões antigas continuam armazenadas,
+mas a consulta filtra somente a atual. Não há limpeza automática de revisões.
+
+Os resultados incluem texto, hierarquia, linhas, fonte, revisão, modelo e
+score. Trechos externos também incluem URL, título, tema, publicação, coleta
+e natureza externa. Similaridade não é probabilidade nem garantia de que o
+trecho responda à pergunta. O serviço Python oferece `score_threshold`
+opcional; nenhum limiar sem calibração foi imposto às ferramentas.
+
+O `RagAgent` recebe os resultados como mensagens de ferramenta, registra os
+trechos em `tool_calls` e as referências em `sources`. A lista final de
+fontes é montada em Python com os campos `citation` recuperados. O grafo leva
+esse contexto real ao Juiz antes da publicação. A avaliação semântica e a
+fidelidade de uma resposta gerada precisam de validação com os modelos reais.
+
+## Configuração e falhas
+
+Configure `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL`, `QDRANT_URL` e, se exigido,
+`QDRANT_API_KEY`. A fonte local exige `RAG_DOCUMENT_PATH`; a externa exige
+`MCP_EXTERNAL_ENABLED=true`. Não há fallback para outro Qdrant implícito na
+base documental. Indexar gera chamadas ao provedor de embeddings e grava na
+coleção configurada.
+
+`unavailable` indica falha de configuração, preparação ou acesso;
+`insufficient_data` indica que a busca ou o filtro não produziu trechos.
+Nenhum desses estados permite completar a resposta com regras inventadas.
+O conteúdo externo não comprova consumo, tarifa, clima, alertas ou outros
+dados da conta, nem define funcionalidades do produto.
+
+## Testes e limites
+
+Na raiz do repositório de IA:
 
 ```powershell
-# Somente leitura local: não exige chaves nem Qdrant.
-python -m scripts.rag inspect ../delta-handbook/IA/RAG/base-conhecimento-delta.md
-
-# Gera embeddings pela API Gemini e grava no Qdrant configurado.
-python -m scripts.rag index ../delta-handbook/IA/RAG/base-conhecimento-delta.md
-
-# Gera o embedding da pergunta e recupera os trechos, sem chamar LLM de resposta.
-python -m scripts.rag search ../delta-handbook/IA/RAG/base-conhecimento-delta.md --question "Como funciona o vínculo do hidrômetro?" --top-k 3
+$env:APP_ENV = 'test'
+python -m pytest tests/test_ci_rag.py tests/test_external_rag.py tests/test_rag_workflow_integration.py -q
 ```
 
-Antes de `index` e `search`, configure `GEMINI_API_KEY`, `QDRANT_URL` e, quando
-exigido pelo servidor, `QDRANT_API_KEY`. Use `.env` ou variáveis do processo,
-conforme os settings existentes. Não há fallback implícito para Qdrant local;
-o destino deve ser explícito. Qdrant aplica timeout de 30 segundos. As credenciais
-precisam permitir criar a coleção, os índices de payload e gravar/ler pontos.
-O comando de indexação faz chamadas cobradas ao provedor de embeddings.
+Os testes verificam rastreabilidade, top-k, filtros, ranking temático controlado,
+idempotência, reparo de revisão incompleta, isolamento de fontes e revisões,
+esquema incompatível e evidências no grafo. Usam Qdrant em memória e embeddings
+artificiais; não comprovam a qualidade semântica do Gemini ou acesso ao Qdrant
+remoto. Os provedores generativos, a avaliação e os bancos cadastrais do grafo
+são substituídos nos cenários de integração.
 
-Use `--source` para identificar outra fonte e `--score-threshold` para aplicar
-um limiar Cosine entre -1 e 1. Na API Python, `load_document`, `index_document`
-e `search_document` estão em `app/services/rag.py`; os clientes são injetáveis.
-O chamador deve fechar o cliente Qdrant; o CLI faz isso em `finally`.
-
-## Revisões e falhas
-
-Reindexar o mesmo conteúdo atualiza os mesmos IDs, sem duplicar pontos. O hash
-inclui conteúdo e versão do segmentador. Após alterar o Markdown, execute
-`index` novamente antes de `search`. A busca filtra fonte, revisão e modelo;
-revisões antigas continuam armazenadas, mas não participam da consulta atual.
-O arquivo precisa estar acessível também na consulta para identificar a revisão.
-
-Uma revisão ausente ou incompleta falha antes de consultar embeddings. Erros
-de provedor/banco propagam na API Python; não viram uma resposta vazia. O CLI
-retorna código 1 com mensagem segura, sem imprimir erros externos ou credenciais.
-Erros de configuração indicam o nome da variável ausente, sem mostrar seu valor.
-Lista vazia significa que a busca executada não encontrou pontos aceitos pelo
-limiar. Coleções incompatíveis são recusadas, nunca apagadas ou recriadas.
-
-Revisões antigas não são removidas automaticamente. Trocar modelo ou dimensões
-exige uma migração explícita, não comparação entre espaços vetoriais diferentes.
-
-## Validação e limites
-
-`python -m pytest tests/test_rag.py -q` verifica segmentação, rastreabilidade,
-idempotência, isolamento de fontes/revisões, erros e consulta vetorial usando
-Qdrant real em memória e embeddings controlados. Não acessa Gemini nem Qdrant
-remoto e não comprova qualidade semântica ou disponibilidade dos serviços.
-
-Na validação desta implementação, a suíte completa passou com 214 testes. O
-diretório temporário padrão do Windows sandbox negou escrita nos testes com
-arquivos; a execução usou `--basetemp` em um diretório novo e isolado dentro do
-workspace. Isso não exige mudar os testes ou a configuração da aplicação.
-
-A inspeção local da base de referência encontrou 12 capítulos e 58 trechos,
-incluindo a apresentação. Credenciais Gemini e URL Qdrant estavam ausentes:
-geração dos embeddings reais, persistência remota e avaliação temática com
-perguntas reais continuam pendentes. O documento original não foi alterado.
+A chamada real ao artigo público por MCP foi executada e está registrada no
+[guia de fontes externas](mcp-fontes-externas-rag.md). Ela não equivale à
+validação completa de memória persistente, bancos, embeddings, Juiz e A2A.
 
 Referências técnicas: [embeddings Gemini](https://ai.google.dev/gemini-api/docs/embeddings)
-e [documentação Qdrant](https://qdrant.tech/documentation/).
+e [Qdrant](https://qdrant.tech/documentation/).

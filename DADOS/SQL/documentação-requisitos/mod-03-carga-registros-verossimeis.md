@@ -6,6 +6,10 @@
 - [Documentação da carga e contagem por tabela](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/dataload.md)
 - [Mapeamento de municípios e regiões tarifárias](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/mapeamento-cidade-regiao.md)
 
+- [Contagem executada — parte 1](../anexos/evidencias-requisitos/mod-03-contagem-01.png)
+- [Contagem executada — parte 2](../anexos/evidencias-requisitos/mod-03-contagem-02.png)
+- [Consulta SQL da contagem](../anexos/evidencias-requisitos/mod-03-consulta-contagem.png)
+
 **Localização e como comprovar:**
 
 A implementação está no arquivo `script-dataload.sql`, localizado no repositório `delta-sql-database`. O script contém os comandos SQL responsáveis pela inserção e complementação dos dados utilizados para popular o banco PostgreSQL.
@@ -127,3 +131,7 @@ Entre as possibilidades de utilização estão:
 - Avaliar consultas analíticas e a integração das informações utilizadas pelas funcionalidades do projeto.
 
 A separação entre os dados residenciais e comerciais/industriais também permite verificar se o modelo atende aos diferentes contextos de utilização previstos para a aplicação.
+
+#### Evidência visual da contagem executada
+
+Os prints anexados mostram 1.960 registros nas 21 tabelas selecionadas na consulta, comprovando o mínimo de 500. A seleção fotografada não inclui `tb_municipality`; os 371 municípios integram a carga completa de 2.331 registros documentada em `dataload.md`.

@@ -8,6 +8,8 @@
 - [Procedure de cadastro de propriedade](https://github.com/delta-app-ofc/delta-sql-database/blob/main/procedures/sp_register_property.sql)
 - [Documentação das Functions e Procedures](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/otimizacao.md)
 
+- [Print das cinco Procedures do schema public](../anexos/evidencias-requisitos/mod-09-procedures-01.png)
+
 **Localização e como comprovar:**
 
 O banco possui **cinco Procedures** em `procedures/`, reunidas em `script-optimization.sql`. Cada uma executa uma operação com várias etapas dentro de uma única chamada e transação.

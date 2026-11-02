@@ -8,6 +8,8 @@
 - [Índice de apoio à recursão](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-indexes.sql)
 - [Documentação da camada de BI, seção 6](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
 
+- [Print da cadeia recursiva com três níveis](../anexos/evidencias-requisitos/mod-15-cadeia-recursiva.png)
+
 **Localização e como comprovar:**
 
 A estrutura avançada escolhida foi a **CTE recursiva**, aplicada ao histórico de reajustes de tarifa.

@@ -19,6 +19,10 @@ banco PostgreSQL com 22 tabelas de negócio normalizadas até a 3FN, com tabelas
 - Documentação do modelo relacional: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-relacional.md
 - Diagrama com a modelagem lógica das entidades principais: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica.png
 - Modelagem conceitual da arquitetura: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-conceitual.png
+- Inventário de tabelas — parte 1: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-01-tabelas-01.png
+- Inventário de tabelas — parte 2: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-01-tabelas-02.png
+- Inventário de tabelas — parte 3: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-01-tabelas-03.png
+- Inventário de tabelas — parte 4: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-01-tabelas-04.png
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-01-banco-postgresql-normalizacao.md
 
 ### MOD-02 — Definir claramente PKs, FKs e cardinalidades 1:1, 1:N e N:N
@@ -40,6 +44,9 @@ carga de 2.331 registros em 22 tabelas, com 201 usuários, 155 imóveis, 400 há
 
 - Script da carga de dados: https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-dataload.sql
 - Documentação da carga e contagem por tabela: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/dataload.md
+- Contagem executada — parte 1: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-03-contagem-01.png
+- Contagem executada — parte 2: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-03-contagem-02.png
+- Consulta SQL da contagem: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-03-consulta-contagem.png
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-03-carga-registros-verossimeis.md
 
 ### MOD-04 — Orquestrar RPA para mover dados do banco legado ao novo normalizado, garantindo integridade e tratamento de falhas de carga
@@ -63,6 +70,7 @@ Data Mart em Star Schema, com camadas `stage`, `silver`, `gold` e `dw`, três di
 - Views analíticas do schema `dw`: https://github.com/delta-app-ofc/delta-sql-database/tree/main/datamart/dw/views
 - Documentação da camada de BI: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md
 - Diagrama da camada analítica: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica-camada-analitica.png
+- Print das nove views do schema dw: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-05-views-dw.png
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-05-views-analiticas-data-mart.md
 
 ### MOD-06 — Usar CTEs na lógica de transformação ETL em SQL
@@ -107,6 +115,7 @@ cinco Procedures (`sp_change_region_rate`, `sp_register_property`, `sp_disable_u
 - Pasta das Procedures: https://github.com/delta-app-ofc/delta-sql-database/tree/main/procedures
 - Script que agrega as Functions e Procedures: https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-optimization.sql
 - Documentação das Functions e Procedures: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/otimizacao.md
+- Print das cinco Procedures do schema public: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-09-procedures-01.png
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-09-procedures-regras-negocio.md
 
 ### MOD-10 — Criar triggers de auditoria em ao menos duas tabelas com logs completos NEW, OLD, TG_OP e CURRENT_USER
@@ -175,6 +184,7 @@ CTE recursiva na view `dw.vw_audit_history_chain`, que reconstrói a cadeia de r
 
 - View com `WITH RECURSIVE`: https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/dw/views/vw_audit_history_chain.sql
 - Documentação da camada de BI: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md
+- Print da cadeia recursiva com três níveis: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencias-requisitos/mod-15-cadeia-recursiva.png
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-15-cte-recursiva-heranca.md
 
 ### MOD-16 — Incluir no repositório relatório de justificativa das decisões

@@ -9,6 +9,11 @@
 - [Documentação das regras de negócio](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/regras-negocio.md)
 - [Mapeamento de municípios e regiões tarifárias](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/mapeamento-cidade-regiao.md)
 
+- [Inventário de tabelas — parte 1](../anexos/evidencias-requisitos/mod-01-tabelas-01.png)
+- [Inventário de tabelas — parte 2](../anexos/evidencias-requisitos/mod-01-tabelas-02.png)
+- [Inventário de tabelas — parte 3](../anexos/evidencias-requisitos/mod-01-tabelas-03.png)
+- [Inventário de tabelas — parte 4](../anexos/evidencias-requisitos/mod-01-tabelas-04.png)
+
 **Localização e como comprovar:**
 
 A implementação pode ser comprovada diretamente no `script-schema.sql`, que define a estrutura relacional do PostgreSQL, incluindo tabelas, atributos, chaves primárias, chaves estrangeiras, restrições de unicidade e validações de integridade. A documentação `modelagem-relacional.md` apresenta a finalidade das entidades, suas dependências e os relacionamentos estabelecidos durante a evolução do projeto. O diagrama lógico permite visualizar a separação das entidades e suas cardinalidades.

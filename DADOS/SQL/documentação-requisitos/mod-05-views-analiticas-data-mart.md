@@ -9,6 +9,8 @@
 - [Documentação da camada de BI](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
 - [Diagrama da camada analítica](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica-camada-analitica.png)
 
+- [Print das nove views do schema dw](../anexos/evidencias-requisitos/mod-05-views-dw.png)
+
 **Localização e como comprovar:**
 
 O Data Mart está no mesmo PostgreSQL do banco relacional e é criado pelo `script-datamart.sql`, que organiza os dados em quatro schemas (arquitetura medalhão):

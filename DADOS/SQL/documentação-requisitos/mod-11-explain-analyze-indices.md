@@ -39,5 +39,5 @@ As sete views do schema `dw` foram analisadas uma a uma em volume de até 730.00
 
 1. Executar os scripts na ordem de `setup_db.py` até `script-indexes.sql`.
 2. Executar `\di` e conferir os três índices.
-3. Executar `EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM gold.dm_property WHERE organization_name = 'SWIFT';` e conferir o plano.
+3. Executar `EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM gold.dm_property WHERE organization_name = 'SWIFT DISTRIBUIDORA';` e conferir o plano.
 4. Para reproduzir o ganho, repetir a metodologia da seção 1 com volume ampliado.

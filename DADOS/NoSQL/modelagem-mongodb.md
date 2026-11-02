@@ -35,13 +35,13 @@ A modelagem usa **dois databases**, previstos em clusters separados nos scripts 
 | Database             | Conteúdo                                                               | Padrão de carga                                            |
 |----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
 | `db_delta_telemetry` | `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
-| `db_delta_app`       | `user_preferences`, `alerts_history`, `user_hour_baseline`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Dados do app e escrita do baseline a cada janela avaliada |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `user_hour_baseline`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Dados do app e escrita do baseline quando uma janela elegível é processada |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
 > de acesso. **Planejado / implementação local (PRs abertas):** o detector da API Mongo também precisa de
 > acesso ao banco da aplicação, com conexão própria. No `delta-api-mongo` (PR #16, `AppMongoConfig`
 > e `application.properties`) os nomes são `appMongoTemplate`, `MONGODB_APP_URI` e
-> `MONGODB_APP_DATABASE`; a IA usa outro nome para o banco, `MONGO_DB_APP` (ver
+> `MONGODB_APP_DATABASE` ([fonte da API, revisão c056aa8](https://github.com/delta-app-ofc/delta-api-mongo/blob/c056aa8/src/main/resources/application.properties)); a IA usa outro nome para o banco, `MONGO_DB_APP` (ver
 > [IA/settings.md](../../IA/settings.md)). Cada serviço lê a variável do seu próprio repositório. Não se
 > deve presumir que a URI de telemetria alcança o cluster da aplicação. A habilitação em produção
 > depende de migrações e índices; o papel de serviço da API não cria esses índices.

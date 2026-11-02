@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Explicar os componentes implementados e suas responsabilidades. Base: `main` de IA em `f6f3d8c`, revisada em 02/11/2026. O [índice da área](leia-me.md) reúne os detalhes e as divergências encontradas.
+Explicar os componentes implementados e suas responsabilidades. Base: `main` de IA. O [índice da área](leia-me.md) reúne os detalhes e as divergências encontradas.
 
 ## Visão geral
 
@@ -51,7 +51,6 @@ Os cinco primeiros estão em `AGENT_REGISTRY`. O Juiz é uma etapa do grafo. Pro
 | MCP local | Subprocesso stdio para ler artigos públicos cadastrados; não é um serviço HTTP externo do Delta. |
 | LangSmith | Rastreamento opcional; conteúdo oculto por padrão pela configuração da integração. |
 
-Não há fluxo Redis ou Neo4j implementado neste serviço. Não se infere o estado de outros repositórios pela presença dessas dependências.
 
 ## Perfil e autorização
 

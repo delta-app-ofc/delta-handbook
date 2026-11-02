@@ -12,7 +12,7 @@ Centralizar informações importantes em um único local, promovendo:
 - Documentação de decisões técnicas;
 
 
-## 🗂️ Estrutura do Repositório
+## Estrutura do Repositório
 
 ```text
 delta-handbook/
@@ -24,7 +24,7 @@ delta-handbook/
 └── ux/
 ```
 
-## 📐 Padrões de Documentação
+## Padrões de Documentação
 
 Sempre que possível, os documentos devem:
 
@@ -35,7 +35,7 @@ Sempre que possível, os documentos devem:
 - Manter histórico de atualizações relevantes.
 
 
-### ✒️ Nomeação
+### Nomeação
 
 Utilizar nomes em minúsculo e separados por hífen:
 
@@ -46,7 +46,7 @@ jornada-do-usuario.md
 ```
 
 
-## 🤝 Contribuindo
+## Contribuindo
 
 Antes de criar ou alterar documentação:
 

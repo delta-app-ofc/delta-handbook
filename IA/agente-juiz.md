@@ -17,7 +17,7 @@ Uma chamada tipada contém uma `Choice` de gravidade (`no_error`, `correctable_e
 | Suporte factual | `JEV_FACTS_SUPPORTED_THRESHOLD` | 0,60 |
 | Relevância | `JEV_RELEVANCE_THRESHOLD` | 0,25 |
 
-Os limites são inclusivos (`>=`). **Divergência:** `.env.example` define probabilidade 0,50; portanto copiar o exemplo muda esse limite em relação ao default do código. Consulte os settings efetivos, sem assumir que todos os ambientes usam o exemplo.
+Os limites são inclusivos (`>=`).
 
 Sem falhas nos critérios e com `no_error`, aprova. Erro corrigível ou limite não atingido pede correção na primeira rodada; na revisão rejeita. Erro crítico é rejeitado pela política Jev. Falha de configuração, provedor ou formato retorna `status=unavailable`, sem liberar a candidata.
 
@@ -25,7 +25,7 @@ Sem falhas nos critérios e com `no_error`, aprova. Erro corrigível ou limite n
 
 `JudgeAgent.run` encaminha **qualquer resultado Jev avaliado cuja confiança fique abaixo do limite** ao `SpecialistJudgeAgent`. Isso inclui um resultado com gravidade crítica de baixa confiança: o parecer especialista substitui a decisão inicial. Não há fallback ao segundo juiz por indisponibilidade do Jev nem somente por probabilidade/suporte/relevância baixos com confiança suficiente.
 
-O segundo juiz usa o provedor generativo selecionado: OpenAI no modo padrão; Gemini (`JUDGE_SPECIALIST_MODEL`) no modo Gemini, com fallback Groq para erro transitório quando configurado. Sua resposta é tipada em `decision`, `severity` e `justification`; ele não reescreve a candidata.
+O segundo juiz usa o provedor generativo selecionado: OpenAI no modo padrão. Sua resposta é tipada em `decision`, `severity` e `justification`; ele não reescreve a candidata.
 
 Parecer crítico é rejeitado. Aprovação com gravidade diferente de `no_error` é rejeitada como inconsistente. Se o segundo juiz pedir correção, a revisão volta diretamente a ele, com seu parecer anterior e a avaliação Jev original. Não há segunda correção.
 
@@ -37,7 +37,6 @@ Parecer crítico é rejeitado. Aprovação com gravidade diferente de `no_error`
 | `evaluated` + `correct`, sem revisão anterior | Preserva evidências, acrescenta feedback e executa uma revisão. |
 | `reject`, `unavailable` ou correção esgotada | Mensagem segura e gráfico nulo. |
 
-`judge_history` guarda candidatas e avaliações para diagnóstico interno. Elas não são entregues pelo contrato público do chat. Saudações, orientação sem agentes e respostas sem candidata útil podem não passar pelo Juiz; ainda seguem o guardrail final.
 
 ## Limites da garantia
 

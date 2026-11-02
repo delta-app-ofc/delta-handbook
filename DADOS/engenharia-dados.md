@@ -209,3 +209,7 @@ O Neo4j garante:
 O Projeto Delta utiliza uma arquitetura multi-banco para garantir escalabilidade, desempenho e inteligência analítica.
 
 Cada banco de dados possui uma responsabilidade bem definida.Essa arquitetura possibilita monitoramento avançado, previsão de consumo e detecção inteligente de desperdícios.
+
+## Processo analítico de BI — v3
+
+A análise gerencial atual usa as oito tabelas Gold da v3 no Databricks. O [processo de BI](BI/processo-bi.md) explica seleção da base, tratamento, cruzamentos, indicadores e apresentação; o [catálogo](BI/indicadores-bi.md) registra BI01–BI18. O datamart PostgreSQL documentado separadamente não deve ser confundido com essa Gold.

@@ -54,3 +54,8 @@ Antes de criar ou alterar documentação:
 2. Mantenha o padrão definido neste repositório.
 3. Documente decisões e justificativas.
 4. Solicite revisão quando necessário.
+
+## Business Intelligence
+
+- [Processo de análise — v3](DADOS/BI/processo-bi.md).
+- [Indicadores BI01–BI18](DADOS/BI/indicadores-bi.md).

@@ -1,5 +1,7 @@
 # 📊 Camada de BI (Data Mart) - PostgreSQL (Projeto Delta)
 
+> Escopo: este documento descreve o datamart PostgreSQL. Para o processo gerencial atual, a Gold no Databricks e BI01–BI18 da v3, consulte [Processo de BI](../BI/processo-bi.md) e [Indicadores](../BI/indicadores-bi.md).
+
 Este documento descreve a camada de BI/Data Mart do banco PostgreSQL do Projeto Delta: arquitetura em
 camadas, modelagem dimensional (star schema), CTEs, Window Functions, índices e a extração real de dados a
 partir do MongoDB. Cobre o perfil comercial/industrial (unidades operadas por organização) e o resumo

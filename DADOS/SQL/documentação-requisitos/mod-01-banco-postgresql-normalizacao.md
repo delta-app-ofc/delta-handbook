@@ -4,7 +4,8 @@
 
 - [Script de criação do banco e tabelas](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-schema.sql)
 - [Documentação do modelo relacional](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-relacional.md)
-- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-logica.png)
+- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica.png)
+- [Modelagem conceitual da arquitetura](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-conceitual.png)
 - [Documentação das regras de negócio](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/regras-negocio.md)
 - [Mapeamento de municípios e regiões tarifárias](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/mapeamento-cidade-regiao.md)
 
@@ -92,7 +93,7 @@ A normalização também orientou a evolução do projeto, principalmente na amp
 
 Em vez de criar estruturas duplicadas para cada perfil de utilização, o modelo reutiliza `tb_user` e `tb_property`, complementando-os com `tb_organization`, `tb_user_organization`, `tb_property_operational_profile`, `tb_property_shift`, `tb_property_operation_day` e as entidades relacionadas à utilização da água.
 
-A associação entre usuários e organizações é representada por `tb_user_organization`, enquanto `is_manager` permanece como indicador de perfil do usuário, sem substituir o relacionamento associativo. Essa distinção permite que a associação de uma pessoa a uma ou mais organizações seja representada independentemente de seu indicador de perfil. A ausência de uma hierarquia interna de gestores e supervisores também foi uma decisão de escopo documentada.
+A associação entre usuários e organizações é representada por `tb_user_organization`, que permite vincular uma pessoa a uma ou mais organizações por registros independentes. A ausência de uma hierarquia interna de gestores e supervisores é uma decisão de escopo documentada.
 
 Outro exemplo é a organização dos hábitos: a possibilidade de cadastrar o mesmo hábito em horários e dias diferentes foi incorporada à estrutura, com a separação entre rotina e dias de ocorrência e validações específicas no PostgreSQL.
 

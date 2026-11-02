@@ -3,7 +3,7 @@
 **Evidência direta:**
 
 - [Script de criação do banco — script-schema.sql](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-schema.sql)
-- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-logica.png)
+- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica.png)
 - [Documentação do modelo relacional](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-relacional.md)
 
 **Localização e como comprovar:**

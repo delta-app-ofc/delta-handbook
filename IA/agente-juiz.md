@@ -2,7 +2,7 @@
 
 ## Objetivo e entradas
 
-Descrever a política de `app/agents/judge.py`, `judge_specialist.py`, `app/config.py` e `app/graph/workflow.py` na `main` `f6f3d8c` (02/11/2026).
+Descrever a política de `app/agents/judge.py`, `judge_specialist.py`, `app/config.py` e `app/graph/workflow.py` na `main`.
 
 O Juiz recebe `JudgeInput`: pergunta, candidata completa, `agent_results`, contexto e gráfico. Evidências são os outputs reais das ferramentas e os trechos recuperados. Pergunta, candidata, gráfico e pareceres anteriores não comprovam fatos por si mesmos. O contexto inclui perfil, mensagens recentes tratadas, memória relevante, avisos e dados de revisão.
 

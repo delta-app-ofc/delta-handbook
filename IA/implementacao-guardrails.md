@@ -144,6 +144,15 @@ _SENHA_RE = re.compile(r"\b(senha|password|secret)\b\s*[:=]\s*\S+", re.I)
 
 Captura construções como `senha: abc123` ou `password=xyz`.
 
+### Etapa 4 — Detalhes técnicos e nomes de hábitos *(em PR, 01/11/2026)*
+
+Depois da validação, a resposta final passa por duas funções de `app/guardrails/output.py`, aplicadas no nó de saída do grafo e **não** dentro de `validate_output` (o console de testes reaproveita `validate_output` nos campos de diagnóstico, que precisam dos nomes internos):
+
+- `hide_technical_details(texto)`: remove frases que citam agentes, ferramentas, nomes `snake_case`, `status:`, traceback/exception/timeout/JSON, provedores e bancos, ou "API/banco/servidor" junto de palavra de falha. Se não sobrar nada, devolve "Não consegui consultar essa informação agora. Tente novamente em instantes.";
+- `capitalize_habit_names(texto)`: troca os seis nomes do catálogo em maiúsculas por `Regar Plantas`, `Lavar Louça` etc.
+
+**Limitação:** é uma regra por padrão de texto; pode deixar passar uma frase técnica escrita de outro jeito e pode cortar uma frase normal. Ela é a segunda barreira: a primeira é a regra de linguagem nos prompts. Veja [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
+
 ### Por que a saída não bloqueia na PII?
 
 Diferente do guardrail de entrada, a saída **nunca bloqueia** por PII — ela **redige**. Bloquear geraria um HTTP 500 ao usuário sem motivo aparente. Redigir é mais seguro: a resposta chega limpa.

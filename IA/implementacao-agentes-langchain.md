@@ -50,6 +50,13 @@ class AgentResult:
 | `get_last_water_bill` | Última conta de água (valor e consumo) | PostgreSQL |
 | `get_tariff` | Tarifa da região do usuário | PostgreSQL |
 | `calculate_forecast` | Calcula previsão determinística | cálculo interno |
+| `simulate_consumption_change` *(em PR)* | Simula variação percentual do consumo diário; devolve litros, diferença e hipóteses | cálculo interno |
+| `simulate_target_change` *(em PR)* | Compara o risco de passar da meta atual e de uma meta simulada | cálculo interno |
+| `get_investment_scenarios` *(em PR)* | Cenários de investimento (aeradores, reúso, captação de chuva); só organização | PostgreSQL |
+| `get_habit_baseline` *(em PR)* | Litros esperados dos hábitos cadastrados (contexto; fora da previsão); só residencial | PostgreSQL |
+
+> Os nomes da tabela acima são os do código; `get_last_water_bill` e `get_tariff` aparecem no código como `get_last_bill` e `get_region_rate`.
+> Com histórico diário, o gráfico é de linha (histórico + projeção); sem ele, mostra barras do mês (consumido, projeção e meta). Na simulação "e se", o gráfico compara cenário atual e simulado.
 
 ### Gráfico gerado
 
@@ -93,6 +100,7 @@ O motor de detecção usa regras explicáveis (fluxo contínuo, consumo de madru
 | `check_anomaly_status` | Verifica se há anomalia ativa na última janela |
 | `get_alerts_history` | Lista alertas históricos do usuário |
 | `summarize_anomalous_windows` | Resume janelas temporais com consumo atípico |
+| `get_habit_windows` *(em PR)* | Hábitos cadastrados (dia e horário) para comparar com uma janela anômala; só contexto, só residencial |
 
 ---
 
@@ -107,6 +115,11 @@ O motor de detecção usa regras explicáveis (fluxo contínuo, consumo de madru
 | `list_habits` | Lista hábitos com frequência e dias | PostgreSQL |
 | `get_habits_by_day` | Filtra hábitos por dia da semana | PostgreSQL |
 | `get_realtime_weather` | Condições climáticas atuais | API Tomorrow.io |
+| `create_habit` | Cadastra hábito; `days`, `start_time` e `end_time` opcionais; nome em linguagem natural | PostgreSQL (`fn_create_user_habit`) |
+| `estimate_habit_water_impact` | Litros por ocorrência, semana e mês (referência) | cálculo interno |
+| `estimate_habit_water_cost` *(em PR)* | Custo mensal em reais da água do hábito (cadastrado ou hipotético) com a tarifa do usuário | PostgreSQL + cálculo interno |
+
+Regras do agente (em PR): simular não cadastra; cadastro só é confirmado quando o banco devolve o id gravado; na revisão do Juiz a tool `create_habit` é removida, então a gravação não se repete. Veja [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
 
 O agente de hábitos inclui ferramentas de clima porque hábitos ao ar livre (regar plantas, lavar quintal, lavar carro) dependem do tempo.
 
@@ -136,6 +149,8 @@ Cada agente tem seu prompt de sistema definido aqui. Os prompts delimitam:
 - o formato esperado da resposta (texto corrido, tabela Markdown quando listar itens)
 
 Os identificadores (nomes de variáveis, funções) são em inglês; os prompts são em português.
+
+Em PR: os prompts de Consumo, Hábitos, Previsão e Vazamento recebem o bloco `_REGRA_LINGUAGEM_USUARIO` (nunca citar agentes, ferramentas, status internos, APIs, bancos ou erros técnicos; falar em linguagem comum e capitalizar nomes de hábitos). O prompt do RAG não recebe esse bloco.
 
 ---
 

@@ -107,6 +107,8 @@ Perguntas que responde:
 
 **Fonte de dados**: MongoDB.
 
+> **Em PR (01/11/2026):** o agente também lê os hábitos cadastrados (`get_habit_windows`, só residencial) para dizer se uma janela anômala coincide com um hábito. Hábito só atenua a interpretação: nunca descarta o indício nem confirma ou afasta vazamento.  Detalhes em [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
+
 > O Agente de Vazamento (`delta-artificial-intelligence/app/agents/leak.py`) só **lê** o
 > campo `consumption_summary.anomaly_detected` e os registros de `alerts_history` — ele
 > nunca decide um limiar novo (proibido pelo próprio prompt do agente). Quem calcula esse
@@ -134,6 +136,8 @@ Perguntas que responde:
 
 **Fontes de dados:** PostgreSQL(Última conta de água se for o primeiro uso e Tarifa por região) e MongoDB.
 
+> **Em PR (01/11/2026):** o agente também simula "e se o consumo mudar X%" (`simulate_consumption_change`, com gráfico e hipóteses), simula uma nova meta diária (`simulate_target_change`), lista cenários de investimento em economia de água (`get_investment_scenarios`, só conta de organização) e lê os hábitos cadastrados como contexto (`get_habit_baseline`, só residencial). Os cálculos continuam em Python.  Detalhes em [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
+
 ### Agente 4 — Perfil
 Responsável por consultar informações cadastrais e informações relacionadas às propriedades e dispositivos do usuário.
 
@@ -154,6 +158,8 @@ Responsável por:
 - consultar e analisar hábitos já cadastrados;
 - verificar frequência semanal e dias da semana dos hábitos;
 - estimar o impacto hídrico de um hábito em litros por semana/mês;
+- estimar o **custo em reais** da água de um hábito, cadastrado ou hipotético, com a tarifa do usuário (**em PR**);
+- simular hábitos hipotéticos sem cadastro e sem gravar nada (**em PR**);
 - consultar o histórico recente de clima para contextualizar hábitos ao ar livre (lavar carro, regar plantas, lavar quintal). O agente não faz previsão do tempo.
 
 O catálogo de hábitos disponíveis é fixo: **BANHO LONGO, LAVAR QUINTAL, LAVAR ROUPA, REGAR PLANTAS, LAVAR CARRO, LAVAR LOUÇA**. Hábitos fora do catálogo não são aceitos — o agente informa o que está disponível.
@@ -165,11 +171,14 @@ Perguntas que responde:
 - "Quais hábitos tenho na segunda-feira?"
 - "Adiciona lavar carro, 2x por semana, nas segundas e sextas."
 - "Quanto de água eu gasto regando as plantas toda semana?"
+- "Quanto eu gastaria em dinheiro se eu lavasse roupa 3 vezes por semana?" (simulação, não cadastra)
 - "Choveu muito nos últimos dias na minha região?"
 
 **Fontes de dados:**
 - PostgreSQL: o agente não faz SELECT direto; chama as functions `fn_user_habits()`, `fn_user_habits_by_day()`, `fn_user_location()` e `fn_create_user_habit()` (ver `DADOS/SQL/otimizacao.md`), que leem e gravam em `tb_habit`, `tb_user_habit`, `tb_user_habit_day` e `tb_day_of_week`.
 - MongoDB: coleção `weather_daily` (histórico meteorológico por localização, alimentada por outro componente do projeto; o agente apenas lê).
+
+> **Em PR (01/11/2026):** o cadastro aceita dias e horário opcionais e normaliza o nome em linguagem natural; o banco passou a permitir o mesmo hábito em horários diferentes (conflito = mesmo hábito, dia e horário) e `fn_create_user_habit` ganhou `p_start_time`/`p_end_time`. Nomes saem capitalizados (`Regar Plantas`).  Detalhes em [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
 
 **Limitação conhecida:** a tool de clima (`get_weather_history`) depende da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 

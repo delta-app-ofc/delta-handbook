@@ -47,7 +47,11 @@ O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `
 - **Resolução** = resposta publicada com sucesso, sem erro de agente e sem bloqueio do Juiz.
 - **Custo por resolução** = custo de IA ÷ resoluções.
 - **ROI** = (resoluções × custo de um atendimento − custo de IA) ÷ custo de IA. Acima de 0 há retorno. Só o custo de tokens entra no denominador; hospedagem, bancos, desenvolvimento e manutenção ficam de fora, então o ROI é um limite superior.
-- **SLO**: p95 do tempo total ≤ 8 s e índice de erros ≤ 5%. Sem requisições, o SLO aparece como "sem dados".
+- **SLO**: p95 do tempo total ≤ 15 s (era 8 s; ajustado em PR em 01/11/2026) e índice de erros ≤ 5%. Sem requisições, o SLO aparece como "sem dados".
+
+### Nível de raciocínio no log *(em PR, 01/11/2026)*
+
+Cada linha de `models` do log JSON registra `reasoning_effort` ao lado de `model` (por exemplo `gpt-6-luna` com `low` no guarda e no roteador e `high` nos especialistas), e o campo também aparece nos eventos `model.start` e `model.end`. Só chamadas OpenAI têm o campo; Groq e Gemini ficam como antes. O cartão de modelo do console de testes mostra "esforço: …".
 
 ## Indicadores da aba Monitor
 
@@ -83,7 +87,7 @@ O Groq só atua como fallback do especialista. Para corrigir um preço sem alter
 | --- | --- | --- |
 | `OBS_USD_TO_BRL` | 5,4212 | PTAX de venda do Banco Central em 30/10/2026, pela [API Olinda do BCB](https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/aplicacao#!/recursos/CotacaoDolarDia). Atualize na data da apresentação |
 | `OBS_QUESTIONS_PER_USER_WEEK` | 0 (usar o medido) | **Não existe fonte externa confiável.** Sem valor definido, o relatório usa a taxa **medida** (perguntas por usuário ÷ semanas observadas), e só depois de 7 dias de dados; antes disso a projeção aparece como "n/d" |
-| `OBS_LATENCY_P95_LIMIT_MS` | 8000 | Meta de SLO definida pela equipe, não é referência externa |
+| `OBS_LATENCY_P95_LIMIT_MS` | 15000 | Meta de SLO definida pela equipe (era 8000), não é referência externa |
 | `OBS_ERROR_RATE_LIMIT` | 0,05 | Meta de SLO definida pela equipe, não é referência externa |
 | `OBS_PRICES_JSON` | tabela interna | Sobrescreve preços, ex. `{"gpt-6-luna": [0.10, 0.50]}` |
 

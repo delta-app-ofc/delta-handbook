@@ -52,7 +52,9 @@ ele estiver disponível e não foi executada contra o banco oficial.
 ## Banco local e banco oficial
 
 `docker-compose.dev.yml` oferece um PostgreSQL local para desenvolvimento. Os
-arquivos de `db/postgres-init/` são cópias de bootstrap desse ambiente; a fonte
+arquivos de `db/postgres-init/` são cópias de bootstrap desse ambiente (em PR,
+01/11/2026: `01-schema`, `02-optimization`, `03-audit`, `04-local-roles` [só local],
+`05-dataload` e `06-datamart-schema`, na ordem do `setup_db.py` oficial); a fonte
 oficial do schema permanece no repositório
 [`delta-sql-database`](https://github.com/delta-app-ofc/delta-sql-database). Uma conexão validada no
 container local não valida acesso ao PostgreSQL oficial nem garante que suas

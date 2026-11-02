@@ -66,6 +66,8 @@ class ChatResponse(BaseModel):
 
 `chart_data` é um dicionário com a estrutura de um gráfico Plotly, que o frontend renderiza com `Plotly.newPlot()`.
 
+> **Em PR (01/11/2026):** a resposta pública do `/chat` e do `/chat/stream` **não traz mais** a lista de agentes usados (o usuário não deve conhecer a estrutura interna) e ganha `suggestions: list[str]` (até 3 perguntas para continuar a conversa). A rota autenticada `GET /chat/suggestions` devolve `{"suggestions": [...]}` com perguntas iniciais pelo perfil da conta (residencial ou organização). As sugestões seguem regras fixas, sem LLM. O bloco de código acima é didático e já diverge do código atual (por exemplo, o usuário vem do token JWT, não do corpo). Veja [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
+
 ---
 
 ## `app/routes/health.py` — Verificação de saúde

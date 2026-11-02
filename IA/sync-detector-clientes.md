@@ -59,7 +59,7 @@ GET /api/detection/devices/{deviceId}/evidence fornece série medida e evidênci
 persistidas. Aceita start/end, até sete dias e 100 janelas por página.
 PUT /api/detection/devices/{deviceId}/visit recebe visit_until ISO UTC ou null,
 com prazo máximo de 90 dias. Exige vínculo atual e registra autor/data.
-Não desativa regras de vazamento. O formulário de visita ainda não está nas telas.
+Não desativa regras de vazamento. A web oferece formulário de visita; no Android a rota está disponível no cliente, sem formulário nesta etapa.
 
 A coorte usa classificação, tipo do imóvel e região. Sem perfil, aguarda histórico
 próprio. Documentos antigos sem cohort_key só entram na coorte após atualização.

@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   documentos:
+    name: ci-tecnico
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -23,12 +24,37 @@ jobs:
       - name: Validar documentos Markdown
         run: python scripts/validate_markdown.py
 
+  testes-sonar:
+    name: Testes Sonar
+    if: always()
+    needs:
+      - documentos
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Registrar aplicabilidade da análise Sonar
+        shell: bash
+        run: |
+          {
+            echo "## Testes Sonar"
+            echo
+            echo "Análise Sonar: **não aplicável** ao delta-handbook, que contém documentação Markdown e não código executável ou cobertura de código."
+            echo
+            echo "Resultado de ci-tecnico (validação Markdown): ${{ needs.documentos.result }}."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ needs.documentos.result }}" != "success" ]]; then
+            echo "::error::O gate Testes Sonar não pode passar porque ci-tecnico não concluiu com sucesso."
+            exit 1
+          fi
+
   report-ci:
     name: Reportar resultado do CI na PR
     if: always() && github.event_name == 'pull_request'
     needs:
       - documentos
-    uses: delta-app-ofc/.github/.github/workflows/report_ci.yml@8f4329cdde8ad39527069966a5cb97bbb49675b5
+      - testes-sonar
+    uses: delta-app-ofc/.github/.github/workflows/report_ci.yml@d30cc21215e716966e2e05a22e0caa1d410f1b65
     with:
       needs_results: ${{ toJSON(needs) }}
     secrets:

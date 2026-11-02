@@ -48,5 +48,21 @@ O índice `idx_log_region_rate_previous_log_id` apoia a recursão. Em 500.342 li
 #### 4. Como comprovar
 
 1. Executar os scripts na ordem de `setup_db.py`. O dataload faz 1 `INSERT` e 2 `UPDATE` na mesma tarifa, e cada operação dispara o trigger de auditoria.
-2. Executar `SELECT log_id, operation, level FROM dw.vw_audit_history_chain WHERE region_rate_id = 5 ORDER BY level;`.
+2. Executar a CTE recursiva da seção 1 sobre a tabela de log, filtrando a tarifa:
+
+```sql
+WITH RECURSIVE chain AS (
+    SELECT id, region_rate_id, operation, previous_log_id, 1 AS level
+    FROM tb_log_region_rate
+    WHERE previous_log_id IS NULL AND region_rate_id = 5
+    UNION ALL
+    SELECT l.id, l.region_rate_id, l.operation, l.previous_log_id, c.level + 1
+    FROM tb_log_region_rate l
+    JOIN chain c ON l.previous_log_id = c.id
+)
+SELECT id, operation, level FROM chain ORDER BY level;
+```
+
 3. Conferir três linhas, com `level` 1, 2 e 3, e `INSERT` seguido de dois `UPDATE`.
+
+O MOD-10 e o MOD-15 usam a mesma Function de auditoria, `fn_log_region_rate`: o MOD-10 comprova o registro de `TG_OP`, `OLD`, `NEW` e `CURRENT_USER`, e o MOD-15 percorre a cadeia de `previous_log_id` que essa Function preenche. A view `dw.vw_audit_history_chain` encapsula essa mesma consulta.

@@ -38,8 +38,11 @@ A modelagem usa **dois databases**, previstos em clusters separados nos scripts 
 | `db_delta_app`       | `user_preferences`, `alerts_history`, `user_hour_baseline`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Dados do app e escrita do baseline a cada janela avaliada |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
-> de acesso. O detector implementado na API Mongo também precisa de acesso ao banco da aplicação,
-> com conexão própria (`appMongoTemplate`, `MONGODB_APP_URI`, `MONGODB_APP_DATABASE`). Não se
+> de acesso. **Planejado / implementação local (PRs abertas):** o detector da API Mongo também precisa de
+> acesso ao banco da aplicação, com conexão própria. No `delta-api-mongo` (PR #16, `AppMongoConfig`
+> e `application.properties`) os nomes são `appMongoTemplate`, `MONGODB_APP_URI` e
+> `MONGODB_APP_DATABASE`; a IA usa outro nome para o banco, `MONGO_DB_APP` (ver
+> [IA/settings.md](../../IA/settings.md)). Cada serviço lê a variável do seu próprio repositório. Não se
 > deve presumir que a URI de telemetria alcança o cluster da aplicação. A habilitação em produção
 > depende de migrações e índices; o papel de serviço da API não cria esses índices.
 >
@@ -160,7 +163,7 @@ de notificações do usuário.
 | Campo          | Tipo      | Obrigatório | Descrição                                                         |
 |----------------|-----------|-------------|-------------------------------------------------------------------|
 | `_id`          | ObjectId  | Sim         | Identificador do documento                                        |
-| `device_id`    | string    | Sim         | Dispositivo que originou o alerta                                 |
+| `device_id`    | string    | Não (obrigatório só para alertas do detector) | Dispositivo que originou o alerta; alertas gerais da IA/sistema não têm |
 | `user_id`      | int       | Não         | Usuário notificado                                                |
 | `alert_type`   | string    | Sim         | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
 | `triggered_at` | timestamp | Sim         | Momento de abertura do alerta                                     |
@@ -401,6 +404,9 @@ Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleç�
 | `device_status`       | `{ device_id: 1 }`                      | **Único**                               | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas.                                                                                          |
 | `alerts_history`      | `{ user_id: 1, triggered_at: -1 }`      | Composto                                | Alimenta a tela de notificações do app, sempre lida por usuário e ordenada por data.                                                                                                                                                                                                 |
 | `alerts_history`      | `{ device_id: 1, resolved_at: 1 }`      | Composto (parcial, `resolved_at: null`) | Consulta rápida de "alertas ainda ativos" por dispositivo, sem varrer o histórico já resolvido.                                                                                                                                                                                      |
+| `alerts_history`      | `{ device_id: 1, rule: 1, resolved_at: 1 }` | Composto | Busca dos alertas abertos do detector por dispositivo e regra a cada janela. |
+| `alerts_history`      | `{ dedup_key: 1 }` | **Único parcial** (`dedup_key` string e `resolved_at: null`) | Só um alerta aberto por chave de deduplicação (detector, IA e sistema). |
+| `alerts_history`      | `{ user_id: 1, severity: 1, triggered_at: -1 }` | Composto | Filtro da tela de alertas por severidade. |
 | `user_preferences`    | `{ user_id: 1 }`                        | **Único**                               | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`.                                                                                                                        |
 | `chat_sessions`       | `{ user_id: 1, last_activity_at: -1 }`  | Composto                                | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente.                                                                                                                                                                                                       |
 | `chat_sessions`       | `{ user_id: 1, is_open: 1 }`            | Composto                                | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova.                                                                                                                                                                                              |

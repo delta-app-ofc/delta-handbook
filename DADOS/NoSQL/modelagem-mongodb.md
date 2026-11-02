@@ -29,17 +29,30 @@ o MongoDB **não duplica** esse domínio.
 
 ## 2. Organização em Databases
 
-A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separando a carga de máquina
+A modelagem usa **dois databases**, previstos em clusters separados nos scripts de infraestrutura, separando a carga de máquina
 (alto volume, escrita constante) da carga de usuário (baixo volume, leitura predominante):
 
 | Database             | Conteúdo                                                               | Padrão de carga                                            |
 |----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
 | `db_delta_telemetry` | `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
-| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Leitura predominante, escrita esporádica (ação do usuário) |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `user_hour_baseline`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Dados do app e escrita do baseline quando uma janela elegível é processada |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
-> de acesso: a credencial que a API usa para ingestão de telemetria não precisa (e não deve) ter acesso ao
-> database de aplicativo, e vice-versa.
+> de acesso. **Planejado / implementação local (PRs abertas):** o detector da API Mongo também precisa de
+> acesso ao banco da aplicação, com conexão própria. No `delta-api-mongo` (PR #16, `AppMongoConfig`
+> e `application.properties`) os nomes são `appMongoTemplate`, `MONGODB_APP_URI` e
+> `MONGODB_APP_DATABASE` ([fonte da API, revisão c056aa8](https://github.com/delta-app-ofc/delta-api-mongo/blob/c056aa8/src/main/resources/application.properties)); a IA usa outro nome para o banco, `MONGO_DB_APP` (ver
+> [IA/settings.md](../../IA/settings.md)). Cada serviço lê a variável do seu próprio repositório. Não se
+> deve presumir que a URI de telemetria alcança o cluster da aplicação. A habilitação em produção
+> depende de migrações e índices; o papel de serviço da API não cria esses índices.
+>
+> `user_hour_baseline` tem chave única `(device_id, hour_of_week)`: slots 0–167 e estado em -1.
+> O fuso padrão é `America/Sao_Paulo`; o código atual usa um fuso global configurável.
+> O contrato local de `alerts_history` inclui `source`, `property_id`, `title`, `message`,
+> `dismissed_at`, `dedup_key`, `rule` e `evidence`; `device_id` não é obrigatório para IA/sistema.
+> O índice parcial de `dedup_key` impede duas ocorrências abertas com a mesma chave.
+> Consulte [detecção e contrato de alertas](../../IA/deteccao-anomalias.md) para os campos,
+> escritores, endpoints, estado da implantação e divergências ainda pendentes.
 
 ---
 
@@ -76,11 +89,11 @@ Documento consolidado e leve, calculado pelo hardware e enviado diretamente para
 > **Quem calcula `anomaly_detected`?** Não é o agente de chat (`delta-artificial-intelligence`,
 > Agente de Vazamento) — ele só *lê* este campo e o histórico de `alerts_history`, nunca decide
 > limiar por conta própria (regra explícita do prompt desse agente: "nunca invente limiares/padrões").
-> Quem calcula é um componente separado, o motor de detecção
-> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML, reagindo
-> quase em tempo real via MongoDB Change Streams sobre as janelas recém-inseridas nesta
-> coleção. Ver `detection/README.md` naquele repositório para o detalhe completo.
+> A implementação de destino calcula esse campo no `delta-api-mongo`, após a inserção,
+> usando regras de fluxo, referência robusta e regime. O detector Java está desligado por
+> padrão; o motor antigo de `delta-business-rules/detection/` e seu Change Stream só devem
+> ser removidos depois da validação em produção. `null` significa não avaliado.
+> Ver [detecção e contrato](../../IA/deteccao-anomalias.md) para o estado da migração.
 
 Esta é a coleção **permanente** do banco de telemetria: não tem TTL e é ela quem sustenta o histórico do
 app e a exportação diária para as tabelas de dashboard no PostgreSQL.
@@ -150,7 +163,7 @@ de notificações do usuário.
 | Campo          | Tipo      | Obrigatório | Descrição                                                         |
 |----------------|-----------|-------------|-------------------------------------------------------------------|
 | `_id`          | ObjectId  | Sim         | Identificador do documento                                        |
-| `device_id`    | string    | Sim         | Dispositivo que originou o alerta                                 |
+| `device_id`    | string    | Não (obrigatório só para alertas do detector) | Dispositivo que originou o alerta; alertas gerais da IA/sistema não têm |
 | `user_id`      | int       | Não         | Usuário notificado                                                |
 | `alert_type`   | string    | Sim         | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
 | `triggered_at` | timestamp | Sim         | Momento de abertura do alerta                                     |
@@ -169,12 +182,12 @@ de notificações do usuário.
 }
 ```
 
-> **Coleção relacionada:** o motor de detecção (`delta-business-rules/detection/`)
-> mantém, na mesma database, `user_hour_baseline` — um documento por `user_id`
-> (`int`, mesma representação de `alerts_history.user_id`) + hora do dia, com a
-> média/desvio de consumo daquele usuário naquele horário, atualizado de
-> forma incremental. É estado interno do motor de detecção (não telemetria
-> bruta nem dado consumido pelo app) — ver `detection/README.md`.
+> **Coleção relacionada:** a implementação Java mantém `user_hour_baseline` neste
+> banco, por `device_id` e hora da semana (0–167), mais um documento de estado (-1).
+> Usa mediana/MAD, referência exponencial e estado das regras e do regime.
+> O destinatário do alerta vem da API Postgres; uma propriedade com vários usuários
+> recebe um alerta para cada usuário. A IA e o sistema usam a mesma `alerts_history`
+> pelos endpoints internos da API Mongo. Ver [contrato](../../IA/deteccao-anomalias.md).
 
 ### 4.3. `chat_sessions`
 
@@ -391,6 +404,9 @@ Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleç�
 | `device_status`       | `{ device_id: 1 }`                      | **Único**                               | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas.                                                                                          |
 | `alerts_history`      | `{ user_id: 1, triggered_at: -1 }`      | Composto                                | Alimenta a tela de notificações do app, sempre lida por usuário e ordenada por data.                                                                                                                                                                                                 |
 | `alerts_history`      | `{ device_id: 1, resolved_at: 1 }`      | Composto (parcial, `resolved_at: null`) | Consulta rápida de "alertas ainda ativos" por dispositivo, sem varrer o histórico já resolvido.                                                                                                                                                                                      |
+| `alerts_history`      | `{ device_id: 1, rule: 1, resolved_at: 1 }` | Composto | Busca dos alertas abertos do detector por dispositivo e regra a cada janela. |
+| `alerts_history`      | `{ dedup_key: 1 }` | **Único parcial** (`dedup_key` string e `resolved_at: null`) | Só um alerta aberto por chave de deduplicação (detector, IA e sistema). |
+| `alerts_history`      | `{ user_id: 1, severity: 1, triggered_at: -1 }` | Composto | Filtro da tela de alertas por severidade. |
 | `user_preferences`    | `{ user_id: 1 }`                        | **Único**                               | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`.                                                                                                                        |
 | `chat_sessions`       | `{ user_id: 1, last_activity_at: -1 }`  | Composto                                | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente.                                                                                                                                                                                                       |
 | `chat_sessions`       | `{ user_id: 1, is_open: 1 }`            | Composto                                | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova.                                                                                                                                                                                              |

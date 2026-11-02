@@ -109,12 +109,15 @@ Perguntas que responde:
 
 > O Agente de Vazamento (`delta-artificial-intelligence/app/agents/leak.py`) só **lê** o
 > campo `consumption_summary.anomaly_detected` e os registros de `alerts_history` — ele
-> nunca decide um limiar novo (proibido pelo próprio prompt do agente). Quem calcula esse
-> campo e cria esses registros é um componente separado, o motor de detecção
-> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML,
-> reagindo quase em tempo real via MongoDB Change Streams. Ver
-> `DADOS/NoSQL/modelagem-mongodb.md` e `detection/README.md` naquele repositório.
+> nunca decide um limiar novo (proibido pelo próprio prompt do agente). **Produtor vigente:**
+> hoje quem calcula esse campo é o motor do `delta-business-rules` (`watcher.py`/Change Stream).
+> **Alvo da migração:** o detector do `delta-api-mongo`, que roda após a inserção de cada janela, com
+> regras explicáveis de fluxo contínuo, consumo noturno/fora do expediente, desvio robusto e mudança
+> de regime. O novo fluxo está desligado por padrão e sua implantação precisa ser validada antes da
+> remoção de `delta-business-rules/detection/` e do `watcher.py`; nunca ligar os dois produtores ao
+> mesmo tempo. Depois da migração, a IA e o sistema escrevem seus próprios tipos de alerta
+> pelo endpoint interno da API Mongo. `anomaly_detected=null` significa não avaliado,
+> nunca ausência de vazamento. Ver [detector e contrato de alertas](deteccao-anomalias.md).
 
 ### Agente 3 — Previsão
 Responsável por:
@@ -132,7 +135,7 @@ Perguntas que responde:
 "Qual deve ser meu consumo no final do mês?"
 "Se eu continuar consumindo nesse ritmo, quanto vou gastar?"
 
-**Fontes de dados:** PostgreSQL(Última conta de água se for o primeiro uso e Tarifa por região) e MongoDB.
+**Fontes de dados:** PostgreSQL (tarifa por região e, somente como referência alternativa quando falta consumo medido, a última conta de água) e MongoDB. Consumo registrado igual a zero não é ausência de dados.
 
 ### Agente 4 — Perfil
 Responsável por consultar informações cadastrais e informações relacionadas às propriedades e dispositivos do usuário.

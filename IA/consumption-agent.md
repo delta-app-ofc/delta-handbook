@@ -91,6 +91,15 @@ Este agente não consulta tarifa nem conta de água, não estima custo, não pre
 consumo e não diagnostica vazamentos. Um pico diário descreve volume agregado,
 não vazão instantânea.
 
+O **detector** classifica vazamento e pico por janela no `delta-api-mongo`; o **contrato de alertas**
+define os campos e o comportamento que o LeakAgent consome. Ambos estão descritos em
+[detector e contrato de alertas](deteccao-anomalias.md) e existem como implementação local
+(PRs abertas), sem implantação validada em produção. A integração do LeakAgent deve
+explicar `anomaly_reasons` e `anomaly_evidence` e ler os alertas persistidos, sem
+recalcular limiares. `anomaly_detected=null` ou ausente significa não avaliado.
+O novo fluxo não elimina a divergência de `user_id` na ingestão descrita no contrato;
+a autorização da leitura de consumo precisa ser validada antes da integração.
+
 ## Verificação
 
 Rode a suíte com:

@@ -31,7 +31,7 @@ O nome da organização fica denormalizado em `gold.dm_property` (`organization_
 
 #### 2. Views analíticas (`dw`)
 
-O schema `dw` contém **sete views**, todas lendo da camada `gold`, exceto `vw_audit_history_chain`, que lê o log de auditoria:
+O schema `dw` contém **nove views**, todas lendo da camada `gold`, exceto `vw_audit_history_chain`, que lê o log de auditoria:
 
 | View | O que entrega |
 |---|---|
@@ -42,11 +42,13 @@ O schema `dw` contém **sete views**, todas lendo da camada `gold`, exceto `vw_a
 | `dw.vw_ft_capex_comparison` | Comparação dos cenários de investimento por payback |
 | `dw.vw_ft_residential_efficiency_ranking` | Ranking de consumo residencial por mês |
 | `dw.vw_audit_history_chain` | Cadeia histórica de reajustes de tarifa (CTE recursiva, MOD-15) |
+| `dw.vw_ft_alert` | Alertas por propriedade e pessoa, com severidade e tempo de resolução em minutos |
+| `dw.vw_ft_user_goal` | Consumo médio dos últimos 30 dias de cada pessoa comparado à meta diária de litros |
 
 #### 3. Como comprovar
 
 1. Executar os scripts na ordem de `setup_db.py`, incluindo `script-datamart.sql` e `script-datamart-dataload.sql`.
-2. Listar as views com `\dv dw.*` e conferir as sete views.
+2. Listar as views com `\dv dw.*` e conferir as nove views.
 3. Consultar `SELECT * FROM dw.vw_ft_property_ranking LIMIT 10;` para ver o resultado analítico sobre as tabelas `gold`.
 4. Abrir o diagrama da camada analítica e conferir as relações entre fatos e dimensões.
 

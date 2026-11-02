@@ -55,7 +55,7 @@ RPA em Python que executa um pipeline de extração, validação, transformaçã
 
 ### MOD-05 — Criar views analíticas para Data Mart, com modelagem dimensional Star Schema ou Snowflake
 
-Data Mart em Star Schema, com camadas `stage`, `silver`, `gold` e `dw`, três dimensões, três tabelas fato e sete views analíticas.
+Data Mart em Star Schema, com camadas `stage`, `silver`, `gold` e `dw`, três dimensões, três tabelas fato e nove views analíticas.
 
 **Evidências diretas:**
 

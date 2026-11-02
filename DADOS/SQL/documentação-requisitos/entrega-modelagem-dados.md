@@ -1,7 +1,5 @@
 # 8. Modelagem de Dados — Texto da Entrega
 
-Texto da seção 8 do documento de entregas interdisciplinares, pronto para copiar e colar. Cada requisito traz uma mini-descrição, as evidências diretas e o link da justificativa.
-
 **Formato exigido de entrega:** links diretos do GitHub para cada demanda, acesso liberado aos professores e relatório de justificativa no próprio repositório.
 
 - Link do GitHub onde estão os códigos do banco de dados relacional: https://github.com/delta-app-ofc/delta-sql-database
@@ -13,7 +11,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-01 — Criar novo banco relacional PostgreSQL normalizado até 3FN ou, se necessário, até 5FN
 
-**Mini-descrição:** banco PostgreSQL com 22 tabelas de negócio normalizadas até a 3FN, com tabelas associativas para relacionamentos N:N e restrições de integridade no próprio banco.
+banco PostgreSQL com 22 tabelas de negócio normalizadas até a 3FN, com tabelas associativas para relacionamentos N:N e restrições de integridade no próprio banco.
 
 **Evidências diretas:**
 
@@ -25,7 +23,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-02 — Definir claramente PKs, FKs e cardinalidades 1:1, 1:N e N:N
 
-**Mini-descrição:** todas as tabelas têm chave primária, os relacionamentos usam chaves estrangeiras nomeadas (`fk_<origem>_<destino>`) com política `ON DELETE`, e as cardinalidades 1:1, 1:N e N:N estão representadas no modelo.
+todas as tabelas têm chave primária, os relacionamentos usam chaves estrangeiras nomeadas (`fk_<origem>_<destino>`) com política `ON DELETE`, e as cardinalidades 1:1, 1:N e N:N estão representadas no modelo.
 
 **Evidências diretas:**
 
@@ -36,7 +34,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-03 — Carregar pelo menos 500 registros verossímeis para testes de volume
 
-**Mini-descrição:** carga de 2.331 registros em 22 tabelas, com 201 usuários, 155 imóveis, 400 hábitos, 371 municípios e tarifas reais da ARSESP, acompanhada de consulta de contagem por tabela.
+carga de 2.331 registros em 22 tabelas, com 201 usuários, 155 imóveis, 400 hábitos, 371 municípios e tarifas reais da ARSESP, acompanhada de consulta de contagem por tabela.
 
 **Evidências diretas:**
 
@@ -46,7 +44,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-04 — Orquestrar RPA para mover dados do banco legado ao novo normalizado, garantindo integridade e tratamento de falhas de carga
 
-**Mini-descrição:** RPA em Python que executa um pipeline de extração, validação, transformação e carga entre o banco legado e o novo banco, com transação única, rollback em caso de falha e registro de cada execução em `tb_log_rpa`.
+RPA em Python que executa um pipeline de extração, validação, transformação e carga entre o banco legado e o novo banco, com transação única, rollback em caso de falha e registro de cada execução em `tb_log_rpa`.
 
 **Evidências diretas:**
 
@@ -57,7 +55,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-05 — Criar views analíticas para Data Mart, com modelagem dimensional Star Schema ou Snowflake
 
-**Mini-descrição:** Data Mart em Star Schema, com camadas `stage`, `silver`, `gold` e `dw`, três dimensões, três tabelas fato e sete views analíticas.
+Data Mart em Star Schema, com camadas `stage`, `silver`, `gold` e `dw`, três dimensões, três tabelas fato e sete views analíticas.
 
 **Evidências diretas:**
 
@@ -69,7 +67,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-06 — Usar CTEs na lógica de transformação ETL em SQL
 
-**Mini-descrição:** a procedure de transformação `silver.sp_load_ft_consumption_daily` e as sete views do schema `dw` usam `WITH` para separar a transformação em etapas.
+a procedure de transformação `silver.sp_load_ft_consumption_daily` e as sete views do schema `dw` usam `WITH` para separar a transformação em etapas.
 
 **Evidências diretas:**
 
@@ -80,7 +78,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-07 — Usar Window Functions para cálculos analíticos, por exemplo Running Total ou Ranking, nas views de BI
 
-**Mini-descrição:** as views de BI calculam consumo acumulado, média móvel de 7 dias, rankings (`RANK`, `DENSE_RANK`), quartis, quintis (`NTILE`), posição relativa (`PERCENT_RANK`) e variação mensal (`LAG`).
+as views de BI calculam consumo acumulado, média móvel de 7 dias, rankings (`RANK`, `DENSE_RANK`), quartis, quintis (`NTILE`), posição relativa (`PERCENT_RANK`) e variação mensal (`LAG`).
 
 **Evidências diretas:**
 
@@ -91,7 +89,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-08 — Criar no mínimo duas Functions para regras críticas de negócio
 
-**Mini-descrição:** 24 Functions PL/pgSQL, entre elas `fn_user_can_estimate`, `fn_get_current_region_rate`, `fn_calculate_water_cost` e `fn_user_is_active`, que concentram no banco as validações e os cálculos de negócio.
+24 Functions PL/pgSQL, entre elas `fn_user_can_estimate`, `fn_get_current_region_rate`, `fn_calculate_water_cost` e `fn_user_is_active`, que concentram no banco as validações e os cálculos de negócio.
 
 **Evidências diretas:**
 
@@ -102,7 +100,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-09 — Criar no mínimo duas Procedures para regras críticas de negócio
 
-**Mini-descrição:** cinco Procedures (`sp_change_region_rate`, `sp_register_property`, `sp_disable_user`, `sp_update_property_classification` e `sp_register_user_access`) que executam operações de várias etapas com validação e transação.
+cinco Procedures (`sp_change_region_rate`, `sp_register_property`, `sp_disable_user`, `sp_update_property_classification` e `sp_register_user_access`) que executam operações de várias etapas com validação e transação.
 
 **Evidências diretas:**
 
@@ -113,7 +111,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-10 — Criar triggers de auditoria em ao menos duas tabelas com logs completos NEW, OLD, TG_OP e CURRENT_USER
 
-**Mini-descrição:** triggers `AFTER INSERT OR UPDATE OR DELETE` em 21 tabelas, cada uma com tabela de log própria que registra `TG_OP`, `NEW`, `OLD`, `CURRENT_USER`, data e hora e o log anterior (`previous_log_id`).
+triggers `AFTER INSERT OR UPDATE OR DELETE` em 21 tabelas, cada uma com tabela de log própria que registra `TG_OP`, `NEW`, `OLD`, `CURRENT_USER`, data e hora e o log anterior (`previous_log_id`).
 
 **Evidências diretas:**
 
@@ -125,7 +123,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-11 — Analisar consultas lentas com EXPLAIN ANALYZE e aplicar índices SQL para otimização
 
-**Mini-descrição:** três índices aplicados após comparar planos com `EXPLAIN (ANALYZE, BUFFERS)` em volume ampliado, com ganhos medidos de cerca de 360x, 280x e 61x.
+três índices aplicados após comparar planos com `EXPLAIN (ANALYZE, BUFFERS)` em volume ampliado, com ganhos medidos de cerca de 360x, 280x e 61x.
 
 **Evidências diretas:**
 
@@ -135,7 +133,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-12 — Criar tabela técnica de catálogo de metadados com tabelas, colunas, regras de negócio e níveis de acesso
 
-**Mini-descrição:** tabela `tb_data_catalog` com 268 colunas catalogadas (descrição, regra de negócio e nível `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL`), usada também para gerar os comentários das colunas.
+tabela `tb_data_catalog` com 268 colunas catalogadas (descrição, regra de negócio e nível `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL`), usada também para gerar os comentários das colunas.
 
 **Evidências diretas:**
 
@@ -146,7 +144,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-13 — Documentar procedimentos para backup e recuperação de falhas
 
-**Mini-descrição:** estratégia em duas camadas, com PITR do Neon e `pg_dump` automatizado a cada 6 horas, procedimento de recuperação por gravidade, RPO de até 6 horas e RTO medido de 11 segundos.
+estratégia em duas camadas, com PITR do Neon e `pg_dump` automatizado a cada 6 horas, procedimento de recuperação por gravidade, RPO de até 6 horas e RTO medido de 11 segundos.
 
 **Evidências diretas:**
 
@@ -158,7 +156,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-14 — Automatizar diretamente no Postgres o registro DAU (Daily Active User)
 
-**Mini-descrição:** a procedure `sp_register_user_access` valida o usuário e grava o acesso em `tb_user_access_log`, e a function `fn_get_dau` conta os usuários distintos do dia.
+a procedure `sp_register_user_access` valida o usuário e grava o acesso em `tb_user_access_log`, e a function `fn_get_dau` conta os usuários distintos do dia.
 
 **Evidências diretas:**
 
@@ -169,7 +167,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-15 — Implementar, onde fizer sentido, CTE recursiva ou herança de tabelas
 
-**Mini-descrição:** CTE recursiva na view `dw.vw_audit_history_chain`, que reconstrói a cadeia de reajustes de tarifa por `previous_log_id`. A herança de tabelas foi testada e descartada, com justificativa.
+CTE recursiva na view `dw.vw_audit_history_chain`, que reconstrói a cadeia de reajustes de tarifa por `previous_log_id`. A herança de tabelas foi testada e descartada, com justificativa.
 
 **Evidências diretas:**
 
@@ -179,7 +177,7 @@ Texto da seção 8 do documento de entregas interdisciplinares, pronto para copi
 
 ### MOD-16 — Incluir no repositório relatório de justificativa das decisões
 
-**Mini-descrição:** um documento de justificativa por requisito, mais os documentos técnicos de cada decisão, reunidos pelo README do repositório.
+um documento de justificativa por requisito, mais os documentos técnicos de cada decisão, reunidos pelo README do repositório.
 
 **Evidências diretas:**
 

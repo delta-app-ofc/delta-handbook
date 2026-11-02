@@ -5,7 +5,7 @@ camadas, modelagem dimensional (star schema), CTEs, Window Functions, índices e
 partir do MongoDB. Cobre o perfil comercial/industrial (unidades operadas por organização) e o resumo
 analítico do perfil residencial já existente.
 
-🔗 Repositório: https://github.com/delta-app-ofc/delta-database (pasta `datamart/`)
+🔗 Repositório: https://github.com/delta-app-ofc/delta-sql-database (pasta `datamart/`)
 
 ---
 
@@ -211,8 +211,7 @@ necessário. Pra responder "esse índice vai ajudar quando o volume crescer de v
 7. Compara os dois planos reais - nunca usando `SET enable_seqscan=off` pra forçar um resultado.
 8. Container descartado ao final.
 
-**Rodada 1** testou os 2 índices que já existiam (ver tabela abaixo). **Rodada 2**, depois de a autora
-pedir um teste mais rigoroso, testou sistematicamente **as 7 views de `dw`, uma por uma**, em volume grande
+**Rodada 1** testou os 2 índices que já existiam (ver tabela abaixo). **Rodada 2** testou sistematicamente **as 7 views de `dw`, uma por uma**, em volume grande
 (até 730.000 linhas em `gold.ft_consumption_daily`), pra confirmar se sobrava algum índice faltando -
 processo descrito na íntegra a seguir.
 
@@ -266,7 +265,7 @@ cresce.
 
 ## 8. Extração real de dados (MongoDB → Postgres)
 
-`bi_etl.py` (raiz do `delta-database`) extrai `db_delta_telemetry.consumption_summary` do MongoDB real e
+`bi_etl.py` (raiz do `delta-sql-database`) extrai `db_delta_telemetry.consumption_summary` do MongoDB real e
 carrega a cadeia `stage → silver → gold`:
 
 1. Lê o watermark atual (`MAX(window_started_at)` em `stage.consumption_summary`); se vazio, busca todo o
@@ -292,21 +291,9 @@ correspondente no Mongo ainda.
 
 ---
 
-## 9. Pendências conhecidas
+## 9. Escopo e integrações
 
-- **Simulador não usa o `device_id` real do Postgres**: o `delta-hardware-data-simulator` ainda se
-  autonumera, em vez de puxar os `device_id` cadastrados em `tb_device`. Fora do escopo do
-  `delta-database` corrigir (é código de outro repositório).
-- **Agentes de IA não leem o perfil comercial/industrial**: o Agente de Previsão
-  (`delta-artificial-intelligence`) depende inteiramente de `tb_user_property` (posse residencial direta) -
-  um usuário vinculado só por `tb_user_organization` nunca passa em `fn_user_can_estimate`, mesmo com
-  telemetria real na camada `gold`. `TASK.md` completo criado naquele repositório para fechar essa lacuna.
-- **`tb_user.is_manager` x `tb_user_organization`**: duas fontes de verdade pro mesmo fato (bater 1:1 nos
-  dados de teste atuais). Mantidas as duas por decisão de escopo; unificação registrada como pendência
-  futura.
-- **Redis/Neo4j**: documentados como planejados em toda a arquitetura do projeto (ver
-  `DADOS/infra-bancos.md`, seção 4.2), sem código em nenhum repositório - nada a fazer aqui. Se o ranking
-  Web em Redis (`ZSET`) for implementado no futuro, ele seria um cache de leitura alimentado por
-  `dw.vw_ft_property_ranking`, não um substituto dela.
-- **Coleções MongoDB do perfil industrial** (alerta, escalonamento, relatório agendado) - fora do escopo
-  deste repositório (só Postgres); pendência de modelagem pra quem cuidar do MongoDB do perfil industrial.
+- **Telemetria e simulador**: a camada `stage` recebe a telemetria do MongoDB (`consumption_summary`). O `delta-hardware-data-simulator` gera os documentos e a resolução para a propriedade é feita por `tb_device.device_id` na carga `silver`.
+- **Perfil comercial/industrial e agentes de IA**: as Functions organizacionais (`fn_user_access_kind`, `fn_organization_forecast_context` e demais, ver `otimizacao.md`) resolvem o acesso e o contexto de usuários vinculados por `tb_user_organization` e ficam disponíveis no banco para API e agentes.
+- **Redis/Neo4j**: fazem parte da arquitetura de dados (ver `DADOS/infra-bancos.md`, seção 4.2) e não possuem código neste repositório. Um ranking Web em Redis (`ZSET`) funcionaria como cache de leitura alimentado por `dw.vw_ft_property_ranking`, e não como substituto dela.
+- **Coleções MongoDB do perfil industrial** (alerta, escalonamento, relatório agendado): pertencem ao repositório do MongoDB. Este repositório trata somente do PostgreSQL.

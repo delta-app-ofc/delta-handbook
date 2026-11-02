@@ -8,7 +8,7 @@ Documentar como o `delta-web-app` (React, TypeScript e Vite) se comunica com a `
 
 Não existe um servidor BFF (Backend For Frontend) separado. O web app chama a API diretamente, e a camada de integração fica dentro do próprio front, em `src/services/`. A origem da API é configurada em `VITE_POSTGRES_API_URL` (sem o sufixo `/delta`) e nunca é versionada.
 
-Os endpoints abaixo foram conferidos na branch `develop` da `delta-api-postgres`. A rota `GET /delta/auth/classification` existe só nessa branch.
+Referências verificadas: API `develop` no commit `6b8530fc6af28b63a57afb7c0cf6c6d9c7a21bf2`, serviços de autenticação da API no commit `e78fb66e35e71d2bb4939b7db1cb765e892a162a` e web app no commit `56782e36bf18926b0e22b3a991134d5a17fa9617`. A rota `GET /delta/auth/classification` aparece nessa versão da API, mas não é chamada pelos serviços do front inspecionados.
 
 ---
 
@@ -27,6 +27,8 @@ pages / components  →  hooks  →  services  →  http.ts (único fetch)
 | `services/session.ts` | Sessão (access e refresh token) em `sessionStorage`, chave `delta.session`. |
 
 A renovação ocorre quando faltam menos de 5 segundos para expirar ou após um `401`; renovações simultâneas são deduplicadas. Escritas só são repetidas após `401`, nunca por falha de rede.
+
+A sessão é guardada em `sessionStorage` para continuar disponível após recargas na mesma aba, sem criar uma sessão persistente em `localStorage`. Scripts da mesma origem podem ler os tokens; essa escolha não os isola de XSS. O front descarta o estado restaurado quando o refresh expira e chama `saveSession(null)` em respostas de autenticação inválida. Falhas de rede não limpam a sessão automaticamente. Ao renovar, substitui apenas o access token e sua expiração; não rotaciona o refresh. No backend verificado, o refresh é associado ao usuário no Redis com TTL e a renovação exige usuário ativo. Encerrar a aba encerra o armazenamento da aba, mas não revoga o token no Redis; esta documentação não afirma existir um endpoint de logout/revogação nesse fluxo.
 
 ---
 
@@ -65,7 +67,9 @@ Na rota `/cadastro/empresa/vinculando`, o hook `useCompanyRegistration` executa,
 2. `POST /delta/auth/complete-registration` com `address` (CEP de 8 números, cidade e estado), `property` (nome da unidade, tipo `PRÉDIO`, classificação e `organizationId`) e `habits` vazio.
 3. `POST /delta/device` quando o código do dispositivo foi informado.
 
-O progresso de cada etapa fica em memória: em uma nova tentativa após falha, o que já foi criado não é criado de novo.
+`declaredUnitCount = 1` representa a única unidade criada nessa etapa do formulário, sem afirmar ser o total definitivo da organização. `habits = []` reutiliza o contrato de conclusão de cadastro sem criar hábitos residenciais no cadastro empresarial; são escolhas do payload atual do front, não exigências gerais da API.
+
+O progresso fica no `progressRef` do hook: novas tentativas pulam etapas concluídas enquanto a mesma instância permanece montada. Recarregar, fechar a aba ou remontar o hook perde esse progresso e pode repetir os `POST`s. O fluxo usa os IDs retornados para retomar etapas nessa instância; não oferece uma chave de idempotência persistida entre execuções.
 
 ### Mapeamentos
 
@@ -76,7 +80,7 @@ O progresso de cada etapa fica em memória: em uma nova tentativa após falha, o
 
 ### Dados que não são enviados
 
-A API não possui campos para os itens abaixo, que ficam apenas no estado do front (`localStorage`, com versão de schema):
+Os itens abaixo não são enviados no payload atual e ficam no rascunho do front (`localStorage`, com versão de schema). A persistência permite retomar o formulário após recargas. `CompanyRegisterContext` restaura versões 1 e 2, grava a versão 2 após alterações, remove JSON inválido e possui ação `RESET`; não define expiração automática. Isso descreve o estado local, sem atribuir essas informações ao banco:
 
 - porte da empresa, rua e número;
 - dias e horários de operação e turnos;

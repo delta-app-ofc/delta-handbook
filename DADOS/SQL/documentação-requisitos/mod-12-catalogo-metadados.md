@@ -6,7 +6,7 @@
 - [Carga do catálogo do banco relacional](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-catalogo-dados.sql)
 - [Carga do catálogo do Data Mart](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-catalogo-datamart.sql)
 - [Geração dos comentários das colunas a partir do catálogo](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-comments.sql)
-- [Governança de acesso](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/governanca-acesso.md)
+- [Governança de acesso](../governanca-acesso.md)
 - [Catálogo de `tb_user`: coluna, tipo, regra e nível de acesso](../anexos/evidencias-requisitos/mod-12-catalogo-tb-user.png)
 
 **Localização e como comprovar:**

@@ -6,7 +6,7 @@
 - [View com Running Total e média móvel](https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/dw/views/vw_ft_consumption_daily.sql)
 - [View com rankings e distribuição](https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/dw/views/vw_ft_property_ranking.sql)
 - [View com comparação mês a mês (`LAG`)](https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/dw/views/vw_ft_monthly_variation.sql)
-- [Documentação da camada de BI, seção 5](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
+- [Documentação da camada de BI, seção 5](../camada-bi.md)
 - [Running Total e média móvel em `vw_ft_consumption_daily`](../anexos/evidencias-requisitos/mod-06-view-consumo-diario.png)
 - [Rankings em `vw_ft_property_ranking`](../anexos/evidencias-requisitos/mod-07-view-ranking-propriedades.png)
 - [`LAG()` em `vw_ft_monthly_variation`](../anexos/evidencias-requisitos/mod-07-view-variacao-mensal.png)

@@ -6,8 +6,8 @@
 - [Pasta das camadas do Data Mart (`stage`, `silver`, `gold`, `dw`)](https://github.com/delta-app-ofc/delta-sql-database/tree/main/datamart)
 - [Views analíticas do schema `dw`](https://github.com/delta-app-ofc/delta-sql-database/tree/main/datamart/dw/views)
 - [Script de carga do Data Mart](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-datamart-dataload.sql)
-- [Documentação da camada de BI](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
-- [Diagrama da camada analítica](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica-camada-analitica.png)
+- [Documentação da camada de BI](../camada-bi.md)
+- [Diagrama da camada analítica](../anexos/modelagem-logica-camada-analitica.png)
 
 - [Print das nove views do schema dw](../anexos/evidencias-requisitos/mod-05-views-dw.png)
 
@@ -17,23 +17,23 @@ O Data Mart está no mesmo PostgreSQL do banco relacional e é criado pelo `scri
 
 | Schema | Papel | Materialização |
 |---|---|---|
-| `stage` | Cópia bruta da telemetria extraída do MongoDB | Tabela |
+| `stage` | Dados brutos do MongoDB: `consumption_summary`, `user_preferences` e `alerts_history` | Tabela |
 | `silver` | Dado tratado, tipado e deduplicado, no grão original | Tabela |
 | `gold` | Modelo dimensional (Star Schema) com chaves substitutas | Tabela |
 | `dw` | Camada de consumo do BI | Views |
 
 #### 1. Modelo dimensional (Star Schema)
 
-O schema `gold` implementa um Star Schema: nenhuma dimensão referencia outra dimensão, e `gold.dm_date` é a dimensão conformada compartilhada pelas tabelas fato.
+O núcleo do schema `gold` organiza consumo, faturas e alertas em Star Schema, compartilhando `gold.dm_date`. A extensão `gold.dm_user_preference` referencia `gold.dm_person`, formando uma relação adicional entre dimensões para as metas.
 
-- **Dimensões:** `gold.dm_date` (1 linha por dia), `gold.dm_property` (1 linha por propriedade) e `gold.dm_person` (1 linha por pessoa).
-- **Fatos:** `gold.ft_consumption_daily` (propriedade × dia), `gold.ft_water_bill_monthly` (pessoa × mês) e `gold.ft_investment_scenario` (cenário de investimento, fato sem dimensão de tempo).
+- **Dimensões:** `gold.dm_date` (1 linha por dia), `gold.dm_property` (1 linha por propriedade) e `gold.dm_person` (1 linha por pessoa), além de `gold.dm_user_preference` (preferências por pessoa).
+- **Fatos:** `gold.ft_consumption_daily` (propriedade × dia), `gold.ft_water_bill_monthly` (pessoa × mês), `gold.ft_investment_scenario` (cenário de investimento, fato sem dimensão de tempo) e `gold.ft_alert` (ocorrência de alerta).
 
-O nome da organização fica denormalizado em `gold.dm_property` (`organization_name`). Essa decisão mantém o desenho como Star Schema, e não Snowflake, porque a organização não vira uma dimensão separada.
+O nome da organização fica denormalizado em `gold.dm_property` (`organization_name`). Essa decisão preserva o núcleo em estrela sem criar uma dimensão separada de organização.
 
 #### 2. Views analíticas (`dw`)
 
-O schema `dw` contém **nove views**, todas lendo da camada `gold`, exceto `vw_audit_history_chain`, que lê o log de auditoria:
+O schema `dw` contém **nove views**. As views analíticas leem `gold`; `vw_ft_user_goal` também consulta `tb_user_property` para associar consumo à pessoa. A view `vw_audit_history_chain` lê diretamente o log de auditoria:
 
 | View | O que entrega |
 |---|---|
@@ -54,4 +54,4 @@ O schema `dw` contém **nove views**, todas lendo da camada `gold`, exceto `vw_a
 3. Consultar `SELECT * FROM dw.vw_ft_property_ranking LIMIT 10;` para ver o resultado analítico sobre as tabelas `gold`.
 4. Abrir o diagrama da camada analítica e conferir as relações entre fatos e dimensões.
 
-A carga da camada de BI é feita por `bi_etl.py` (extração do MongoDB para `stage`) e pelas procedures `sp_load` de cada schema, executadas em sequência: `stage → silver → gold`.
+A sequência de carga é `bi_etl.py → silver.sp_load() → gold.sp_load()`. O ETL Python grava as coleções diretamente nas tabelas de `stage`; não há chamada `stage.sp_load()` nesse fluxo. O `script-datamart-dataload.sql` executa as duas procedures SQL.

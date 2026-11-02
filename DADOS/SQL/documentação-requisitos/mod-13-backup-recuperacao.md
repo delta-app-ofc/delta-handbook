@@ -2,15 +2,15 @@
 
 **Evidência direta:**
 
-- [Documentação de backup e recuperação](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/backup-recuperacao.md)
+- [Documentação de backup e recuperação](../backup-recuperacao.md)
 - [Script de backup e teste de restauração](https://github.com/delta-app-ofc/delta-sql-database/blob/main/backup_db.py)
 - [Workflow automatizado de backup](https://github.com/delta-app-ofc/delta-sql-database/blob/main/.github/workflows/backup-postgres.yml)
 - [Tabela de registro dos testes de restauração](https://github.com/delta-app-ofc/delta-sql-database/blob/main/tables/tb_backup_restore_log.sql)
-- [Evidência da janela de PITR no Neon](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencia-neon.png)
+- [Evidência da janela de PITR no Neon](../anexos/evidencia-neon.png)
 
-- [Print do teste de restauração: 47 tabelas com contagens corretas](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-backup.png)
-- [Log completo da restauração local](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-restauracao.txt)
-- [Relatório da execução e consultas de verificação](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/README.md)
+- [Print do teste de restauração: 47 tabelas com contagens corretas](../anexos/backup-recuperacao/resultado-backup.png)
+- [Log completo da restauração local](../anexos/backup-recuperacao/resultado-restauracao.txt)
+- [Relatório da execução e consultas de verificação](../anexos/backup-recuperacao/README.md)
 
 **Localização e como comprovar:**
 

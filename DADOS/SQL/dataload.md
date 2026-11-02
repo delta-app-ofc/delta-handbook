@@ -50,7 +50,7 @@ Quatro tabelas técnicas não recebem carga inicial, porque seus registros nasce
 | `tb_backup_restore_log` | `backup_db.py restore-test` | A cada teste de restauração (MOD-13) |
 | `tb_log_rpa` | `delta-rpa` | A cada execução da migração (MOD-04) |
 
-As tabelas `tb_log_*` de auditoria também são populadas em execução: cada `INSERT` do dataload dispara o trigger da tabela correspondente.
+Quando `script-audit.sql` é executado antes do dataload, cada `INSERT` dispara o trigger correspondente e popula os logs de auditoria. Executar apenas `script-schema.sql` e `script-dataload.sql` não instala esses triggers; a comprovação dos logs pertence ao MOD-10.
 
 ## Como validar a contagem
 

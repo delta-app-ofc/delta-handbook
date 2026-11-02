@@ -110,11 +110,13 @@ Perguntas que responde:
 > O Agente de Vazamento (`delta-artificial-intelligence/app/agents/leak.py`) só **lê** o
 > campo `consumption_summary.anomaly_detected` e os registros de `alerts_history` — ele
 > nunca decide um limiar novo (proibido pelo próprio prompt do agente). Quem calcula esse
-> campo e cria esses registros é um componente separado, o motor de detecção
-> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML,
-> reagindo quase em tempo real via MongoDB Change Streams. Ver
-> `DADOS/NoSQL/modelagem-mongodb.md` e `detection/README.md` naquele repositório.
+> campo é o detector implementado no `delta-api-mongo`, após a inserção de cada janela,
+> com regras explicáveis de fluxo contínuo, consumo noturno/fora do expediente,
+> desvio robusto e mudança de regime. O novo fluxo está desligado por padrão; sua
+> implantação precisa ser validada antes da remoção de `delta-business-rules/detection/`
+> e do `watcher.py`/Change Stream antigo. A IA e o sistema escrevem seus próprios tipos
+> pelo endpoint interno da API Mongo. `anomaly_detected=null` significa não avaliado,
+> nunca ausência de vazamento. Ver [detector e contrato de alertas](deteccao-anomalias.md).
 
 ### Agente 3 — Previsão
 Responsável por:

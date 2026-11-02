@@ -2,7 +2,7 @@
 
 ## Objetivo e escopo
 
-Explicar o `HabitsAgent` e suas ferramentas na `main` de IA `f6f3d8c`, revisada em 02/11/2026. Fontes: `app/tools/habits/`, `app/agents/habits.py`, `app/data/db_postgres.py` e `app/tools/charts.py`.
+Explicar o `HabitsAgent` e suas ferramentas. Fontes: `app/tools/habits/`, `app/agents/habits.py`, `app/data/db_postgres.py` e `app/tools/charts.py`.
 
 O agente de hábitos é liberado para contas residenciais. O usuário fica preso às ferramentas. Consultas, cadastro e cenários são operações distintas: simular não cadastra e listar não satisfaz um pedido explícito de cadastro.
 
@@ -17,7 +17,7 @@ O agente de hábitos é liberado para contas residenciais. O usuário fica preso
 | LAVAR CARRO | 200 |
 | LAVAR LOUÇA | 20 |
 
-Esses números são constantes do projeto, **não medições do usuário nem valores verificados nesta revisão por pesquisa externa**. `names.py` resolve variações de escrita; ambiguidade devolve opções e pede esclarecimento.
+Esses números são constantes do projeto, **não medições do usuário**. `names.py` resolve variações de escrita; ambiguidade devolve opções e pede esclarecimento.
 
 `list_habits` lista frequência/dias; `get_habits_by_day` aceita dias completos ou abreviados em português. `create_habit` recebe nome, frequência e, opcionalmente, dias e horários. Sem frequência, usa o número de dias distintos; sem ambos, devolve `needs_frequency`.
 
@@ -58,8 +58,8 @@ A tarifa vem da região/classificação do imóvel e da vigência na data da con
 
 Gráficos de hábitos derivam dos outputs, sem converter médias em medições. Testes relacionados: `test_habit_create.py`, `test_habit_cost.py`, `test_habit_simulation.py` e `test_habits_in_forecast_and_leak.py`.
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [app/tools/habits/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/habits/tools.py)
-- [app/tools/habits/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/habits/calculations.py)
-- [app/agents/habits.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/agents/habits.py)
+- [app/tools/habits/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/habits/tools.py)
+- [app/tools/habits/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/habits/calculations.py)
+- [app/agents/habits.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/habits.py)

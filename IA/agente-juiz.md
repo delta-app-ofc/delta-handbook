@@ -2,7 +2,7 @@
 
 ## Objetivo e entradas
 
-Descrever a política de `app/agents/judge.py`, `judge_specialist.py`, `app/config.py` e `app/graph/workflow.py` na `main`.
+Descrever a política de `app/agents/judge.py`, `judge_specialist.py`, `app/config.py` e `app/graph/workflow.py`.
 
 O Juiz recebe `JudgeInput`: pergunta, candidata completa, `agent_results`, contexto e gráfico. Evidências são os outputs reais das ferramentas e os trechos recuperados. Pergunta, candidata, gráfico e pareceres anteriores não comprovam fatos por si mesmos. O contexto inclui perfil, mensagens recentes tratadas, memória relevante, avisos e dados de revisão.
 
@@ -46,8 +46,8 @@ Cadastro de hábito já pode ter sido gravado antes desse parecer. Rejeitar a ca
 
 Testes versionados: `test_ci_judge.py`, `test_ci_judge_specialist.py` e integração no grafo. A inspeção desses testes não equivale à execução real com Jev ou à avaliação de qualidade semântica.
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [app/agents/judge.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/agents/judge.py)
-- [app/agents/judge_specialist.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/agents/judge_specialist.py)
-- [app/config.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/config.py)
+- [app/agents/judge.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/judge.py)
+- [app/agents/judge_specialist.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/judge_specialist.py)
+- [app/config.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/config.py)

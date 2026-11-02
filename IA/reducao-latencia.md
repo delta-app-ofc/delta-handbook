@@ -1,6 +1,6 @@
 # Redução de latência do chat
 
-> **Estado em 02/11/2026:** pool, caches por pergunta, preparação paralela, raciocínio por papel e SSE estão presentes na `main` de IA `f6f3d8c`. As tabelas de tempo e os resultados abaixo são registros históricos das rodadas da branch `feat/reduz-latencia-chat`, não medições repetidas nesta revisão. Os guias de [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md) e [workflow](workflow.md) descrevem o contrato atual.
+> Pool, caches por pergunta, preparação paralela, raciocínio por papel e SSE estão implementados. As tabelas de tempo abaixo registram as rodadas de medição da implementação original; não representam uma garantia de latência para outros ambientes. Os guias de [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md) e [workflow](workflow.md) explicam a configuração e o uso.
 
 ## Objetivo
 
@@ -310,9 +310,9 @@ simples: uma leitura por unidade com a mesma função de consumo, totais e ordem
 Na tarefa original de redução de latência ficaram fora do escopo: Agente Juiz e Jev (modelo de decisão da TypeSafe usado pelo Juiz; timeout, payload, fallback, número de revisões), escolha e parâmetros de modelos e provedores
 (inclusive circuito aberto para falhas do provedor), prompt do agente de consumo, agentes em paralelo e `/playground`.
 
-## Documentação sincronizada com a main
+## Documentos relacionados
 
-A revisão de 02/11/2026 atualizou [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md), [guardrails](implementacao-guardrails.md) e [orquestração](implementacao-langgraph-orquestracao.md). O [índice](leia-me.md) registra diferenças do código atual, incluindo thresholds do Juiz e referências antigas do README. Resultados numéricos deste documento permanecem históricos, sem servir como SLO observado da main atual.
+Os detalhes de funcionamento estão em [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md), [guardrails](implementacao-guardrails.md) e [orquestração](implementacao-langgraph-orquestracao.md). O [índice](leia-me.md) reúne os demais assuntos. Os resultados numéricos deste documento descrevem as condições das rodadas registradas.
 
 ## Registro histórico da implementação
 

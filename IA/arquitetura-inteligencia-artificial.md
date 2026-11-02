@@ -355,9 +355,11 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 | `GET` | `/sessions/{session_id}/messages` | Mensagens de uma sessão do usuário |
 | `POST` | `/sessions/{session_id}/close` | Encerra a sessão e grava o resumo na memória de longo prazo |
 
-- **Autenticação:** todas as rotas, exceto `/health`, exigem `Authorization: Bearer <JWT>`, assinado com HS256 e
-  com os claims `sub` (o `user_id`) e `exp`. O `user_id` vem somente do token, nunca do corpo ou da URL. O
-  back-end precisa emitir o token com o segredo `JWT_SECRET` compartilhado com a API de IA.
+- **Autenticação:** chat e sessões exigem `Authorization: Bearer <JWT>` emitido pelo back-end com RS256. A IA
+  verifica assinatura com `AUTH_PUBLIC_KEY`, validade, emissor, audiência e `kid` quando configurado. O `user_id`
+  vem somente do `sub`, nunca do corpo ou da URL. HS256 com `JWT_SECRET` é uma alternativa apenas para
+  desenvolvimento/teste e não é aceito simultaneamente com a chave pública. O console `/playground` tem
+  configuração de acesso própria; veja [API FastAPI](implementacao-api-fastapi.md).
 - **Claim `sub`:** por padrão do JWT, `sub` é uma string. A API a converte para inteiro positivo antes de consultar
   `chat_sessions.user_id`; um `sub` que não seja um inteiro positivo resulta em 401.
 - **Campos de data:** na resposta de `GET /sessions`, `created_at` vem de `started_at` e `updated_at` vem de
@@ -367,8 +369,8 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 - **Título, prévia e ícone:** gerados por um modelo de linguagem rápido na primeira troca de mensagens e gravados
   em `title`, `preview` e `icon`.
 
-Status: implementado e testado com MongoDB real em banco descartável; a emissão do JWT pelo back-end e o limite de
-50–100 mensagens por sessão ainda não existem na API de IA.
+Status: implementado e testado com MongoDB real em banco descartável; a emissão do JWT é responsabilidade do back-end. A API de IA ainda não faz rotação automática
+por limite de 50–100 mensagens em uma sessão.
 
 ---
 

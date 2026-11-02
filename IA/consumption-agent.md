@@ -1,6 +1,6 @@
 # Agente de Consumo
 
-Revisado em 02/11/2026 contra a `main` de IA `f6f3d8c`. O `ConsumptionAgent` responde sobre consumo efetivamente registrado. Está registrado no roteador e pode ser executado diretamente; `run(question)` devolve `AgentResult` pelo runtime compartilhado. O ID vem do chamador confiável e fica preso às tools, sem aparecer como argumento livre do modelo. No chat, a resposta passa pelo grafo, Juiz e guardrail final.
+O `ConsumptionAgent` responde sobre consumo efetivamente registrado. Está registrado no roteador e pode ser executado diretamente; `run(question)` devolve `AgentResult` pelo runtime compartilhado. O ID vem do chamador confiável e fica preso às tools, sem aparecer como argumento livre do modelo. No chat, a resposta passa pelo grafo, Juiz e guardrail final.
 
 Para execução manual:
 
@@ -103,7 +103,7 @@ real nem comprovam a integração com serviços externos. A validação com Mong
 PostgreSQL e provedor LLM reais continua dependente desses serviços e de suas
 credenciais.
 
-Registro histórico da implementação inicial, sem reexecução nesta revisão: a regressão completa do conjunto integrado das cinco tarefas passou com
+Registro histórico da implementação inicial: a regressão completa do conjunto integrado das cinco tarefas passou com
 160 testes em 4,29 segundos. Houve uma advertência de depreciação em
 `google.genai`, sem falhas de teste. Os imports dos três agentes e dos
 conectores também foram validados sem credenciais nem chamadas externas.
@@ -112,8 +112,8 @@ conectores também foram validados sem credenciais nem chamadas externas.
 
 Unidades e leituras equivalentes são reutilizadas durante a pergunta, evitando consultas repetidas. O escopo temporal é renovado em cada execução. Isso não é cache global de respostas ou autorização entre usuários. Veja [redução de latência](reducao-latencia.md).
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [app/agents/consumption.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/agents/consumption.py)
-- [app/tools/consumption/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/consumption/tools.py)
-- [app/tools/consumption/analysis.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/consumption/analysis.py)
+- [app/agents/consumption.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/consumption.py)
+- [app/tools/consumption/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/consumption/tools.py)
+- [app/tools/consumption/analysis.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/consumption/analysis.py)

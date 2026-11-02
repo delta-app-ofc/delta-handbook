@@ -1,22 +1,72 @@
-# Configuração da aplicação de IA
+# Configuração da aplicação
 
-## Objetivo e carregamento
+`app/config.py` reúne as variáveis de ambiente em `Settings`. O carregamento não abre conexões nem exige credenciais: cada caminho valida apenas o componente que vai usar. Isso mantém imports, cálculos puros e agentes com LLM falso independentes de bancos e provedores reais.
 
-`app/config.py` concentra `Settings` e validadores por componente. Referência: `main` `f6f3d8c`, revisada em 02/11/2026. Não exige todas as credenciais no import; cada integração valida o caminho de uso.
+## Precedência e recarga
 
-Variáveis do processo prevalecem sobre `.env`. `APP_ENV=test` definido no processo evita leitura de `.env`. `load_settings(environ=...)` usa o mapa injetado sem arquivo por padrão. `get_settings` guarda snapshot em cache; `reload_settings`, `clear_settings_cache` ou `get_settings(refresh=True)` permitem recarga controlada. Não recarregue por requisição.
+As variáveis do processo prevalecem sobre o arquivo `.env`. Em desenvolvimento, o módulo lê `.env` sem alterar `os.environ`; quando `APP_ENV=test` está definido no processo, não lê nenhum arquivo `.env`, mesmo quando passado explicitamente. Uma chamada `load_settings(environ=...)` usa apenas o mapa recebido, sem ler arquivo por padrão, para permitir testes isolados. Um caminho de arquivo pode ser passado explicitamente para testar a precedência com dados temporários.
 
-Settings ocultam segredos/URIs na representação. Mensagens de configuração devem indicar nomes de variáveis, sem seus valores. Validação sintática não comprova DNS, conexão ou schema do produto.
+`get_settings()` devolve um snapshot em cache. Use `get_settings(refresh=True)` depois de alterar variáveis durante a execução; não recarregue por requisição. Acesse os campos desse snapshot para ler os valores efetivos. `reload_settings()`, `clear_settings_cache()` e os antigos aliases uppercase não fazem parte dessa interface.
 
-## Ambientes
+A representação de `Settings` omite chaves, senhas e URIs de conexão. Erros de validação identificam os nomes das variáveis, sem incluir seus valores. A checagem das URIs é local e sintática; não tenta conectar nem consultar DNS.
 
-| Ambiente | Defaults de bancos | Console |
+## Comportamento por ambiente
+
+| `APP_ENV` | Comportamento |
+| --- | --- |
+| `development` (padrão) | Pode usar os serviços descartáveis definidos em `docker-compose.dev.yml`: PostgreSQL local e as duas URIs Mongo locais. O fallback local só é aplicado quando a variável correspondente não foi informada. |
+| `test` | Não usa defaults locais e não lê `.env`. Testes isolados injetam valores sintéticos com `load_settings(environ=...)` ou `monkeypatch`; casos de histórico também podem usar MongoDB real descartável e ser pulados quando ele falta. |
+| `staging` / `production` | Não recebe URI local automaticamente. O componente precisa de configuração explícita antes de ser usado. Os nomes dos bancos Mongo mantêm os defaults `db_delta_app` e `db_delta_telemetry`. |
+
+Em desenvolvimento, `DATABASE_URL` usa a conta pública e descartável do container local quando a variável está ausente. A conexão é configurada por essa URI; o conector não usa o conjunto antigo de variáveis SQL separadas.
+
+As conexões Mongo de aplicação e telemetria sempre permanecem independentes. Os dois exemplos locais podem apontar para o mesmo container; staging e produção devem informar cada URI do cluster correspondente.
+
+## Variáveis disponíveis
+
+| Variável | Default | Regra de uso |
 | --- | --- | --- |
-| `development` (default) | SQL local e Mongo `localhost:27018` apenas se a variável estiver ausente. Vazio explícito não recebe default. | Ligado por padrão. |
-| `test` | Sem URIs locais automáticas; processo em test ignora `.env`. | Ligado por padrão. |
-| `staging` / `production` | Exigem conexões explícitas para cada componente utilizado. | Desligado por padrão. |
+| `APP_ENV` | `development` | Aceita `development`, `test`, `staging` ou `production`. |
+| `GEMINI_API_KEY` | vazio | Exigida ao selecionar o caminho Gemini. Sem segredo default. |
+| `GROQ_API_KEY` | vazio | Exigida para o caminho rápido Groq, Groq especialista ou fallback Groq habilitado. |
+| `DATABASE_URL` | URI do PostgreSQL local em desenvolvimento | A URI inteira é repassada para preservar senha codificada e opções como TLS. |
+| `MONGODB_APP_URI` | `mongodb://localhost:27018` em desenvolvimento | Cluster Mongo de dados do aplicativo. |
+| `MONGODB_TELEMETRY_URI` | `mongodb://localhost:27018` em desenvolvimento | Cluster Mongo de telemetria; variável separada da URI de aplicação. Aceita `mongodb://` com vários hosts e `mongodb+srv://`. |
+| `MONGO_DB_APP` | `db_delta_app` | Nome não vazio do banco de aplicação. |
+| `MONGO_DB_TELEMETRY` | `db_delta_telemetry` | Nome não vazio do banco de telemetria. |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Modelo configurável para o provedor Gemini. |
+| `GROQ_SPECIALIST_MODEL` | `openai/gpt-oss-120b` | Modelo configurável para o caminho especialista Groq. |
+| `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | Modelo configurável para o caminho rápido Groq. |
+| `LLM_FALLBACK_ENABLED` | `true` | Aceita explicitamente `true` ou `false`. |
+| `LLM_TIMEOUT_SECONDS` | `15` | Tempo positivo em segundos. |
+| `LLM_MAX_RETRIES` | `1` | Número inteiro não negativo. |
+| `LLM_MAX_OUTPUT_TOKENS` | `4096` | Limite inteiro positivo de saída. |
+| `DB_CONNECT_TIMEOUT_SECONDS` | `5` | Timeout inteiro positivo de conexão com banco. |
+| `DB_QUERY_TIMEOUT_SECONDS` | `30` | Timeout inteiro positivo para operações de banco. |
 
-`DELTA_PLAYGROUND_ENABLED=true/false` sobrescreve o default do console. Habilitado, ele não exige Bearer; precisa de ambiente restrito. O Dockerfile define `APP_ENV=production`.
+Temperatura e `top_p` do modo Gemini/Groq são parâmetros fixos; OpenAI usa configuração de raciocínio por papel. A seleção dos modelos e os parâmetros LLM são aplicados em `app/services/llms.py`; os drivers PostgreSQL/MongoDB aplicam os timeouts de banco. Consulte [provedores](llm-models.md), [PostgreSQL](postgres-connection.md) e [MongoDB](mongo-connection.md) para a semântica de cada parâmetro.
+
+## Validação por componente
+
+```python
+from app.config import (
+    validate_llm_config,
+    validate_mongo_config,
+    validate_postgres_config,
+)
+
+validate_llm_config("specialist")  # provedor selecionado e fallback aplicável
+validate_llm_config("gemini")      # somente Gemini
+validate_llm_config("fast")        # papel rápido do provedor selecionado
+validate_postgres_config()          # DATABASE_URL e parâmetros do pool
+validate_mongo_config("app")       # URI e nome do banco de aplicação
+validate_mongo_config("telemetry") # URI e nome do banco de telemetria
+
+```
+
+Os validadores lançam `ConfigurationError` se o componente não estiver pronto. Eles verificam esquema de URI, variáveis obrigatórias, nomes e intervalos numéricos sem tentar conectar. Chamadas isoladas devem usar o validador do componente correspondente.
+
+Defina `APP_ENV=test` no processo para impedir leitura de `.env`. `tests/conftest.py` configura fixtures de histórico e autenticação; não se deve assumir que ele apaga toda variável herdada ou torna todos os casos independentes de banco.
 
 ## Geração e Juiz
 
@@ -27,14 +77,7 @@ Settings ocultam segredos/URIs na representação. Mensagens de configuração d
 | `OPENAI_REASONING_EFFORT` | `medium` | Raciocínio geral e segundo juiz OpenAI. |
 | `OPENAI_FAST_REASONING_EFFORT` | `low` | Guarda, roteador, síntese, metadados e resumos. Vazio usa geral. |
 | `OPENAI_SPECIALIST_REASONING_EFFORT` | `high` | Especialistas. Vazio usa geral. |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Especialista no modo Gemini. |
 | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-2-preview` | Embeddings, inclusive no modo OpenAI. |
-| `GROQ_SPECIALIST_MODEL` | `openai/gpt-oss-120b` | Fallback especialista. |
-| `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | Papel rápido no modo Gemini. |
-| `LLM_FALLBACK_ENABLED` | `true` | Habilita fallback quando configurado. |
-| `LLM_TIMEOUT_SECONDS` | `15` | Timeout por tentativa. |
-| `LLM_MAX_RETRIES` | `1` | Retries adicionais por provedor. |
-| `LLM_MAX_OUTPUT_TOKENS` | `4096` | Limite de saída da aplicação. |
 | `JEV_MODEL` | `jev-1.14.0` | Juiz TypeSafe. |
 | `JEV_TIMEOUT_SECONDS` | `5` | Timeout do classificador Jev. |
 | `JEV_CONFIDENCE_THRESHOLD` | `0.70` | Encaminha baixa confiança ao segundo juiz. |
@@ -49,9 +92,6 @@ Chaves: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` e `TYPESAFE_API_KEY`,
 
 | Variável | Default / regra |
 | --- | --- |
-| `DATABASE_URL` | URI SQL local em development quando ausente; é o formato usado pelo conector atual. |
-| `DB_CONNECT_TIMEOUT_SECONDS` | 5 segundos. |
-| `DB_QUERY_TIMEOUT_SECONDS` | 30 segundos. |
 | `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` / `DB_POOL_WAIT_SECONDS` | 1 / 10 / 5, por processo. |
 | `MONGODB_APP_URI` / `MONGODB_TELEMETRY_URI` | Dois alvos; local `mongodb://localhost:27018` apenas em development e se ausentes. |
 | `MONGO_DB_APP` / `MONGO_DB_TELEMETRY` | `db_delta_app` / `db_delta_telemetry`. |
@@ -60,7 +100,7 @@ Chaves: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GROQ_API_KEY` e `TYPESAFE_API_KEY`,
 | `MCP_EXTERNAL_ENABLED` | `false`. |
 | `MCP_TIMEOUT_SECONDS` / `MCP_CACHE_TTL_SECONDS` | 45 segundos / 3600 segundos. |
 
-As antigas variáveis SQL separadas `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_DB`, `NAME_DB` não são o contrato do conector desta revisão. Os CLIs `scripts.check_postgres` e `scripts.check_mongo` citados anteriormente não estão na árvore atual.
+As antigas variáveis SQL separadas `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_DB`, `NAME_DB` não são usadas pelo conector. Os CLIs `scripts.check_postgres` e `scripts.check_mongo` citados anteriormente não fazem parte do serviço.
 
 ## Autenticação e CORS
 
@@ -74,9 +114,9 @@ As antigas variáveis SQL separadas `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_D
 
 `OBS_HASH_SECRET` de pelo menos 16 caracteres habilita hash de usuários. `LANGSMITH_TRACING=false`, `LANGSMITH_PROJECT=delta-ai` e `LANGSMITH_SEND_CONTENT=false` mantêm tracing opcional e conteúdo oculto por padrão; a chave é `LANGSMITH_API_KEY`.
 
-Reinicie a API depois de trocar configurações em operação. Em testes/diagnósticos no mesmo processo, recarregar settings exige descartar/fechar caches afetados: modelos gerais, OpenAI, RAG, segundo juiz, pool SQL e Mongo têm funções próprias; memória longa mantém caches separados. Faça isso sem requisições em andamento. O `lifespan` atual não encerra todos esses caches, conforme [índice da revisão](leia-me.md).
+Reinicie a API depois de trocar configurações em operação. Em testes/diagnósticos no mesmo processo, recarregar settings exige descartar/fechar caches afetados: modelos gerais, OpenAI, RAG, segundo juiz, pool SQL e Mongo têm funções próprias; memória longa mantém caches separados. Faça isso sem requisições em andamento. O `lifespan` atual não encerra todos esses caches, conforme os [pontos de atenção](leia-me.md).
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [app/config.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/config.py)
-- [.env.example](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/.env.example)
+- [app/config.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/config.py)
+- [.env.example](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/.env.example)

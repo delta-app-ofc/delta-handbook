@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Descrever as ferramentas de `ForecastAgent` e os cálculos determinísticos da `main` de IA `f6f3d8c` (02/11/2026). Fontes: `app/tools/forecast/`, `app/tools/simulation/calculations.py`, `app/data/db_postgres.py` e `app/tools/charts.py`.
+Descrever as ferramentas de `ForecastAgent` e os cálculos determinísticos da aplicação. Fontes: `app/tools/forecast/`, `app/tools/simulation/calculations.py`, `app/data/db_postgres.py` e `app/tools/charts.py`.
 
 O LLM escolhe ferramentas e explica saídas. Totais, médias, projeção, comparação de metas e cenários são calculados em Python. Não são previsões feitas numericamente pelo modelo de linguagem.
 
@@ -45,8 +45,8 @@ O gráfico de previsão é construído a partir dos resultados de ferramentas, c
 
 Testes versionados incluem `test_forecast_calculations.py`, `test_forecast_sources.py`, `test_forecast_chart.py`, `test_consumption_simulation.py`, `test_goals_and_investments.py` e `test_habits_in_forecast_and_leak.py`. Validar com dados reais exige conferir schema, views, carga do ETL, tarifas e permissão do usuário; um teste isolado não comprova essas condições.
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [app/tools/forecast/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/forecast/tools.py)
-- [app/tools/forecast/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/forecast/calculations.py)
-- [app/tools/simulation/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/simulation/calculations.py)
+- [app/tools/forecast/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/forecast/tools.py)
+- [app/tools/forecast/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/forecast/calculations.py)
+- [app/tools/simulation/calculations.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/simulation/calculations.py)

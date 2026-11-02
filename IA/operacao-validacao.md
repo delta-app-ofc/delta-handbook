@@ -1,8 +1,8 @@
 # Operação e validação da IA
 
-## Objetivo e referência
+## Objetivo
 
-Reunir caminhos e comandos existentes na `main` de IA `f6f3d8c` (02/11/2026). Os comandos abaixo são para a raiz do repositório **`delta-artificial-intelligence`**. Sua conferência com os arquivos não significa que foram executados nesta revisão documental.
+Reunir caminhos e comandos para desenvolver, executar e verificar a IA. Os comandos abaixo são para a raiz do repositório **`delta-artificial-intelligence`**.
 
 ## Desenvolvimento local
 
@@ -65,7 +65,7 @@ O runner `tests/run_ci.py` produz `reports/junit.xml`, `coverage.xml`, HTML e re
 
 A suíte contém casos isolados com substitutos e casos de histórico com MongoDB real. A fixture de histórico usa `DELTA_TEST_MONGO_URI` (default `localhost:27018`) e **apaga o database `delta_test_historico`** no ciclo de teste. Use serviço descartável e não execute em paralelo com outra atividade que dependa desse database. Sem Mongo, esses testes são pulados. Resultado sem falhas com skips não confirma integração.
 
-Uma validação real precisa exercitar autenticação com token do backend, ownership, fontes de consumo, tarifas/funções/views, escrita e conflito de hábitos, histórico, fechamento/resumo, RAG atual e falhas dos provedores. Isso requer dados e ambiente próprios; não foi executado nesta revisão.
+Uma validação real precisa exercitar autenticação com token do backend, ownership, fontes de consumo, tarifas/funções/views, escrita e conflito de hábitos, histórico, fechamento/resumo, RAG atual e falhas dos provedores. Isso requer dados e ambiente próprios.
 
 ## CI e entrega existentes
 
@@ -77,16 +77,16 @@ Uma validação real precisa exercitar autenticação com token do backend, owne
 
 O Dockerfile usa Python 3.12 slim, certificados/fusos, usuário sem root, `APP_ENV=production` e Uvicorn com um worker em `${PORT:-10000}`. Copia `app/` e `frontend/`; scripts diagnósticos não entram na imagem. O servidor MCP em `app/` entra.
 
-A revisão de YAML não verifica secrets do GitHub, settings do Render, proteção de branch ou sucesso de deploy. Nenhum push, PR, merge ou deploy faz parte desta atualização documental.
+A presença dos workflows não comprova configuração dos secrets, settings do Render, proteção de branch ou sucesso de deploy.
 
 ## Como manter estes documentos
 
-Atualize contratos pelo código da `main`, registrando commit e data. Diferencie código presente, testes executados, medições históricas e integração remota. Não copie instruções de branches ainda não mergeadas como comportamento da main. O [índice](leia-me.md) concentra divergências conhecidas sem transformar propostas em funcionalidades.
+Mantenha os contratos alinhados ao funcionamento da aplicação, preservando explicações, exemplos e decisões válidos. Substitua somente informações incorretas ou desatualizadas e acrescente os detalhes que faltarem. Diferencie funcionalidades disponíveis, propostas, testes executados e medições históricas. O [índice](leia-me.md) concentra divergências conhecidas sem transformar propostas em funcionalidades.
 
-## Fontes da implementação revisada
+## Código relacionado
 
-- [Dockerfile](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/Dockerfile)
-- [.github/workflows/test.yml](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/.github/workflows/test.yml)
-- [.github/workflows/cd.yml](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/.github/workflows/cd.yml)
-- [app/routes/playground.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/routes/playground.py)
-- [tests/run_ci.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/tests/run_ci.py)
+- [Dockerfile](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/Dockerfile)
+- [.github/workflows/test.yml](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/.github/workflows/test.yml)
+- [.github/workflows/cd.yml](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/.github/workflows/cd.yml)
+- [app/routes/playground.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/routes/playground.py)
+- [tests/run_ci.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/tests/run_ci.py)

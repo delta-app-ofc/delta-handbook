@@ -63,8 +63,8 @@ Armazena os endereços dos imóveis cadastrados.
 - **cep**: CEP (8 dígitos numéricos).
 - **city**: Cidade.
 - **state**: Estado.
-- **latitude** *(opcional)*: Latitude geográfica do endereço (entre -90 e 90).
-- **longitude** *(opcional)*: Longitude geográfica do endereço (entre -180 e 180).
+- **latitude** *(obrigatória)*: Latitude geográfica do endereço (entre -90 e 90).
+- **longitude** *(obrigatória)*: Longitude geográfica do endereço (entre -180 e 180).
 
 ---
 

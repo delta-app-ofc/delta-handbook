@@ -69,11 +69,11 @@ Armazena os endereços dos imóveis cadastrados.
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
 - **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` (ver `tb_municipality`); o aplicativo não envia esse campo.
-- **cep**: CEP (8 dígitos numéricos).
+- **cep**: CEP (8 dígitos numéricos). Não é único: vários endereços e imóveis podem compartilhar o mesmo CEP.
 - **city**: Cidade.
 - **state**: Estado.
-- **latitude** *(opcional)*: Latitude geográfica do endereço (entre -90 e 90).
-- **longitude** *(opcional)*: Longitude geográfica do endereço (entre -180 e 180).
+- **latitude** *(obrigatória)*: Latitude geográfica do endereço (entre -90 e 90).
+- **longitude** *(obrigatória)*: Longitude geográfica do endereço (entre -180 e 180).
 
 ---
 

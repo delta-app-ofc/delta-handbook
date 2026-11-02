@@ -2,6 +2,39 @@
 
 Esta página reúne o que os workflows de integração contínua executam e como reproduzir localmente. A validação de checklist e encaminhamento de revisores segue separada nos workflows organizacionais já existentes. Estes CIs rodam em pull requests e, quando indicado no workflow, também podem ser acionados manualmente.
 
+## Nomes dos checks nas Pull Requests
+
+A padronização define nomes de job para os workflows dos 16 repositórios, permitindo identificar o resultado técnico e a suíte de testes nas Pull Requests. O nome exibido do job é o contexto do check; o nome do arquivo YAML ou do workflow, isoladamente, não o substitui.
+
+| Repositório | Check técnico | Suíte e relatórios Sonar |
+| --- | --- | --- |
+| `.github` | `ci-tecnico` | `Testes Sonar` |
+| `delta-api-mongo` | `ci-tecnico` | `Testes Sonar` |
+| `delta-api-postgres` | `ci-tecnico` | `Testes Sonar` |
+| `delta-artificial-intelligence` | `ci-tecnico` | `Testes Sonar` |
+| `delta-business-intelligence` | `ci-tecnico` | `Testes Sonar` |
+| `delta-business-rules` | `ci-tecnico` | `Testes Sonar` |
+| `delta-handbook` | `ci-tecnico` | `Testes Sonar` |
+| `delta-hardware-data-simulator` | `ci-tecnico` | `Testes Sonar` |
+| `delta-mobile-app` | `ci-tecnico` | `Testes Sonar` |
+| `delta-mongo-database` | `ci-tecnico` | `Testes Sonar` |
+| `delta-neo4j-database` | `ci-tecnico` | `Testes Sonar` |
+| `delta-redis-database` | `ci-tecnico` | `Testes Sonar` |
+| `delta-rpa` | `ci-tecnico` | `Testes Sonar` |
+| `delta-sql-database` | `ci-tecnico` | `Testes Sonar` |
+| `delta-template-repository` | `ci-tecnico` | `Testes Sonar` |
+| `delta-web-app` | `ci-tecnico` | `Testes Sonar` |
+
+O check `Testes Sonar` executa as verificações de testes e relatórios configuradas para cada repositório. No `delta-handbook` e no `delta-template-repository`, os workflows não configuram análise nem cobertura Sonar: o job publica essa não aplicabilidade no resumo e só passa quando `ci-tecnico` conclui a validação documental/configuração com sucesso. Esse resultado não representa uma análise ou cobertura Sonar.
+
+Nos 16 repositórios, preserve o check de governança `validate-pr-checks / Governança da Pull Request`. Nos satélites ele é publicado pelo workflow compartilhado; no repositório especial `.github`, pelo workflow local com o mesmo nome exibido. A política `Delta / Política Sonar`, onde configurada, é um gate real e separado: não a substitua por um relatório informativo, por um status de não aplicabilidade ou por um comentário.
+
+Comentários e publicação de diagnósticos pelo reporter são informativos e podem ser tratados como best effort. Uma falha deve aparecer como aviso no resumo do workflow; não pode alterar o resultado de `ci-tecnico`, de `Testes Sonar`, de scanner, nem de upload de artefato consumido pela análise. A publicação opcional de comentário não deve impedir a tentativa de atualizar o corpo da PR. O marcador de resultado só é incluído se essa atualização for concluída; se a atualização do corpo falhar, não invente o marcador. Como o workflow local de governança depende desse marcador, a governança pode ficar pendente ou ser pulada nesse caso. Um aviso do reporter não garante que a PR possa ser integrada se a API estiver indisponível.
+
+### Disponibilização e proteção dos checks
+
+Abra primeiro as Pull Requests que adicionam ou atualizam os workflows e permita que elas sejam validadas. Um workflow disparado por `workflow_run` precisa estar presente no branch padrão para que o GitHub o execute; portanto, workflows desse tipo e suas dependências devem chegar ao branch padrão antes de esperar seus checks em outras PRs. Depois que cada contexto de check tiver sido publicado em uma PR, configure a proteção de branch ou o ruleset fora destas alterações, selecionando os nomes exibidos exatos: `ci-tecnico`, `Testes Sonar`, `validate-pr-checks / Governança da Pull Request` e, quando aplicável, `Delta / Política Sonar`. Não exija um contexto antes de existir e publicar um resultado. Esta documentação não altera rulesets nem configurações do GitHub.
+
 ## Aplicações e serviços
 
 | Repositório | O que o CI valida | Execução local |

@@ -15,6 +15,8 @@
 - [Ambiente de integração com Docker](https://github.com/delta-app-ofc/delta-rpa/blob/main/docker-compose.test.yml)
 - [Workflow de testes e integração contínua](https://github.com/delta-app-ofc/delta-rpa/blob/main/.github/workflows/test.yml)
 - [Workflow de execução automatizada do RPA](https://github.com/delta-app-ofc/delta-rpa/blob/main/.github/workflows/rpa.yml)
+- [Execução #44 do RPA no GitHub Actions: sucesso](../anexos/evidencias-requisitos/mod-04-rpa-execucao-github-actions.png)
+- [Log da execução: extração, validação, transformação, carga e COMMIT](../anexos/evidencias-requisitos/mod-04-rpa-log-execucao.png)
 
 **Localização e como comprovar:**
 

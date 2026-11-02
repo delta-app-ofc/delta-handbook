@@ -7,6 +7,8 @@
 - [Function de elegibilidade para estimativas](https://github.com/delta-app-ofc/delta-sql-database/blob/main/functions/fn_user_can_estimate.sql)
 - [Function de tarifa vigente](https://github.com/delta-app-ofc/delta-sql-database/blob/main/functions/fn_get_current_region_rate.sql)
 - [Documentação das Functions e Procedures](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/otimizacao.md)
+- [Lista de Functions do schema public, parte 1](../anexos/evidencias-requisitos/mod-08-functions-01.png)
+- [Lista de Functions do schema public, parte 2](../anexos/evidencias-requisitos/mod-08-functions-02.png)
 
 **Localização e como comprovar:**
 

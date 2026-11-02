@@ -9,6 +9,8 @@
 - [Documentação das Functions e Procedures](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/otimizacao.md)
 
 - [Print das cinco Procedures do schema public](../anexos/evidencias-requisitos/mod-09-procedures-01.png)
+- [Chamada de `sp_change_region_rate`](../anexos/evidencias-requisitos/mod-09-chamada-sp-change-region-rate.png)
+- [Tarifa anterior encerrada e nova tarifa registrada](../anexos/evidencias-requisitos/mod-09-tarifa-encerrada-e-nova.png)
 
 **Localização e como comprovar:**
 

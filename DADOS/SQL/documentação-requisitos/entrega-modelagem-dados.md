@@ -142,7 +142,7 @@ três índices aplicados após comparar planos com `EXPLAIN (ANALYZE, BUFFERS)` 
 
 ### MOD-12 — Criar tabela técnica de catálogo de metadados com tabelas, colunas, regras de negócio e níveis de acesso
 
-tabela `tb_data_catalog` com 268 colunas catalogadas (descrição, regra de negócio e nível `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL`), usada também para gerar os comentários das colunas.
+tabela `tb_data_catalog` com 261 colunas catalogadas (descrição, regra de negócio e nível `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL`), usada também para gerar os comentários das colunas.
 
 **Evidências diretas:**
 

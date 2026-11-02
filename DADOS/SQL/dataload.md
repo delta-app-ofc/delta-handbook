@@ -45,7 +45,7 @@ Quatro tabelas técnicas não recebem carga inicial, porque seus registros nasce
 
 | Tabela | Quem grava | Quando |
 |---|---|---|
-| `tb_data_catalog` | `script-catalogo-dados.sql` e `script-catalogo-datamart.sql` | Na criação do catálogo de metadados (268 colunas catalogadas, MOD-12) |
+| `tb_data_catalog` | `script-catalogo-dados.sql` e `script-catalogo-datamart.sql` | Na criação do catálogo de metadados (261 colunas catalogadas, MOD-12) |
 | `tb_user_access_log` | `sp_register_user_access` | A cada acesso de usuário (MOD-14) |
 | `tb_backup_restore_log` | `backup_db.py restore-test` | A cada teste de restauração (MOD-13) |
 | `tb_log_rpa` | `delta-rpa` | A cada execução da migração (MOD-04) |

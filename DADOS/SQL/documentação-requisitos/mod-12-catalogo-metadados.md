@@ -7,6 +7,7 @@
 - [Carga do catálogo do Data Mart](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-catalogo-datamart.sql)
 - [Geração dos comentários das colunas a partir do catálogo](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-comments.sql)
 - [Governança de acesso](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/governanca-acesso.md)
+- [Catálogo de `tb_user`: coluna, tipo, regra e nível de acesso](../anexos/evidencias-requisitos/mod-12-catalogo-tb-user.png)
 
 **Localização e como comprovar:**
 
@@ -34,7 +35,7 @@ A restrição `uq_tb_data_catalog_table_column` impede duas linhas para a mesma 
 
 #### 2. Cobertura
 
-- `script-catalogo-dados.sql` cadastra **139 colunas** do banco relacional: 38 `PUBLICO`, 77 `INTERNO`, 19 `RESTRITO` e 5 `SENSIVEL`.
+- `script-catalogo-dados.sql` cadastra **132 colunas** do banco relacional: 38 `PUBLICO`, 71 `INTERNO`, 19 `RESTRITO` e 4 `SENSIVEL`.
 - `script-catalogo-datamart.sql` cadastra **129 colunas** dos schemas `stage`, `silver`, `gold` e `dw`: 68 `PUBLICO`, 53 `INTERNO` e 8 `RESTRITO`.
 - As tabelas `tb_log_*` não entram no catálogo, porque são espelhos automáticos das tabelas principais e não acrescentam metadado novo.
 - `script-comments.sql` usa o catálogo como fonte única para gerar `COMMENT ON COLUMN`, e as tabelas `tb_log_*` herdam o comentário da coluna correspondente.

@@ -6,6 +6,7 @@
 - [Views analíticas com CTEs](https://github.com/delta-app-ofc/delta-sql-database/tree/main/datamart/dw/views)
 - [Script do Data Mart](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-datamart.sql)
 - [Documentação da camada de BI, seção 5](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
+- [Resultado da view com CTE `vw_ft_consumption_daily`](../anexos/evidencias-requisitos/mod-06-view-consumo-diario.png)
 
 **Localização e como comprovar:**
 

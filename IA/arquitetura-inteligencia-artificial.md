@@ -138,21 +138,7 @@ Perguntas que responde:
 
 > **Em PR (01/11/2026):** o agente também simula "e se o consumo mudar X%" (`simulate_consumption_change`, com gráfico e hipóteses), simula uma nova meta diária (`simulate_target_change`), lista cenários de investimento em economia de água (`get_investment_scenarios`, só conta de organização) e lê os hábitos cadastrados como contexto (`get_habit_baseline`, só residencial). Os cálculos continuam em Python.  Detalhes em [`habitos-simulacao-e-saida-ao-usuario.md`](habitos-simulacao-e-saida-ao-usuario.md).
 
-### Agente 4 — Perfil
-Responsável por consultar informações cadastrais e informações relacionadas às propriedades e dispositivos do usuário.
-
-Perguntas que responde:
-
-- "Qual é meu nome?"
-- "Minha propriedade é uma casa ou um prédio?"
-- "Em qual região minha propriedade está localizada?"
-- "Meu dispositivo está ativo?"
-
-**Fonte de dados** PostgreSQL.
-
-O agente nunca deverá retornar informações sensíveis, como senha ou credenciais armazenadas.
-
-### Agente 5 — Hábitos
+### Agente 4 — Hábitos
 Responsável por:
 - cadastrar novos hábitos de consumo de água (quando o usuário solicitar);
 - consultar e analisar hábitos já cadastrados;
@@ -182,7 +168,7 @@ Perguntas que responde:
 
 **Limitação conhecida:** a tool de clima (`get_weather_history`) depende da cidade/estado do primeiro imóvel do usuário (`tb_user_property → tb_address`). Usuários sem imóvel residencial cadastrado receberão a mensagem "localização não encontrada" e o agente responderá sem dados climáticos.
 
-### Agente 6 — RAG
+### Agente 5 — RAG
 Responsável por consultar conhecimento externo antes de gerar determinadas respostas (ex.: dúvidas gerais sobre conservação de água, tarifas públicas, dicas de uso consciente). Teria que fazer a diferenciação entre perfil RESIDENCIAL e COMERCIAL. Usaria processamento por chucking -> recuperação por similaridade -> resposta com citação (para atender o requisito de identificabilidade das fontes) 
 
 
@@ -194,7 +180,7 @@ Responsável por consultar conhecimento externo antes de gerar determinadas resp
     - https://www.epa.gov/watersense/types-facilities -> dicas de consumo de água para áreas comerciais -> teria que colocar no prompt para não indicar nada da watersense.
 
 
-### Agente 7 — Juiz
+### Agente 6 — Juiz
 Responsável por revisar as respostas dos demais agentes antes da entrega ao usuário, com foco em **mitigação de alucinações**.
 
 Verificações previstas:

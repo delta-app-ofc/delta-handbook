@@ -38,7 +38,7 @@ jobs:
           {
             echo "## Testes Sonar"
             echo
-            echo "Análise Sonar: **não aplicável** ao delta-handbook, que contém documentação Markdown e não código executável ou cobertura de código."
+            echo "Análise Sonar: **não aplicável** neste workflow documental, que não configura análise nem cobertura Sonar. Este check depende da validação real de Markdown em ci-tecnico."
             echo
             echo "Resultado de ci-tecnico (validação Markdown): ${{ needs.documentos.result }}."
           } >> "$GITHUB_STEP_SUMMARY"

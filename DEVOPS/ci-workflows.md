@@ -1,5 +1,7 @@
 # Workflows de CI do Delta
 
+Para entender como os checks se combinam com checklist, revisão humana e proteção de merge, consulte o [fluxo de aprovação de PRs](pr-review-rules.md) e a [política Sonar](politica-sonar.md).
+
 Esta página reúne o que os workflows de integração contínua executam e como reproduzir localmente. A validação de checklist e encaminhamento de revisores segue separada nos workflows organizacionais já existentes. Estes CIs rodam em pull requests e, quando indicado no workflow, também podem ser acionados manualmente.
 
 ## Nomes dos checks nas Pull Requests

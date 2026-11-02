@@ -1,154 +1,97 @@
-# Implementação: API FastAPI — Estrutura Base
+# API FastAPI do chatbot
 
-## Objetivo
+## Objetivo e componentes
 
-Definir a estrutura HTTP da aplicação de inteligência artificial do Projeto Delta: endpoints, contratos de entrada e saída, e organização dos módulos de rotas.
+Documentar o contrato implementado na `main` de IA `f6f3d8c` (02/11/2026). Fontes: `app/main.py`, `app/auth.py`, `app/schemas.py` e `app/routes/`.
 
-## Contexto
+`main.py` registra os routers, o middleware de rastreamento, CORS e o encerramento de recursos. As rotas chamam o grafo; guardrails e gravação do turno estão dentro dele. Swagger fica em `/docs`.
 
-A API é a porta de entrada para o chatbot do Delta. Toda requisição do app Web/Mobile passa por aqui antes de chegar aos agentes de IA. O framework escolhido foi o **FastAPI** — uma biblioteca Python moderna que gera documentação automática, faz validação de dados via Pydantic e tem suporte nativo a tipagem.
+## Rotas da aplicação
 
----
+| Método | Rota | Comportamento |
+| --- | --- | --- |
+| GET | `/health` | Público. Retorna `status` e `issues`; só carrega settings, sem testar bancos ou LLM. |
+| GET | `/chat/suggestions` | Até três perguntas iniciais conforme o perfil autenticado. |
+| POST | `/chat` | Pergunta e resposta JSON, criando ou continuando sessão. |
+| POST | `/chat/stream` | Mesmo processamento, com eventos SSE de progresso. |
+| GET | `/sessions?limit=20&offset=0` | Sessões com mensagens, ordenadas por atividade, e `total`. Limite de 1 a 100. |
+| GET | `/sessions/{session_id}/messages` | Mensagens da sessão do usuário, em ordem cronológica. |
+| POST | `/sessions/{session_id}/close` | Gera resumo de longo prazo e marca sessão fechada. Nova mensagem a reabre. |
 
-## Estrutura planejada
+Chat e sessões exigem `Authorization: Bearer <JWT>`. Não há `user_id` no contrato de entrada. As rotas de console em `/playground` têm configuração própria e não exigem Bearer; veja [operação](operacao-validacao.md).
 
-Os arquivos abaixo estão reservados no repositório mas ainda não têm implementação ativa — a API completa é um componente pendente (ver `AGENTS.md`).
+## Autenticação
 
-```
-app/
-├── main.py          ← ponto de entrada da aplicação (vazio)
-├── schemas.py       ← contratos de dados (request/response)
-└── routes/
-    ├── health.py    ← verificação de disponibilidade
-    ├── chat.py      ← endpoint principal do chatbot
-    └── sessions.py  ← gerenciamento de sessões e histórico
-```
+A integração com o backend usa **RS256**, verificado com `AUTH_PUBLIC_KEY`: PEM RSA de pelo menos 2048 bits ou caminho de arquivo, inclusive prefixo `file:`. Não se fornece chave privada à IA.
 
----
+A IA exige `exp`, `sub`, `iss` e `aud`, valida emissor e audiência e aceita 10 segundos de tolerância de relógio no caminho RS256. `AUTH_KEY_ID` confere `kid` quando não está vazio. Defaults: issuer/audience `delta-api`, key ID `delta-1`. O `sub` deve ser texto com inteiro positivo, sem zeros à esquerda e até `2**31 - 1`.
 
-## `app/main.py` — Ponto de entrada
+`AUTH_CHECK_ACTIVE=true` consulta o usuário no PostgreSQL a cada requisição autenticada. Conta inexistente/inativa é recusada; falha da consulta retorna 503. Definir `false` desliga essa verificação.
 
-```python
-from fastapi import FastAPI
-from app.routes.health import router as health_router
-from app.routes.chat import router as chat_router
-from app.routes.sessions import router as sessions_router
+**HS256** existe somente para `development` e `test`, com `JWT_SECRET` de 32 ou mais caracteres. Quando há chave pública, só RS256 é aceito; os algoritmos não ficam habilitados ao mesmo tempo. Staging/produção recusam a alternativa HS256.
 
-app = FastAPI(title="Delta AI", version="0.1.0")
+| Status | Situação |
+| --- | --- |
+| 401 | Bearer ausente, inválido, expirado ou conta recusada. Inclui `WWW-Authenticate: Bearer`. |
+| 503 | Autenticação sem configuração válida, chave ilegível ou verificação de conta indisponível. |
+| 404 | Sessão inexistente, excluída ou de outro usuário; mesma mensagem para os três casos. |
+| 422 | Corpo inválido pelo Pydantic ou bloqueio de entrada no chat JSON. Os formatos desses erros podem diferir. |
+| 500 | Falha não tratada ou encerramento de sessão malsucedido. |
 
-app.include_router(health_router)
-app.include_router(chat_router)
-app.include_router(sessions_router)
-```
+A descrição 503 compartilhada em `app/schemas.py` ainda fala só de `JWT_SECRET`; o comportamento acima é o de `app/auth.py`.
 
-Cada router é registrado com `include_router`. O arquivo `main.py` só faz isso — não contém lógica de negócio. Lógica fica nos agentes e serviços.
+## Contrato do chat
 
----
-
-## `app/schemas.py` — Contratos de dados
-
-O FastAPI usa Pydantic para validar automaticamente os dados que entram e saem da API.
-
-```python
-class ChatRequest(BaseModel):
-    user_id: int
-    session_id: str | None = None   # gerado automaticamente se não informado
-    message: str = Field(..., min_length=1, max_length=2000)
-
-class ChatResponse(BaseModel):
-    response: str          # texto da resposta do agente
-    agent_used: str        # qual(is) agente(s) responderam
-    session_id: str        # id da sessão (novo ou recebido)
-    chart_data: dict | None = None  # gráfico Plotly serializado, quando houver
+```json
+{"message": "Quanto consumi esta semana?", "session_id": null}
 ```
 
-`session_id` é opcional na entrada — se não for enviado, o sistema gera um UUID automaticamente. Isso permite tanto sessões novas quanto a continuação de conversas anteriores.
+`message` tem de 1 a 2000 caracteres. Sem `session_id`, o servidor cria um documento em `chat_sessions` e devolve seu ObjectId como texto. Com ID, valida ownership antes do grafo. Não cria sessões a partir de IDs arbitrários do cliente.
 
-`chart_data` é um dicionário com a estrutura de um gráfico Plotly, que o frontend renderiza com `Plotly.newPlot()`.
-
----
-
-## `app/routes/health.py` — Verificação de saúde
-
-Endpoint simples para monitorar se a API está no ar:
-
-```
-GET /health → {"status": "ok"}
+```json
+{
+  "response": "Texto validado da resposta",
+  "session_id": "507f1f77bcf86cd799439011",
+  "chart_data": null,
+  "suggestions": ["Como foi meu consumo comparado com o mês passado?"]
+}
 ```
 
-Usado por ferramentas de monitoramento e pelo CI/CD para confirmar que o serviço subiu corretamente.
+`chart_data`, quando presente, é uma estrutura Plotly. `agent_used`, evidências e candidatas bloqueadas não integram esse contrato público.
 
----
+Sugestões são escolhidas por regras de `app/graph/suggestions.py`, sem LLM: até três, sem duplicatas e sem repetir a pergunta atual por comparação de texto sem diferença entre maiúsculas/minúsculas. Há catálogo residencial e organizacional; perfil desconhecido usa sugestões residenciais como fallback. Essas sugestões não autorizam consultas nem contornam a restrição de agentes por perfil.
 
-## `app/routes/chat.py` — Fluxo principal
+## Eventos SSE
 
-O endpoint `/chat` é o coração da API. O fluxo completo de uma requisição é:
+Use `fetch` com POST, JSON e Bearer. O `EventSource` nativo não cobre esse contrato de POST com cabeçalho de autenticação.
+
+```text
+event: stage
+data: {"stage":"checking","label":"Verificando a mensagem"}
+
+event: result
+data: {"response":"Texto validado","session_id":"507f1f77bcf86cd799439011","chart_data":null,"suggestions":[]}
 
 ```
-POST /chat
-  │
-  ├─ 1. validate_input()        ← guardrail: anon. PII + detecta injection
-  ├─ 2. session_id = uuid4()    ← gera se não informado
-  ├─ 3. run_workflow()          ← LangGraph executa os agentes (recebe mensagem anonimizada)
-  ├─ 4. validate_output()       ← guardrail: redige PII da resposta
-  ├─ 5. append_turn() x2        ← salva no MongoDB (msg original + resposta revisada)
-  └─ 6. return ChatResponse     ← retorna resposta revisada ao cliente
-```
 
-```python
-@router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
-    guard = validate_input(req.user_id, req.message)
-    if not guard["ok"]:
-        raise HTTPException(status_code=422, detail=guard["reason"])
+- `stage`: etapas `checking`, `understanding`, `planning`, `working`, `composing`, `validating`, `revising` e `finishing`. Rótulos fixos, sem valores da conta ou texto da candidata.
+- `result`: um único JSON final, com o contrato de `ChatResponse`.
+- `error`: `status` 422 ou 500 e `detail`; falha de processamento pode incluir `request_id`.
+- `: keep-alive`: comentário a cada 15 segundos sem evento.
 
-    session_id = req.session_id or str(uuid.uuid4())
-    state = run_workflow(user_id=req.user_id, session_id=session_id, question=guard["message"])
+Auth, ownership e abertura do histórico são verificados antes do streaming e podem retornar erro HTTP. Depois de aberto, HTTP permanece 200 e o cliente precisa interpretar `error`. Use `Cache-Control: no-cache` e respeite o comportamento sem buffering indicado por `X-Accel-Buffering: no`.
 
-    out_guard = validate_output(state["response"], pii_map=guard["pii_map"])
-    if not out_guard["ok"]:
-        raise HTTPException(status_code=500, detail=out_guard["reason"])
+## Histórico, rastreamento e limites
 
-    append_turn(session_id, req.user_id, "human", req.message)          # original
-    append_turn(session_id, req.user_id, "assistant", out_guard["response"])  # revisada
+A listagem retorna título, prévia, ícone, datas e `is_open`. Título tem até 40 caracteres e prévia até 80; ícone desconhecido deve ser mostrado como `general`. Mensagens usam papéis `user`/`bot` e timestamp UTC.
 
-    return ChatResponse(
-        response=out_guard["response"],
-        agent_used=state.get("agent_used", ""),
-        session_id=session_id,
-        chart_data=state.get("chart_data"),
-    )
-```
+O servidor gera `X-Request-ID` e o expõe por CORS. `X-Client: app` ou `web` identifica o canal na observabilidade; outros valores viram `unknown`. `CORS_ALLOWED_ORIGINS` define origens separadas por vírgulas; padrão/vazio permite `*`, com `allow_credentials=False`.
 
-Os guardrails (validação de entrada e saída) envolvem toda a execução dos agentes. Se qualquer um falhar, a API retorna um erro HTTP antes de salvar no banco.
+Uma sessão nova sem mensagens é removida em falha ou bloqueio de entrada. A gravação final do turno usa duas operações independentes e suas falhas são ignoradas pelo grafo; HTTP 200 não garante histórico persistido. Veja [memória](implementacao-memoria-sessoes.md).
 
----
+## Fontes da implementação revisada
 
-## `app/routes/sessions.py` — Histórico de sessões
-
-Três endpoints para gerenciar o histórico de conversas:
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET`  | `/sessions/{user_id}` | Lista todas as sessões do usuário |
-| `GET`  | `/sessions/{session_id}/history?user_id=X` | Retorna as mensagens de uma sessão |
-| `POST` | `/sessions/{session_id}/close?user_id=X` | Encerra a sessão e salva na memória de longo prazo |
-
-O parâmetro `user_id` é obrigatório para verificar que quem está pedindo o histórico é dono daquela sessão.
-
----
-
-## Camada de dados
-
-A camada de acesso ao banco está em `app/data/`:
-
-- **`db_postgres.py`** — conexão com PostgreSQL (dados cadastrais, tarifas, hábitos)
-- **`db_mongo.py`** — conexão com MongoDB (telemetria IoT, histórico de chat)
-
-Os módulos de dados não fazem lógica de negócio — apenas executam queries e retornam resultados. A lógica fica nos agentes e services.
-
----
-
-## Referência arquitetural
-
-Ver [arquitetura-inteligencia-artificial.md](arquitetura-inteligencia-artificial.md) para a descrição completa dos endpoints propostos e a estrutura de pastas.
+- [app/auth.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/auth.py)
+- [app/schemas.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/schemas.py)
+- [app/routes/chat.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/routes/chat.py)
+- [app/routes/sessions.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/routes/sessions.py)

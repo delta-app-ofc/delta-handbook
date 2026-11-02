@@ -1,171 +1,52 @@
-# Implementação: Agentes Especializados com LangChain
+# Agentes especialistas e runtime LangChain
 
 ## Objetivo
 
-Implementar os agentes especializados do Delta — Previsão, Vazamento e Hábitos — usando **LangChain** para estruturar o ciclo de raciocínio do modelo de IA com ferramentas (tools) que acessam dados reais.
+Descrever o contrato compartilhado dos agentes implementados na `main` de IA `f6f3d8c`, revisada em 02/11/2026. O grafo e o console usam as mesmas classes; rodar uma classe diretamente não aplica automaticamente todas as etapas de segurança do chat.
 
-## Contexto
+## Ciclo de ferramentas
 
-Cada agente sabe responder um tipo específico de pergunta. Isso é uma decisão arquitetural importante: um único agente genérico tenderia a "misturar" conceitos e dar respostas menos precisas. Separar por especialidade permite prompts mais focados e ferramentas específicas.
+`app/agents/_runtime.py` oferece `run_agent`: recebe modelo, prompt, ferramentas e pergunta; vincula ferramentas com `bind_tools`; chama o modelo; executa as ferramentas solicitadas; acrescenta `AIMessage`/`ToolMessage` e repete até obter texto. O limite padrão é seis iterações; depois pede resposta final sem novas ferramentas.
 
-O motor compartilhado é o `_runtime.py` — um laço de tool-calling simples que funciona sem LangGraph e serve de base para todos os agentes.
+`AgentResult` contém `response`, `tool_calls`, `chart_data` e `sources`. Cada `ToolCall` registra nome, entrada e output efetivo. O runtime remove chaves `user_id` do output apresentado ao modelo; a autorização já está aplicada na construção das ferramentas.
 
----
+Ferramentas são executadas pela aplicação. O modelo escolhe entre operações expostas, mas não deve definir o usuário confiável nem calcular números que as funções determinísticas retornam.
 
-## Motor compartilhado: `app/agents/_runtime.py`
+## Especialistas e ferramentas
 
-### Como funciona o loop de tool-calling
+| Agente | Ferramentas implementadas |
+| --- | --- |
+| `ConsumptionAgent` | `get_consumption_summary`, `compare_consumption_periods`, `get_consumption_peaks`, `list_consumption_units`. |
+| `ForecastAgent` | `check_can_estimate`, `get_last_bill`, `get_consumption_history`, `get_daily_target`, `get_region_rate`, `calculate_forecast`, `get_habit_baseline`, `simulate_consumption_change`, `simulate_target_change`, `get_investment_scenarios`. |
+| `LeakAgent` | `get_anomalous_windows`, `get_alerts_history`, `summarize_anomalous_windows`, `get_habit_windows`. |
+| `HabitsAgent` | `list_habits`, `get_habits_by_day`, `create_habit`, `estimate_habit_water_impact`, `estimate_habit_water_cost`, `get_weather_history`. |
+| `RagAgent` | `search_knowledge_base` e ferramenta externa vinculada ao perfil, `search_external_knowledge`. |
 
-```
-1. LLM recebe: system_prompt + pergunta
-2. LLM decide: responder diretamente OU chamar uma tool
-3. Se chamar tool:
-   a. Executa a tool com os argumentos fornecidos
-   b. Adiciona o resultado ao histórico
-   c. Volta ao passo 2 (LLM decide de novo)
-4. Quando LLM responde diretamente → retorna AgentResult
-```
+Consulte [consumo](consumption-agent.md), [previsões](previsoes-simulacoes.md), [hábitos](habitos.md), [RAG](rag-retrieval.md) e [MCP](mcp-conhecimento-externo.md).
 
-```python
-@dataclass
-class AgentResult:
-    response: str
-    tool_calls: list[ToolCall] = field(default_factory=list)
-    chart_data: dict | None = None  # gráfico Plotly, quando gerado
-```
+## Vazamento: leitura e explicação dos sinais
 
-`ToolCall` registra o nome da tool, os argumentos usados e o resultado — útil para o Agente Juiz futuramente verificar se a resposta é coerente com os dados consultados.
+O `LeakAgent` consulta janelas marcadas com `anomaly_detected` na telemetria e registros de `alerts_history` do app. `app/tools/leak/analysis.py` faz resumo descritivo; não cria um limiar ou motor de detecção. Esse motor pertence ao componente de regras de negócio.
 
----
+A janela padrão é 30 dias. Lista vazia informa falta de indícios/alertas no recorte, sem garantir ausência de vazamento. Falha da fonte não equivale à ausência. Uma anomalia não comprova causa, diagnóstico ou envio de notificação.
 
-## Agente de Previsão — `app/agents/forecast.py`
+`get_habit_windows` consulta dias e horários de hábitos somente para perfil residencial. Coincidência com uma janela é contexto possível; não descarta o sinal. Sem horário, só permite comparação por dia. No perfil organizacional, essa ferramenta retorna `not_applicable`; as ferramentas de janelas/alertas continuam filtradas pelo usuário e não oferecem seleção de unidade.
 
-**Pergunta típica:** "Quanto vou gastar este mês?" ou "Vou ultrapassar minha meta?"
+## Prompts, gráficos e revisão
 
-### Tools disponíveis
+`app/services/prompts.py` delimita papéis e incorpora regras do perfil. Ter texto de prompt para um papel não o torna um agente registrado.
 
-| Tool | O que faz | Fonte |
-|------|-----------|-------|
-| `get_consumption_history` | Busca histórico de consumo mensal | MongoDB |
-| `get_last_water_bill` | Última conta de água (valor e consumo) | PostgreSQL |
-| `get_tariff` | Tarifa da região do usuário | PostgreSQL |
-| `calculate_forecast` | Calcula previsão determinística | cálculo interno |
+Os gráficos são construídos em `app/tools/charts.py` a partir dos resultados das ferramentas e devolvidos como dicionários Plotly. Não são evidência independente de medição. Na composição multiagente, a saída usa o primeiro gráfico disponível.
 
-### Gráfico gerado
+O runtime aceita feedback e contexto de revisão em mensagens separadas da pergunta. O grafo preserva evidências anteriores para o [Juiz](agente-juiz.md). Hábitos retira `create_habit` da segunda execução; isso evita novo cadastro pela revisão, sem desfazer a escrita inicial.
 
-Após a execução, o agente constrói automaticamente um gráfico de linha combinando histórico + projeção:
+## Modelos e verificação
 
-```python
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=dates, y=values, name="Histórico"))
-fig.add_trace(go.Scatter(x=proj_dates, y=proj_values, name="Projeção",
-                         line={"dash": "dot"}))
-```
+`llm_especialista` usa o provedor selecionado em `LLM_PROVIDER`; `llm_rapido` atende guarda, roteador, síntese e metadados. Veja [modelos](llm-models.md).
 
-O resultado é serializado como `fig.to_dict()` — um dicionário JSON que o frontend renderiza com `Plotly.newPlot()`. Nenhuma imagem é gerada no servidor.
+Os testes `test_ci_consumption.py`, `test_ci_forecast.py`, `test_ci_leak.py`, `test_ci_habits.py`, `test_ci_rag.py` e `test_agent_runtime.py` verificam contratos com modelos e ferramentas substituídos. A suíte inclui outros testes de cálculo, autorização e fontes. Não se deve inferir qualidade semântica ou acesso remoto por esses resultados.
 
----
+## Fontes da implementação revisada
 
-## Agente de Vazamento — `app/agents/leak.py`
-
-**Pergunta típica:** "Existe algum indício de vazamento?" ou "Meu consumo está anormal?"
-
-### Importante: o que este agente FAZ e NÃO FAZ
-
-O agente de vazamento **não detecta** vazamentos — ele **lê e explica** o que o motor de regras já calculou.
-
-```
-delta-business-rules (outro repositório)
-  └── motor de detecção (regras + EWMA)
-       ├── consumption_summary.anomaly_detected = true/false
-       └── alerts_history → registros de alertas
-
-delta-artificial-intelligence (este repositório)
-  └── LeakAgent → lê esses dados e explica em linguagem natural
-```
-
-O motor de detecção usa regras explicáveis (fluxo contínuo, consumo de madrugada, desvio da baseline) sem modelo de ML. O agente de IA só lê o resultado final.
-
-### Tools disponíveis
-
-| Tool | O que faz |
-|------|-----------|
-| `check_anomaly_status` | Verifica se há anomalia ativa na última janela |
-| `get_alerts_history` | Lista alertas históricos do usuário |
-| `summarize_anomalous_windows` | Resume janelas temporais com consumo atípico |
-
----
-
-## Agente de Hábitos — `app/agents/habits.py`
-
-**Pergunta típica:** "Com que frequência lavo roupa?" ou "Quais hábitos tenho na segunda-feira?"
-
-### Tools disponíveis
-
-| Tool | O que faz | Fonte |
-|------|-----------|-------|
-| `list_habits` | Lista hábitos com frequência e dias | PostgreSQL |
-| `get_habits_by_day` | Filtra hábitos por dia da semana | PostgreSQL |
-| `get_realtime_weather` | Condições climáticas atuais | API Tomorrow.io |
-
-O agente de hábitos inclui ferramentas de clima porque hábitos ao ar livre (regar plantas, lavar quintal, lavar carro) dependem do tempo.
-
-### Gráfico gerado
-
-O agente constrói um gráfico de barras horizontal com a frequência semanal de cada hábito:
-
-```python
-fig = go.Figure(
-    go.Bar(
-        x=freqs,        # frequência semanal
-        y=names,        # nome do hábito
-        orientation="h",
-    )
-)
-```
-
-A altura do gráfico se adapta ao número de hábitos: `height=max(250, 60 * len(habits))`.
-
----
-
-## Prompts — `app/services/prompts.py`
-
-Cada agente tem seu prompt de sistema definido aqui. Os prompts delimitam:
-- o papel do agente ("Você é o agente de previsão do Delta...")
-- o que ele pode e não pode fazer ("Nunca invente dados; use apenas o que as tools retornarem")
-- o formato esperado da resposta (texto corrido, tabela Markdown quando listar itens)
-
-Os identificadores (nomes de variáveis, funções) são em inglês; os prompts são em português.
-
----
-
-## Modelos de IA — `app/services/llms.py`
-
-Dois modelos configurados:
-
-| Variável | Modelo padrão | Uso |
-|----------|---------------|-----|
-| `llm_gemini` | `gemini-2.5-flash` (fallback: `openai/gpt-oss-120b` via Groq) | Agentes especializados |
-| `llm_rapido` | `openai/gpt-oss-20b` via Groq | Router, resumos, contexto |
-
-Os modelos efetivos são lidos das variáveis de ambiente `GEMINI_MODEL`, `GROQ_SPECIALIST_MODEL` e `GROQ_FAST_MODEL`; os valores acima são os defaults definidos em `app/config.py`. O fallback para Groq garante que, se a cota do Gemini acabar ou o modelo estiver indisponível, a aplicação continua funcionando com outro provedor.
-
----
-
-## Testes — `tests/`
-
-Os testes dos agentes usam `ScriptedChatModel` — um modelo fake que retorna respostas pré-definidas sem fazer chamadas reais à API de IA. Isso permite testar o fluxo completo (prompt → tool → resposta) sem custo e sem acesso à internet.
-
-```python
-def test_forecast_agent_runs():
-    model = ScriptedChatModel([...])  # respostas fixas para o teste
-    agent = ForecastAgent(user_id=1, llm=model)
-    result = agent.run("Quanto vou gastar este mês?")
-    assert result.response != ""
-```
-
----
-
-## Referência arquitetural
-
-Ver [arquitetura-inteligencia-artificial.md](arquitetura-inteligencia-artificial.md) — seções "Responsabilidade dos Agentes" e "LangChain".
+- [app/agents/_runtime.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/agents/_runtime.py)
+- [app/tools/leak/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/tools/leak/tools.py)

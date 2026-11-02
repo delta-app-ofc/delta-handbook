@@ -1,224 +1,68 @@
-# Implementação: Orquestração com LangGraph
+# Implementação da orquestração LangGraph
 
 ## Objetivo
 
-Implementar o fluxo de orquestração multiagente usando **LangGraph** — uma biblioteca que modela a execução como um grafo de nós e arestas, onde cada nó é uma etapa do processamento.
+Orientar manutenção do grafo implementado em `app/graph/`, conforme a `main` de IA `f6f3d8c` (02/11/2026). O percurso completo, sem duplicar o código, está em [workflow](workflow.md).
 
-## Contexto
+## Módulos
 
-Antes do LangGraph, cada requisição ia diretamente para um agente fixo. Com o LangGraph, o sistema decide dinamicamente qual(is) agente(s) deve(m) responder com base na intenção detectada na pergunta. Uma pergunta sobre hábitos vai para o HabitsAgent; uma análise cruzada de consumo + vazamento vai para dois agentes — executados em sequência dentro do nó `execute`.
+| Arquivo | Responsabilidade |
+| --- | --- |
+| `state.py` | `GraphState`, mensagens acumuladas e `AgentOutput`. |
+| `workflow.py` | Grafo, preparação paralela, execução sequencial, revisão/publicação e gerador de eventos. |
+| `context.py` | Até seis mensagens recentes e memória longa condicional. |
+| `profile.py` | Perfil confiável e conjuntos de agentes permitidos. |
+| `router.py` | Classificação via `llm_rapido`, validação do JSON e registro dinâmico de especialistas. |
+| `synthesis.py` | Síntese das respostas com sucesso quando há mais de um especialista. |
+| `suggestions.py` | Perguntas iniciais e de continuação por regras, chamadas pelas rotas após o grafo. |
 
----
+## Estado compartilhado
 
-## Estrutura do grafo
+`GraphState` reúne a entrada (`user_id`, `session_id`, `question`), mensagens e contexto (`recent_messages`, `relevant_memory`, `access_kind`), intenção/complexidade e agentes selecionados. Resultados carregam resposta, gráfico, fontes, outputs de ferramentas e avisos.
 
-```
-[context] → [route] → [execute] → [respond] → END
-```
+Campos de julgamento incluem `candidate`, `previous_candidate`, `previous_agent_results`, `revision_feedback`, `revision_count`, `judge_history`, `judge_action` e `composition_status`. `_blocked` interrompe o caminho de entrada; `_persist_session` controla salvamento do histórico, sem desabilitar todas as escritas de ferramentas.
 
-| Nó | Responsabilidade |
-|----|-----------------|
-| `context` | Carrega histórico recente (MongoDB) e memórias relevantes (Qdrant, quando necessário) |
-| `route` | Classifica a intenção e escolhe os agentes via `llm_rapido` |
-| `execute` | Instancia e executa cada agente selecionado |
-| `respond` | Consolida as respostas em uma única saída |
+`AgentOutput` usa `status` igual a `success`, `error` ou `skipped`, com `agent`, `answer`, `sources`, `chart_data`, `tool_calls` e `warnings`. Não é o JSON público do chat.
 
----
+## Registro e perfis
 
-## Estado compartilhado — `app/graph/state.py`
+`AGENT_REGISTRY` registra `consumption`, `forecast`, `leak`, `habits` e `rag`. O carregamento importa a classe pelo caminho cadastrado e constrói a instância com `user_id` e, quando disponível, `access_kind`.
 
-O LangGraph passa um dicionário de estado por todos os nós. Cada nó recebe o estado atual, processa e retorna o estado atualizado.
+| Perfil | Especialistas permitidos |
+| --- | --- |
+| `residential` | consumption, forecast, leak, habits, rag |
+| `organizational` | consumption, forecast, leak, rag |
+| `none` / `unknown` | Nenhum; orientação fixa. |
 
-```python
-class GraphState(_GraphStateRequired, total=False):
-    # entrada
-    user_id: int
-    session_id: str
-    question: str
-    # contexto (preenchido por context_node)
-    recent_messages: list[dict]
-    relevant_memory: list[str]
-    # decisão de roteamento (preenchido por route_node)
-    intent: str
-    complexity: str           # "simple" | "medium" | "complex"
-    selected_agents: list[str]
-    agent_used: str
-    # resultados (preenchido por execute_node)
-    agent_results: list[dict]
-    warnings: list[str]
-    # saída final (preenchida por respond_node)
-    response: str
-    chart_data: dict | None
-```
+O classificador recebe perfil, até quatro mensagens recentes e até duas memórias. Tenta ler JSON completo e, em falha, extrai do primeiro `{` ao último `}`. O contrato Pydantic valida intenção, complexidade e lista. Falha gera `intent=unknown`, `complexity=simple`, sem agentes. Nomes desconhecidos e duplicados são removidos; nomes fora do perfil são registrados em `unavailable`.
 
-`AgentOutput` é o contrato entre o nó de execução e o nó de resposta:
+Essa filtragem acontece novamente na execução. Ela complementa autorização nas ferramentas e consultas; não substitui filtros SQL/Mongo de ownership.
 
-```python
-class AgentOutput(BaseModel):
-    agent: str
-    status: Literal["success", "error"]
-    answer: str
-    chart_data: dict | None = None
-    warnings: list[str] = []
-```
+## Concorrência e composição
 
----
+`prepare` usa duas tarefas: guarda semântica e contexto seguido de roteamento. Contexto também pode resolver perfil em paralelo ao histórico. Cada tarefa recebe uma cópia do contexto de rastreamento. A guarda precisa liberar antes de `execute`.
 
-## Nó 1: context — `app/graph/context.py`
+Os especialistas não executam em paralelo. O próximo recebe um resumo de até 300 caracteres por resposta anterior bem-sucedida. A síntese usa resultados bem-sucedidos, preservando evidências individuais para o Juiz. Se ela não produzir saída, `respond` reúne as respostas e escolhe o primeiro gráfico disponível.
 
-Monta o contexto da pergunta antes do roteamento:
+## Revisão e checkpoint
 
-```python
-def build_context(user_id: int, session_id: str, question: str) -> dict:
-    recent = load_history_validated(user_id, session_id)  # MongoDB, sempre
+O grafo admite no máximo uma correção. Cada especialista recebe feedback, candidata anterior e seu resultado anterior. O grafo combina chamadas anteriores/novas com marcadores `previous`, `initial` ou `revision` e reúne fontes sem duplicação. O especialista de hábitos remove `create_habit` na revisão.
 
-    relevant = []
-    if _needs_long_term_memory(question):  # só se a pergunta pede memória anterior
-        relevant = search_memory(user_id, question)
+`MemorySaver` usa `user_id:session_id`. O histórico persistente vem do MongoDB e o checkpoint é apagado ao final do chat, inclusive no caminho de eventos. A chamada do console com `persist_session=False` conserva checkpoint no processo; reinício não o recupera. A rota do console ainda salva mensagens em Mongo por caminho próprio, conforme [operação](operacao-validacao.md).
 
-    return {
-        "recent_messages": recent[-6:],    # últimas 6 mensagens
-        "relevant_memory": relevant,
-    }
-```
+## Adicionar ou alterar um especialista
 
-A busca de memória de longo prazo (Qdrant) só ocorre quando a pergunta contém palavras como "lembra", "antes", "semana passada". Isso evita ~500ms de latência em perguntas diretas.
+1. Implementar a classe com `run(question, revision_feedback=..., revision_context=...)` retornando `AgentResult`.
+2. Construir ferramentas vinculadas ao usuário e validar qualquer seleção de imóvel/unidade.
+3. Registrar o caminho em `AGENT_REGISTRY` e os perfis aplicáveis em `AGENTS_BY_PROFILE`.
+4. Ajustar prompt do roteador, prompts do especialista e rótulos de progresso quando necessário.
+5. Preservar fontes e outputs reais para o julgamento, incluindo o comportamento de revisão e efeitos de escrita.
+6. Cobrir seleção, isolamento, falha, composição e revisão nos testes pertinentes.
 
----
+Testes relevantes incluem `test_parallel_guard.py`, `test_rag_workflow_integration.py`, `test_suggestions.py`, `test_progress.py` e `tests/user_profile/test_profile.py`. São evidência de contratos testados; não substituem integração com serviços reais.
 
-## Nó 2: route — `app/graph/router.py`
+## Fontes da implementação revisada
 
-Usa `llm_rapido` para classificar a intenção e escolher os agentes. O modelo recebe o histórico recente + a pergunta e retorna um JSON:
-
-```json
-{"intent": "habits_impact", "complexity": "medium", "agents": ["habits", "forecast"]}
-```
-
-### Parsing robusto do JSON
-
-O LLM pode retornar texto antes ou depois do JSON. O parser tenta carregar o texto completo e, se falhar, extrai o primeiro objeto `{...}` encontrado usando `find`/`index` para localizar abertura e fechamento correspondentes:
-
-```python
-try:
-    data = json.loads(content)
-except json.JSONDecodeError:
-    start = content.find("{")
-    # usa find do fechamento a partir do início para pegar o primeiro objeto,
-    # evitando incluir chaves de texto externo ao JSON
-    end = content.index("}", start) + 1 if start >= 0 else -1
-    try:
-        data = json.loads(content[start:end]) if start >= 0 else {}
-    except (json.JSONDecodeError, ValueError):
-        data = {}
-```
-
-> **Limitação**: objetos JSON aninhados (ex.: `{"agents": ["habits"]}`) requerem rastreamento de profundidade para encontrar o `}` correto. O parser acima funciona para o contrato de roteamento, que não tem objetos aninhados.
-
-### Registro de agentes
-
-```python
-AGENT_REGISTRY = {
-    "forecast": "app.agents.forecast.ForecastAgent",
-    "leak": "app.agents.leak.LeakAgent",
-    "habits": "app.agents.habits.HabitsAgent",
-}
-```
-
-O router filtra agentes desconhecidos — se o LLM inventar um nome, ele é ignorado silenciosamente.
-
----
-
-## Nó 3: execute — `app/graph/workflow.py`
-
-Itera sobre os agentes selecionados, instancia cada um com `load_agent` e executa:
-
-```python
-for name in selected:
-    try:
-        agent = load_agent(name, user_id)  # importação dinâmica via AGENT_REGISTRY
-        internal = agent.run(question)
-        output = AgentOutput(
-            agent=name,
-            status="success",
-            answer=internal.response,
-            chart_data=internal.chart_data,
-        )
-    except Exception as exc:
-        output = AgentOutput(agent=name, status="error", answer="", warnings=[str(exc)])
-        state["warnings"].append(f"{name}: {exc}")
-    results.append(output.model_dump())
-```
-
-Erros em um agente não derrubam os outros — o nó captura a exceção, registra em `warnings` e continua para o próximo agente da lista.
-
----
-
-## Nó 4: respond — `app/graph/workflow.py`
-
-Consolida os resultados:
-
-- **0 agentes selecionados** → resposta padrão de escopo ("Posso ajudar com previsão, vazamentos ou hábitos.")
-- **1 agente com sucesso** → retorna a resposta diretamente
-- **Múltiplos agentes** → une as respostas com `---` como separador; prioriza o `chart_data` do primeiro agente que gerou gráfico
-
----
-
-## Checkpointing com MemorySaver
-
-```python
-_memory = MemorySaver()
-workflow = _graph.compile(checkpointer=_memory)
-```
-
-`MemorySaver` persiste o estado do grafo em memória, vinculado ao `thread_id = session_id`. Isso permite que o LangGraph retome uma conversa a partir do ponto onde parou — relevante quando o sistema for expandido com nós assíncronos ou retentativas.
-
----
-
-## Inicialização e execução
-
-```python
-def run_workflow(user_id: int, session_id: str, question: str) -> GraphState:
-    initial: GraphState = {
-        "user_id": user_id,
-        "session_id": session_id,
-        "question": question,
-        "response": "",
-        ...
-    }
-    # thread_id inclui user_id para evitar colisão entre usuários diferentes
-    # que possam enviar o mesmo session_id (ex.: UUID gerado pelo cliente)
-    thread_id = f"{user_id}:{session_id}"
-    return workflow.invoke(
-        initial,
-        config={"configurable": {"thread_id": thread_id}},
-    )
-```
-
-O `thread_id` composto (`user_id:session_id`) é obrigatório para o `MemorySaver` identificar qual sessão está sendo retomada sem risco de dois usuários lerem o checkpoint um do outro.
-
----
-
-## Fluxo completo de uma requisição
-
-```
-POST /chat {"user_id": 42, "message": "Quais meus hábitos afetam a conta?"}
-  │
-  ├─ validate_input() → ok
-  │
-  ├─ run_workflow()
-  │    ├─ context: carrega últimas 6 mensagens do MongoDB
-  │    ├─ route: llm_rapido → {"intent": "habits_impact",
-  │    │                        "agents": ["habits", "forecast"]}
-  │    ├─ execute: HabitsAgent.run() + ForecastAgent.run()
-  │    └─ respond: une as duas respostas
-  │
-  ├─ validate_output() → ok
-  ├─ append_turn() x2 → salva no MongoDB
-  └─ return ChatResponse
-```
-
----
-
-## Referência arquitetural
-
-Ver [arquitetura-inteligencia-artificial.md](arquitetura-inteligencia-artificial.md) — seções "LangGraph" e "Arquitetura Multiagente".
+- [app/graph/state.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/graph/state.py)
+- [app/graph/router.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/graph/router.py)
+- [app/graph/workflow.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/graph/workflow.py)

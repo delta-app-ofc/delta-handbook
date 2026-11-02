@@ -1,59 +1,44 @@
-# Conexão PostgreSQL
+# Conexão PostgreSQL da IA
 
-O módulo `app/data/db_postgres.py` abre uma conexão `psycopg2` por operação e
-fecha cursor e conexão ao concluir a consulta ou ao ocorrer uma falha. O
-projeto não mantém um pool de conexões.
+## Objetivo e configuração
 
-## Configuração
+Documentar `app/data/db_postgres.py` na `main` de IA `f6f3d8c`, revisada em 02/11/2026. O caminho normal usa **pool por processo**, criado no primeiro uso com `psycopg2.pool.ThreadedConnectionPool`; não abre uma conexão independente por operação.
 
-Use `DATABASE_URL` para uma URI PostgreSQL completa ou configure as cinco
-variáveis `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_DB` e `NAME_DB`. Um conjunto
-separado completo tem precedência sobre `DATABASE_URL`; se qualquer variável
-separada for informada sem completar o conjunto, a validação falha antes de
-chamar o driver. A URI completa é passada ao `psycopg2` sem ser remontada, para
-preservar opções como TLS e senhas percent-encoded.
+Use `DATABASE_URL`, preservando opções de URI como TLS. A interface antiga de cinco variáveis separadas não é usada por este conector. Não copie credenciais reais para documentação.
 
-Os limites são definidos em segundos:
+| Variável | Default | Aplicação |
+| --- | --- | --- |
+| `DB_CONNECT_TIMEOUT_SECONDS` | 5 | `connect_timeout` ao abrir conexão. |
+| `DB_QUERY_TIMEOUT_SECONDS` | 30 | `statement_timeout` local à transação, via `set_config`. |
+| `DB_POOL_MIN_SIZE` | 1 | Conexões iniciais. |
+| `DB_POOL_MAX_SIZE` | 10 | Limite e retenção máxima de conexões no pool. |
+| `DB_POOL_WAIT_SECONDS` | 5 | Espera por vaga no semáforo do pool. |
 
-| Variável | Aplicação |
-| --- | --- |
-| `DB_CONNECT_TIMEOUT_SECONDS` | Passado ao `psycopg2` como `connect_timeout`, em segundos. |
-| `DB_QUERY_TIMEOUT_SECONDS` | Convertido para milissegundos e aplicado à sessão PostgreSQL como `statement_timeout`. |
+`workers × DB_POOL_MAX_SIZE` precisa caber na capacidade disponível do servidor, considerando também outras aplicações. O pool não é compartilhado entre workers.
 
-Se a URI já declarar opções do libpq, como `search_path`, a aplicação acrescenta
-`statement_timeout` às opções existentes. O timeout de conexão limita a abertura
-da conexão; o timeout de consulta limita a execução no servidor.
+## Ciclo de uma operação
 
-## Verificação
+`_cursor` adquire uma vaga, obtém conexão, prepara timeout transacional e entrega cursor. Sucesso faz commit; a limpeza fecha cursor, devolve ou descarta conexão e libera vaga. Transação aberta após falha é desfeita ao devolver conexão saudável ao pool.
 
-Com as variáveis de ambiente configuradas e o PostgreSQL acessível, execute:
+Uma conexão quebrada pode ser trocada uma vez **antes de executar o SQL da operação**. Esse preparo não repete uma escrita já concluída. Erros de driver viram exceções públicas seguras; ausência de linha não deve ser confundida com indisponibilidade.
 
-```bash
-python -m scripts.check_postgres
-```
+`close_pool` fecha conexões e permite recriação, inclusive após recarga controlada de settings. A API o chama no `lifespan`. `get_conn` permanece como conexão direta de diagnóstico, fora do pool.
 
-O comando valida somente a configuração PostgreSQL, abre a conexão e executa
-`SELECT 1`. Ele não exige chaves de LLM nem depende das tabelas, funções ou views
-do produto. Sucesso retorna código zero; falha retorna código diferente de zero
-e imprime somente um diagnóstico seguro.
+## Consultas e dependências
 
-Uma resposta de `SELECT 1` confirma conectividade, autenticação e acesso ao banco
-indicado. Ela não comprova que esse banco tenha as tabelas e funções usadas pelo
-Agente de Previsão.
+A IA depende de cadastro ativo, vínculos, unidades autorizadas, tarifas, contas e hábitos. Consumo/previsão organizacionais leem camada consolidada SQL, incluindo `dw.vw_ft_consumption_daily` e funções auxiliares. Cadastro de hábito usa `fn_create_user_habit`, cuja disponibilidade e permissão precisam ser conferidas no banco alvo.
 
-Na execução de **4 de outubro de 2026**, o comando retornou código 1 com o
-diagnóstico seguro `Não foi possível conectar ao PostgreSQL.`. O Docker Engine
-local estava indisponível, a porta local 5432 não tinha serviço escutando e
-esta execução não dispunha de `DATABASE_URL` nem das variáveis separadas. A
-configuração padrão de desenvolvimento apontou para o serviço local. Portanto,
-o `SELECT 1` real continua pendente; a verificação usa um serviço local quando
-ele estiver disponível e não foi executada contra o banco oficial.
+Consultas usam parâmetros e IDs vinculados ao usuário. A seleção de unidade precisa ocorrer antes da leitura. Não ter dados suficientes é diferente de falha de conexão ou função/view ausente.
 
-## Banco local e banco oficial
+## Diagnóstico e bootstrap local
 
-`docker-compose.dev.yml` oferece um PostgreSQL local para desenvolvimento. Os
-arquivos de `db/postgres-init/` são cópias de bootstrap desse ambiente; a fonte
-oficial do schema permanece no repositório
-[`delta-sql-database`](https://github.com/delta-app-ofc/delta-sql-database). Uma conexão validada no
-container local não valida acesso ao PostgreSQL oficial nem garante que suas
-views e dados organizacionais estejam disponíveis.
+O CLI `scripts.check_postgres` não existe nessa revisão. O diagnóstico versionado disponível é `python -m scripts.bench_pool`; é benchmark com acesso real e deve ser usado somente contra um banco de teste configurado, conforme o próprio script. Conexão simples não valida schema completo ou dados do produto.
+
+`docker-compose.dev.yml` oferece SQL local. `db/postgres-init/` tem seis scripts de bootstrap nesta `main` (01 a 06). São cópias para desenvolvimento; a fonte oficial é o repositório `delta-sql-database`. Não assuma que a cópia local tem todas as migrações/funções recentes do banco oficial.
+
+`test_pg_pool.py` e `test_database_adapters.py` verificam comportamento com substitutos. Não foi executada conexão real nesta revisão documental. Veja [operação](operacao-validacao.md) e [redução de latência](reducao-latencia.md) para metodologia e medições históricas identificadas.
+
+## Fontes da implementação revisada
+
+- [app/data/db_postgres.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/data/db_postgres.py)
+- [scripts/bench_pool.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/scripts/bench_pool.py)

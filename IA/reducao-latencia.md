@@ -1,10 +1,6 @@
 # Redução de latência do chat
 
-> **Estado:** implementado e testado na branch `feat/reduz-latencia-chat` do `delta-artificial-intelligence`
-> (feita em cima da `feat/observabilidade`, para medir pelos registros dela),
-> **ainda não mesclado na `main`**. Os caminhos de arquivo citados abaixo (como `app/data/db_postgres.py`) são desse
-> repositório. Até o merge, os documentos [Conexão PostgreSQL](postgres-connection.md) e
-> [Settings](settings.md) continuam descrevendo o comportamento anterior.
+> **Estado em 02/11/2026:** pool, caches por pergunta, preparação paralela, raciocínio por papel e SSE estão presentes na `main` de IA `f6f3d8c`. As tabelas de tempo e os resultados abaixo são registros históricos das rodadas da branch `feat/reduz-latencia-chat`, não medições repetidas nesta revisão. Os guias de [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md) e [workflow](workflow.md) descrevem o contrato atual.
 
 ## Objetivo
 
@@ -311,30 +307,14 @@ simples: uma leitura por unidade com a mesma função de consumo, totais e ordem
 
 ## Fora do escopo (decisão da equipe)
 
-Agente Juiz e Jev (modelo de decisão da TypeSafe usado pelo Juiz; timeout, payload, fallback, número de revisões), escolha e parâmetros de modelos e provedores
+Na tarefa original de redução de latência ficaram fora do escopo: Agente Juiz e Jev (modelo de decisão da TypeSafe usado pelo Juiz; timeout, payload, fallback, número de revisões), escolha e parâmetros de modelos e provedores
 (inclusive circuito aberto para falhas do provedor), prompt do agente de consumo, agentes em paralelo e `/playground`.
 
-## Documentos a atualizar quando a mudança for mesclada
+## Documentação sincronizada com a main
 
-- [Conexão PostgreSQL](postgres-connection.md): hoje diz que o módulo abre uma conexão por operação e que o projeto não
-  tem pool, e cita `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_DB` e `NAME_DB` e o `scripts.check_postgres`. Esses
-  nomes e o script **não existem** no código atual do `delta-artificial-intelligence` (a conexão usa `DATABASE_URL`).
-  Trecho sugerido para o parágrafo inicial depois do merge:
+A revisão de 02/11/2026 atualizou [PostgreSQL](postgres-connection.md), [settings](settings.md), [API](implementacao-api-fastapi.md), [guardrails](implementacao-guardrails.md) e [orquestração](implementacao-langgraph-orquestracao.md). O [índice](leia-me.md) registra diferenças do código atual, incluindo thresholds do Juiz e referências antigas do README. Resultados numéricos deste documento permanecem históricos, sem servir como SLO observado da main atual.
 
-  > O conector PostgreSQL usa um pool de conexões por processo (`psycopg2.pool.ThreadedConnectionPool`), criado no
-  > primeiro uso e fechado no encerramento da aplicação (`close_pool()`). A conexão vem de `DATABASE_URL`, com
-  > `connect_timeout` e `statement_timeout` aplicados por operação (`set_config` local à transação). O tamanho é
-  > configurado por `DB_POOL_MIN_SIZE`, `DB_POOL_MAX_SIZE` e `DB_POOL_WAIT_SECONDS`; `workers × DB_POOL_MAX_SIZE`
-  > deve ficar abaixo do `max_connections` do PostgreSQL. Ao recarregar settings, chame `close_pool()`.
-
-- [Settings](settings.md): incluir `DB_POOL_MIN_SIZE`, `DB_POOL_MAX_SIZE`, `DB_POOL_WAIT_SECONDS`,
-  `OPENAI_FAST_REASONING_EFFORT` e `OPENAI_SPECIALIST_REASONING_EFFORT`.
-- [API FastAPI](implementacao-api-fastapi.md): incluir a rota `POST /chat/stream` e o contrato dos eventos.
-- [Guardrails](implementacao-guardrails.md) e [orquestração LangGraph](implementacao-langgraph-orquestracao.md):
-  registrar que a guarda de entrada passou a ser dividida em regras instantâneas e classificador LLM, e que este roda
-  em paralelo com contexto e roteador.
-
-## O que foi implementado
+## Registro histórico da implementação
 
 Branch `feat/reduz-latencia-chat` (a partir de `feat/historico-conversas`):
 

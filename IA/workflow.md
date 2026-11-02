@@ -1,157 +1,55 @@
-# Orquestração LangGraph — workflow.md
+# Fluxo de uma pergunta no LangGraph
 
-Este documento descreve o grafo LangGraph do Delta (`app/graph/workflow.py`),
-explicando cada nó, as transições condicionais e como adicionar um novo agente.
+## Objetivo
+
+Descrever o percurso implementado em `app/graph/workflow.py`, na `main` de IA `f6f3d8c`, revisada em 02/11/2026. Para contratos internos e extensão, consulte [implementação LangGraph](implementacao-langgraph-orquestracao.md).
 
 ## Grafo
 
-```
-guardrail_input
-  │
-  ├─ (_blocked=True) → END
-  │
-  └─ (_blocked=False) → context → route → execute → synthesize → respond → guardrail_output → END
-```
-
-A topologia é linear com uma saída antecipada no guardrail de entrada. Não há
-ciclos nem bifurcações depois do nó `route`.
-
-## Nós
-
-### `guardrail_input`
-
-Valida a mensagem antes de qualquer lógica de negócio. Chama `validate_input`
-de `app/guardrails/input.py`, que:
-
-1. Rejeita mensagens vazias, longas demais ou com `user_id` inválido.
-2. Detecta padrões de injeção de prompt.
-3. Anonimiza PII (CPF, CNPJ, telefone, e-mail) e armazena o mapa de tokens
-   em `GraphState.pii_map`.
-
-Se `state["skip_guardrail_input"]` for `True` (setado pela rota HTTP, que já
-validou), o nó passa direto sem re-validar.
-
-Quando bloqueado, `_blocked=True` é setado no estado e a aresta condicional
-roteia para `END` sem executar nenhum agente.
-
-### `context`
-
-Recupera contexto externo antes do roteamento:
-
-- Histórico recente da sessão (`app/memory/session.py`).
-- Memória de longo prazo relevante para a pergunta (`app/memory/long_term.py`).
-
-Armazena o resultado em `GraphState.recent_messages` e `GraphState.relevant_memory`.
-
-### `route`
-
-Usa `llm_rapido` (Groq) para classificar a intenção e escolher os agentes.
-A classificação vem de `app/graph/router.py` — função `classify(question, context)`.
-
-Intenções possíveis:
-
-| Intenção | Agentes selecionados |
-|----------|---------------------|
-| `consumption` | `["consumption"]` |
-| `forecast` | `["forecast"]` |
-| `leak` | `["leak"]` |
-| `habits` | `["habits"]` |
-| `comprehensive` | dois ou mais agentes |
-| `privacy_violation` | `[]` — encerra no nó `respond` |
-| `unknown` | `[]` |
-
-A intenção `privacy_violation` é ativada quando a pergunta solicita dados de
-outros usuários, rankings ou comparações entre residências distintas.
-
-### `execute`
-
-Chama cada agente da lista `selected_agents` em sequência.
-
-**Context-passing entre agentes:** o primeiro agente recebe a pergunta original.
-O segundo em diante recebe:
-
-```
-{pergunta original}
-
-Contexto dos agentes anteriores:
-- forecast: {primeiros 300 chars da resposta do forecast}
+```text
+guardrail_input → prepare → execute → synthesize → respond → compose
+       ↓             ↓                                      ↓
+   bloqueio/END  bloqueio/END                 sem candidata: output_guard → END
+                                                           ↓ candidata pronta
+                                                         judge
+                                               approve / correct / reject
+                                                  ↓         ↓         ↓
+                                               publish    revise     block
+                                                  ↓         ↓         ↓
+                                            output_guard  execute  output_guard
+                                                  ↓                   ↓
+                                                 END                 END
 ```
 
-Isso permite que o LeakAgent mencione, por exemplo, que "o agente de previsão
-identificou consumo elevado neste período" sem re-consultar o banco.
+`prepare` reúne classificador semântico e contexto/roteamento. `context` e `route` são funções rastreadas executadas dentro desse nó; não são nós independentes conectados no grafo compilado.
 
-Cada resultado é registrado em `GraphState.agent_results` com os campos:
-`agent`, `status` (`success` ou `error`), `answer`, `chart_data` e `tool_calls`.
+## Etapas
 
-### `synthesize`
+1. A rota autentica, cria/valida a sessão e chama `run_workflow` ou `run_workflow_events`.
+2. `guardrail_input` valida tamanho e identidade, anonimiza padrões de PII e bloqueia injeção/dados internos. Recusa termina sem executar especialistas.
+3. `prepare` roda o classificador LLM em paralelo com contexto e roteador. O contexto resolve perfil SQL em paralelo à leitura de histórico/memória. Se a guarda bloquear, o resultado preparado é descartado e nenhum especialista roda. Consultas de contexto e roteamento podem já ter ocorrido.
+4. `route` escolhe nomes do registro, remove duplicados/desconhecidos e aplica a lista permitida pelo perfil. Sem vínculo ou com perfil desconhecido, não chama o roteador e não seleciona agentes.
+5. `execute` roda especialistas **em sequência**, com o ID confiável, histórico recente e resumo das respostas anteriores. Uma falha vira resultado `error`, sem impedir os próximos agentes.
+6. `synthesize` usa o modelo rápido somente quando pelo menos dois agentes tiveram sucesso. `respond` usa a síntese ou respostas disponíveis e o primeiro gráfico aplicável; saudações e restrições recebem mensagens fixas.
+7. `compose` forma a candidata. Violação de privacidade, ausência de agentes ou ausência de sucesso seguem direto à saída; candidata pronta vai ao Juiz.
+8. `judge` avalia pergunta, candidata, contexto, gráfico e outputs reais. Aprovação publica; pedido de correção na primeira passagem prepara uma única revisão; rejeição, falha ou nova correção bloqueiam.
+9. `revise` preserva candidata e resultados anteriores, acrescenta feedback e repete execução/composição. Tools e fontes anteriores são mantidas como evidência. A ferramenta de cadastro de hábito é retirada da revisão.
+10. `output_guard` mascara PII, verifica referência a terceiros no texto/gráfico, remove detalhes técnicos e formata nomes de hábitos. Persiste o turno quando habilitado e inicia geração de metadados em background.
 
-Ativado apenas quando ≥ 2 agentes tiveram `status=success`. Usa `llm_rapido`
-para unificar as respostas em texto coeso, indicando a origem de cada dado e
-sinalizando contradições.
+A revisão pode executar ferramentas de leitura novamente. Não há mecanismo geral que transforme todas as escritas em operações posteriores ao Juiz; veja [hábitos](habitos.md).
 
-Se `llm_rapido` falhar (exceção), o nó cai silenciosamente para concatenação
-bruta com separador `---`.
+## Estado e memória
 
-### `respond`
+O checkpoint em RAM usa `thread_id = user_id:session_id`. A execução inicializa campos de resultado e julgamento para cada pergunta. No chat persistente, tenta ler histórico Mongo uma vez e compartilhá-lo com o contexto; falha nessa leitura permite nova tentativa. Ao terminar, remove o checkpoint do chat persistente. A chamada do console com `persist_session=False` mantém checkpoint em memória; a rota ainda grava mensagens por caminho próprio, conforme [operação](operacao-validacao.md).
 
-Verifica se a intenção é `privacy_violation`. Se for, retorna:
-> "Não tenho acesso a dados de outros usuários. Posso ajudar apenas com
-> informações da sua conta."
+São usadas até seis mensagens recentes no contexto. Memória longa é consultada quando a pergunta contém gatilhos temporais/conversacionais. Isso é uma heurística por termos, não uma garantia de recuperação para toda referência ao passado.
 
-Caso contrário, usa o resultado do nó `synthesize` (ou a resposta do único
-agente) como resposta final.
+## Saída, bloqueios e progresso
 
-### `guardrail_output`
+Um bloqueio do Juiz devolve a mensagem segura e remove o gráfico; não equivale ao erro 422 de entrada. O guardrail final também pode substituir texto ou descartar gráfico. A candidata aprovada é verificada na saída e pode ser alterada por essa limpeza, sem novo julgamento.
 
-Sanitiza a resposta antes de entregá-la:
+`run_workflow_events` usa worker e fila para publicar etapas, keepalive e estado final. O cliente recebe apenas rótulos fixos até a resposta final. Detalhes em [API](implementacao-api-fastapi.md), [guardrails](implementacao-guardrails.md) e [Juiz](agente-juiz.md).
 
-- Remove CPF/CNPJ/telefone com `validate_output` de `app/guardrails/output.py`.
-- Resolve tokens PII do mapa de entrada (ex.: `[PII_CPF_abc]` → `[CPF OMITIDO]`).
-- Persiste o histórico de sessão via `append_turn` (best-effort — falha não
-  interrompe o fluxo).
+## Fontes da implementação revisada
 
-## Estado (`GraphState`)
-
-Definido em `app/graph/state.py` como TypedDict com campos obrigatórios e
-opcionais (`total=False`):
-
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `user_id` | `int` | Usuário autenticado |
-| `session_id` | `str` | Identificador da sessão |
-| `question` | `str` | Pergunta original (anonimizada após `guardrail_input`) |
-| `response` | `str` | Resposta final |
-| `agent_results` | `list[dict]` | Resultados de cada agente |
-| `selected_agents` | `list[str]` | Agentes escolhidos pelo router |
-| `intent` | `str` | Intenção classificada |
-| `complexity` | `str` | `simple` ou `medium` |
-| `pii_map` | `dict` | Mapa token → valor original (opcional) |
-| `_blocked` | `bool` | True se a entrada foi bloqueada |
-| `skip_guardrail_input` | `bool` | True quando a rota HTTP já validou |
-
-## Como adicionar um novo agente
-
-1. Implemente o agente em `app/agents/<nome>.py` seguindo o padrão de
-   `ForecastAgent` — método `.run(question)` que devolve um objeto com
-   `.response`, `.chart_data` e `.tool_calls`.
-
-2. Registre o agente em `app/graph/router.py`, no dicionário `AGENT_REGISTRY`:
-   ```python
-   from app.agents.meu_agente import MeuAgente
-   AGENT_REGISTRY["meu_agente"] = MeuAgente
-   ```
-
-3. Adicione a intenção ao `_ROUTER_PROMPT` em `app/graph/router.py` com
-   exemplos de perguntas que mapeiam para esse agente.
-
-4. Escreva testes em `tests/` com `ScriptedChatModel` e ferramentas substituídas.
-
-## Limitações conhecidas
-
-- `ConsumptionAgent` ainda não está no `AGENT_REGISTRY` — não é roteável pelo
-  workflow. Adicionar é uma task separada.
-- Agentes `judge` e `rag` não estão implementados.
-- O nó `context` consulta memória de longo prazo mesmo quando a pergunta não
-  referencia o passado — custo desnecessário que pode ser otimizado com um filtro.
-- Não há rate limiting por `user_id` no workflow — isso cabe a um middleware
-  de API.
+- [app/graph/workflow.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/f6f3d8c/app/graph/workflow.py)

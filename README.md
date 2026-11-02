@@ -21,8 +21,13 @@ delta-handbook/
 ├── devops/
 ├── eqs/
 ├── geral/
+├── IA/
 └── ux/
 ```
+
+## Inteligência artificial
+
+A documentação do chatbot está em [IA/leia-me.md](IA/leia-me.md), com arquitetura, API, agentes, Juiz, memória, RAG/MCP, configuração e operação conferidos com a `main` do serviço.
 
 ## 📐 Padrões de Documentação
 

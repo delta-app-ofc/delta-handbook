@@ -2,6 +2,16 @@
 
 Este documento descreve a implementação local da migração do detector para o `delta-api-mongo` e seu contrato com a IA e o aplicativo. Conferência do código: 02/11/2026. Implementação local não significa implantação validada em produção.
 
+**Fontes verificadas** (branches das PRs abertas em 02/11/2026; os commits podem mudar até o merge):
+
+| Repositório | PR | Conteúdo | Último commit conferido |
+|---|---|---|---|
+| `delta-api-mongo` | #16 | detector (`modules/detection`) | `48b5549` |
+| `delta-api-mongo` | #17 | API de alertas (`modules/alerts`) | `18d7bc3` |
+| `delta-mongo-database` | #14 | `user_hour_baseline`, campos de anomalia, migrações | `bc50088` |
+| `delta-mongo-database` | #16 | contrato de `alerts_history` | `22f37da` |
+| `delta-api-postgres` | #52 | rota interna do dono do dispositivo | `5a7364d` |
+
 ## Estado e responsabilidades
 
 O detector e a API de alertas estão presentes no código Java e desligados por padrão. A habilitação depende das migrações e índices do MongoDB, das configurações do Render e da validação em ambiente integrado. A remoção de `delta-business-rules/detection/` e do `watcher.py` permanece planejada, condicionada à validação do novo fluxo em produção; não se deve manter dois detectores escrevendo alertas simultaneamente.

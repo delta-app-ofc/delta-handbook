@@ -83,10 +83,3 @@ A API não possui campos para os itens abaixo, que ficam apenas no estado do fro
 - usos e fonte de água;
 - consumo médio mensal.
 
----
-
-## Limites da integração atual
-
-- O cadastro de usuário e o de empresa ainda não foram validados contra uma API em execução; os testes automatizados do front usam `fetch` simulado.
-- O segmento da empresa é texto livre no formulário e a API aceita quatro valores; hoje a conversão é por palavra-chave.
-- Metas, alertas, vazão e clima não têm endpoint e aparecem como indisponíveis.

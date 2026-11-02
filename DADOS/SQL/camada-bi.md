@@ -291,9 +291,12 @@ correspondente no Mongo ainda.
 
 ---
 
-## 9. Escopo e integrações
+## 9. Quem consome o PostgreSQL
 
-- **Telemetria e simulador**: a camada `stage` recebe a telemetria do MongoDB (`consumption_summary`). O `delta-hardware-data-simulator` gera os documentos e a resolução para a propriedade é feita por `tb_device.device_id` na carga `silver`.
-- **Perfil comercial/industrial e agentes de IA**: as Functions organizacionais (`fn_user_access_kind`, `fn_organization_forecast_context` e demais, ver `otimizacao.md`) resolvem o acesso e o contexto de usuários vinculados por `tb_user_organization` e ficam disponíveis no banco para API e agentes.
-- **Redis/Neo4j**: fazem parte da arquitetura de dados (ver `DADOS/infra-bancos.md`, seção 4.2) e não possuem código neste repositório. Um ranking Web em Redis (`ZSET`) funcionaria como cache de leitura alimentado por `dw.vw_ft_property_ranking`, e não como substituto dela.
-- **Coleções MongoDB do perfil industrial** (alerta, escalonamento, relatório agendado): pertencem ao repositório do MongoDB. Este repositório trata somente do PostgreSQL.
+| Consumidor | O que lê |
+|---|---|
+| `delta-api-postgres` (API REST, Java) | Tabelas de cadastro, as seis views `dw.vw_ft_*` de rankings e consumo (`AnalyticsController`), `sp_register_property` e `fn_calculate_water_cost` |
+| `delta-artificial-intelligence` (agentes de IA) | `dw.vw_ft_consumption_daily`, as Functions `fn_user_*` e `fn_organization_*` e tabelas como `tb_last_water_bill` e `tb_investment_scenario` |
+| `delta-business-rules` (regras de detecção) | `tb_user_property`, `tb_property` e `fn_get_property_classification_group` |
+| `delta-redis-database` (ranking em tempo real) | Propriedades e consumo do PostgreSQL, buscados pela `delta-api-postgres` na rota `/sync` |
+| Web app e mobile app | Dados do PostgreSQL pela `delta-api-postgres` |

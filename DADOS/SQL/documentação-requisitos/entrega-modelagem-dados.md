@@ -152,6 +152,8 @@ estratégia em duas camadas, com PITR do Neon e `pg_dump` automatizado a cada 6 
 - Script de backup e teste de restauração: https://github.com/delta-app-ofc/delta-sql-database/blob/main/backup_db.py
 - Workflow automatizado: https://github.com/delta-app-ofc/delta-sql-database/blob/main/.github/workflows/backup-postgres.yml
 - Evidência da janela de PITR no Neon: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencia-neon.png
+- Teste de restauração com 47 tabelas e contagens corretas: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-backup.png
+- Log da restauração local: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-restauracao.txt
 - Justificativa do requisito: https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/mod-13-backup-recuperacao.md
 
 ### MOD-14 — Automatizar diretamente no Postgres o registro DAU (Daily Active User)

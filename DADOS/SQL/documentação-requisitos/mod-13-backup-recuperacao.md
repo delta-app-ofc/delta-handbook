@@ -8,6 +8,10 @@
 - [Tabela de registro dos testes de restauração](https://github.com/delta-app-ofc/delta-sql-database/blob/main/tables/tb_backup_restore_log.sql)
 - [Evidência da janela de PITR no Neon](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/evidencia-neon.png)
 
+- [Print do teste de restauração: 47 tabelas com contagens corretas](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-backup.png)
+- [Log completo da restauração local](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/resultado-restauracao.txt)
+- [Relatório da execução e consultas de verificação](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/backup-recuperacao/README.md)
+
 **Localização e como comprovar:**
 
 O banco PostgreSQL do Projeto Delta é hospedado no Neon. A estratégia usa duas camadas, e uma cobre a limitação da outra.
@@ -44,3 +48,7 @@ O `pg_dump` protege também contra falhas do próprio provedor, como conta suspe
 2. Abrir a aba Actions do `delta-sql-database` e conferir as execuções do workflow `Backup Postgres` e seus artefatos.
 3. Executar `SELECT * FROM tb_backup_restore_log ORDER BY id DESC;` e conferir os testes de restauração registrados.
 4. Abrir `evidencia-neon.png` e conferir a janela de PITR configurada no Neon.
+
+#### 6. Execução comprovada em 02/11/2026
+
+O backup final foi restaurado em um PostgreSQL 18 local separado do banco de origem. As 47 tabelas públicas verificadas apresentaram as mesmas contagens do manifesto, e os 47 resultados foram registrados como `SUCCESS` em `tb_backup_restore_log`. O print da consulta consolidada confirma `SUCCESS`, 47 tabelas e `contagens_corretas = true`.

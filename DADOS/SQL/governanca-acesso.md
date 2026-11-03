@@ -66,7 +66,6 @@ Permissões:
 - `ALL PRIVILEGES ON DATABASE` (conectar, criar objetos, uso de espaço temporário)
 - Responsável por backup, restore e administração geral do PostgreSQL (operações executadas fora do SQL de grants, via acesso de sistema/infra)
 
-> ⚠️ **Pendência:** o script atual **não** concede `CREATEROLE` nem privilégios de gerenciamento de usuários/roles. Se o `sys_devops` precisa criar/alterar/remover roles e usuários pelo próprio banco, é necessário um `ALTER ROLE sys_devops CREATEROLE;` explícito (ou acesso de superusuário via infraestrutura).
 
 ---
 

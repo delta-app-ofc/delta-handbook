@@ -109,12 +109,15 @@ Perguntas que responde:
 
 > O Agente de Vazamento (`delta-artificial-intelligence/app/agents/leak.py`) só **lê** o
 > campo `consumption_summary.anomaly_detected` e os registros de `alerts_history` — ele
-> nunca decide um limiar novo (proibido pelo próprio prompt do agente). Quem calcula esse
-> campo e cria esses registros é um componente separado, o motor de detecção
-> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML,
-> reagindo quase em tempo real via MongoDB Change Streams. Ver
-> `DADOS/NoSQL/modelagem-mongodb.md` e `detection/README.md` naquele repositório.
+> nunca decide um limiar novo (proibido pelo próprio prompt do agente). **Produtor vigente:**
+> hoje quem calcula esse campo é o motor do `delta-business-rules` (`watcher.py`/Change Stream).
+> **Alvo da migração:** o detector do `delta-api-mongo`, que roda após a inserção de cada janela, com
+> regras explicáveis de fluxo contínuo, consumo noturno/fora do expediente, desvio robusto e mudança
+> de regime. O novo fluxo está desligado por padrão e sua implantação precisa ser validada antes da
+> remoção de `delta-business-rules/detection/` e do `watcher.py`; nunca ligar os dois produtores ao
+> mesmo tempo. Depois da migração, a IA e o sistema escrevem seus próprios tipos de alerta
+> pelo endpoint interno da API Mongo. `anomaly_detected=null` significa não avaliado,
+> nunca ausência de vazamento. Ver [detector e contrato de alertas](deteccao-anomalias.md).
 
 ### Agente 3 — Previsão
 Responsável por:
@@ -132,7 +135,7 @@ Perguntas que responde:
 "Qual deve ser meu consumo no final do mês?"
 "Se eu continuar consumindo nesse ritmo, quanto vou gastar?"
 
-**Fontes de dados:** PostgreSQL(Última conta de água se for o primeiro uso e Tarifa por região) e MongoDB.
+**Fontes de dados:** PostgreSQL (tarifa por região e, somente como referência alternativa quando falta consumo medido, a última conta de água) e MongoDB. Consumo registrado igual a zero não é ausência de dados.
 
 ### Agente 4 — Perfil
 Responsável por consultar informações cadastrais e informações relacionadas às propriedades e dispositivos do usuário.
@@ -355,6 +358,10 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 | `GET` | `/sessions/{session_id}/messages` | Mensagens de uma sessão do usuário |
 | `POST` | `/sessions/{session_id}/close` | Encerra a sessão e grava o resumo na memória de longo prazo |
 
+> **Em atualização:** o back-end (`delta-api-postgres`) já emite o token em **RS256**, e a API de IA passa a
+> conferi-lo com a chave pública dele, em vez do segredo HS256 compartilhado descrito abaixo. Ver
+> [Autenticação da API de IA](autenticacao.md); o HS256 fica só para desenvolvimento e teste.
+
 - **Autenticação:** todas as rotas, exceto `/health`, exigem `Authorization: Bearer <JWT>`, assinado com HS256 e
   com os claims `sub` (o `user_id`) e `exp`. O `user_id` vem somente do token, nunca do corpo ou da URL. O
   back-end precisa emitir o token com o segredo `JWT_SECRET` compartilhado com a API de IA.
@@ -367,8 +374,8 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 - **Título, prévia e ícone:** gerados por um modelo de linguagem rápido na primeira troca de mensagens e gravados
   em `title`, `preview` e `icon`.
 
-Status: implementado e testado com MongoDB real em banco descartável; a emissão do JWT pelo back-end e o limite de
-50–100 mensagens por sessão ainda não existem na API de IA.
+Status: implementado e testado com MongoDB real em banco descartável; o limite de 50–100 mensagens por sessão ainda
+não existe na API de IA. A emissão do JWT é do back-end (já existe, em RS256; ver [Autenticação da API de IA](autenticacao.md)).
 
 ---
 

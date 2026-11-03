@@ -35,7 +35,7 @@ Usuário digita o CEP
 
 | Antes | Depois |
 | --- | --- |
-| O app enviava `regionId` no endereço | O app envia só `cep`, `city`, `state` (e coordenadas, se tiver) |
+| O app enviava `regionId` no endereço | O app envia só `cep`, `city`, `state` e as coordenadas `latitude` e `longitude`, que são obrigatórias |
 | Qualquer id de região era aceito | A região vem sempre do município |
 | Município sem tarifa cadastrava com a região escolhida | Município sem tarifa não cadastra e o app mostra o erro |
 

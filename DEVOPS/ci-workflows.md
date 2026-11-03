@@ -3,73 +3,61 @@
 Para entender como os checks se combinam com checklist, revisão humana e proteção de merge, consulte o [fluxo de aprovação de PRs](pr-review-rules.md) e a [política Sonar](politica-sonar.md).
 
 Esta página reúne o que os workflows de integração contínua executam e como reproduzir localmente. A validação de checklist e encaminhamento de revisores segue separada nos workflows organizacionais já existentes. Estes CIs rodam em pull requests e, quando indicado no workflow, também podem ser acionados manualmente.
+Os workflows de cada repositório definem o ambiente, os comandos e os relatórios usados nas PRs. O GitHub Actions publica o resultado dos jobs na aba **Checks** e guarda os logs na aba **Actions**.
 
-## Nomes dos checks nas Pull Requests
+Para configurar os workflows e a proteção da branch, consulte [Implantação de CI/CD](implantacao-ci-cd.md). Para publicação das aplicações, veja [Deploys no Render](deploys-render.md); para as cargas analíticas, veja [Operação do Glue e Databricks](operacao-glue-databricks.md).
 
-A padronização define nomes de job para os workflows dos 16 repositórios, permitindo identificar o resultado técnico e a suíte de testes nas Pull Requests. O nome exibido do job é o contexto do check; o nome do arquivo YAML ou do workflow, isoladamente, não o substitui.
+## Organização dos workflows
 
-| Repositório | Check técnico | Suíte e relatórios Sonar |
-| --- | --- | --- |
-| `.github` | `ci-tecnico` | `Testes Sonar` |
-| `delta-api-mongo` | `ci-tecnico` | `Testes Sonar` |
-| `delta-api-postgres` | `ci-tecnico` | `Testes Sonar` |
-| `delta-artificial-intelligence` | `ci-tecnico` | `Testes Sonar` |
-| `delta-business-intelligence` | `ci-tecnico` | `Testes Sonar` |
-| `delta-business-rules` | `ci-tecnico` | `Testes Sonar` |
-| `delta-handbook` | `ci-tecnico` | `Testes Sonar` |
-| `delta-hardware-data-simulator` | `ci-tecnico` | `Testes Sonar` |
-| `delta-mobile-app` | `ci-tecnico` | `Testes Sonar` |
-| `delta-mongo-database` | `ci-tecnico` | `Testes Sonar` |
-| `delta-neo4j-database` | `ci-tecnico` | `Testes Sonar` |
-| `delta-redis-database` | `ci-tecnico` | `Testes Sonar` |
-| `delta-rpa` | `ci-tecnico` | `Testes Sonar` |
-| `delta-sql-database` | `ci-tecnico` | `Testes Sonar` |
-| `delta-template-repository` | `ci-tecnico` | `Testes Sonar` |
-| `delta-web-app` | `ci-tecnico` | `Testes Sonar` |
+| Arquivo ou processo | Responsabilidade |
+| --- | --- |
+| `test.yml` | Instala o ambiente e executa a verificação técnica do projeto. |
+| Workflow Sonar | Gera os relatórios definidos pelo projeto e envia a análise ao Sonar. |
+| `sonar-policy.yml` | Aciona a avaliação compartilhada da política Sonar para as PRs. |
+| Workflow de governança | Confere a descrição e o checklist da PR e encaminha os revisores. |
+| Reporter de CI | Registra o resultado técnico na PR conforme a configuração do workflow. |
+| `cd.yml`, nos serviços com esse arquivo | Solicita publicação no Render após push na `main`. |
 
-O check `Testes Sonar` executa as verificações de testes e relatórios configuradas para cada repositório. No `delta-handbook` e no `delta-template-repository`, os workflows não configuram análise nem cobertura Sonar: o job publica essa não aplicabilidade no resumo e só passa quando `ci-tecnico` conclui a validação documental/configuração com sucesso. Esse resultado não representa uma análise ou cobertura Sonar.
+## Checks apresentados na PR
 
-Nos 16 repositórios, preserve o check de governança `validate-pr-checks / Governança da Pull Request`. Nos satélites ele é publicado pelo workflow compartilhado; no repositório especial `.github`, pelo workflow local com o mesmo nome exibido. A política `Delta / Política Sonar`, onde configurada, é um gate real e separado: não a substitua por um relatório informativo, por um status de não aplicabilidade ou por um comentário.
+O job técnico usa o nome `ci-tecnico`. Os projetos com a etapa correspondente publicam `Testes Sonar`; a avaliação compartilhada publica o status `Delta / Política Sonar`. A governança usa `validate-pr-checks / Governança da Pull Request`.
 
-Comentários e publicação de diagnósticos pelo reporter são informativos e podem ser tratados como best effort. Uma falha deve aparecer como aviso no resumo do workflow; não pode alterar o resultado de `ci-tecnico`, de `Testes Sonar`, de scanner, nem de upload de artefato consumido pela análise. A publicação opcional de comentário não deve impedir a tentativa de atualizar o corpo da PR. O marcador de resultado só é incluído se essa atualização for concluída; se a atualização do corpo falhar, não invente o marcador. Como o workflow local de governança depende desse marcador, a governança pode ficar pendente ou ser pulada nesse caso. Um aviso do reporter não garante que a PR possa ser integrada se a API estiver indisponível.
+No handbook e no template, o workflow registra a aplicabilidade da etapa Sonar a partir da verificação documental ou de configuração. A análise de código e os relatórios de cobertura seguem os workflows dos projetos executáveis.
 
-### Disponibilização e proteção dos checks
+Os rulesets devem exigir os nomes efetivamente publicados no repositório. Workflows acionados por `workflow_run` precisam estar na branch padrão para receber os eventos.
 
-Abra primeiro as Pull Requests que adicionam ou atualizam os workflows e permita que elas sejam validadas. Um workflow disparado por `workflow_run` precisa estar presente no branch padrão para que o GitHub o execute; portanto, workflows desse tipo e suas dependências devem chegar ao branch padrão antes de esperar seus checks em outras PRs. Depois que cada contexto de check tiver sido publicado em uma PR, configure a proteção de branch ou o ruleset fora destas alterações, selecionando os nomes exibidos exatos: `ci-tecnico`, `Testes Sonar`, `validate-pr-checks / Governança da Pull Request` e, quando aplicável, `Delta / Política Sonar`. Não exija um contexto antes de existir e publicar um resultado. Esta documentação não altera rulesets nem configurações do GitHub.
+## Verificações por componente
 
-## Aplicações e serviços
+| Componente | Ambiente e verificações |
+| --- | --- |
+| APIs PostgreSQL e MongoDB | Java 17 e testes Maven, com o ambiente definido pelo projeto. |
+| Inteligência artificial | Dependências Python, compilação e suíte de testes. |
+| Regras de negócio | Python e pytest para as regras de consumo e detecção. |
+| API Redis | Python, pytest e Redis temporário para os testes de ranking e endpoints. |
+| Aplicação web | Node, testes, lint e build definidos nos scripts npm. |
+| Android | Gradle e tarefas configuradas no workflow do aplicativo. |
+| RPA | Testes Python e execução com bancos descartáveis via Compose. |
+| Simulador | Verificações dos módulos Python e execução de teste configurada no projeto. |
+| PostgreSQL | Aplicação dos scripts e verificações SQL em banco temporário. |
+| MongoDB | Aplicação de coleções, índices e verificações em MongoDB temporário. |
+| Neo4j | Preparação do grafo e verificações com Neo4j temporário. |
+| Business Intelligence | Verificação dos scripts e suítes locais configuradas no repositório. A operação dos jobs está no guia de Glue. |
+| `.github` | Sintaxe e testes dos scripts de automação. |
+| Handbook | Verificação dos Markdown rastreados pelo Git. |
+| Template | Verificação dos arquivos de configuração e regras de ignore. |
 
-| Repositório | O que o CI valida | Execução local |
-| --- | --- | --- |
-| `delta-api-postgres` | Suíte Maven existente em Java 17, executada em container com H2. Não comprova compatibilidade completa com PostgreSQL, schema e procedures oficiais ou integrações externas. | Na raiz: `docker compose -f docker-compose.test.yml config --quiet`, `docker compose -f docker-compose.test.yml run --build --rm tests`. Depois: `docker compose -f docker-compose.test.yml down`. |
-| `delta-api-mongo` | Suíte padrão Maven com Java 17. Os testes HTTP que precisam de MongoDB real são opt-in e não entram neste CI. | Java 17: `bash ./mvnw --batch-mode --no-transfer-progress test` (Linux/macOS) ou `mvnw.cmd test` (Windows). |
-| `delta-artificial-intelligence` | Instala dependências de desenvolvimento com Python 3.12, roda `pip check`, compila `app` e executa `tests/` com `APP_ENV=test`. Os testes atuais cobrem dois cenários isolados de previsão, sem bancos ou provedores externos. | `python -m pip install -r requirements-dev.txt`; defina `APP_ENV=test`; rode `python -m pip check`, `python -m compileall -q app` e `python -m unittest discover -s tests -v`. |
-| `delta-business-rules` | Suíte pytest em Python 3.12. Usa dados locais e não conecta a PostgreSQL, MongoDB ou Change Streams reais. | `python -m pip install -r requirements-dev.txt`; `python -m pytest -q`. |
-| `delta-redis-database` | Suíte pytest em Python 3.12 com Redis 7 descartável. Exercita endpoints e ranking; as respostas da API PostgreSQL usadas nos testes de sincronização são simuladas. | Com Python 3.12, Docker e Compose: `docker compose -f docker-compose.dev.yml up -d`; `python -m pip install -r requirements.txt -r requirements-dev.txt`; `python -m pytest -q`; `docker compose -f docker-compose.dev.yml down`. Os testes limpam o banco lógico 1 de `localhost:6379`; use uma instância descartável. |
-| `delta-web-app` | `npm ci`, testes, lint e build com Node 22. Testes usam respostas simuladas; não validam backend real nem navegador. | Com Node 22: `npm ci`, `npm test`, `npm run lint`, `npm run build`. |
-| `delta-mobile-app` | Confere se `README.md`, `AGENTS.md` e `LICENSE` existem, estão em UTF-8 e não estão vazios. A `main` atual ainda não contém código mobile nem ferramenta de build. | Na raiz: `python -c "from pathlib import Path; files = ('README.md', 'AGENTS.md', 'LICENSE'); [(print('OK:', f) if Path(f).read_text(encoding='utf-8').strip() else (_ for _ in ()).throw(ValueError(f'{f} vazio'))) for f in files]"`. Atualize o CI quando houver build e testes reais de aplicativo. |
-| `delta-rpa` | Testes pytest e execução do pipeline contra PostgreSQLs descartáveis do Compose. Não compara automaticamente os registros migrados com um resultado esperado e não comprova funcionamento com bancos de produção. | `python -m pip install -r requirements-dev.txt`; `python -m pytest`; `docker compose -p delta-rpa-ci -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from rpa`; `docker compose -p delta-rpa-ci -f docker-compose.test.yml down -v`. |
-| `delta-hardware-data-simulator` | Compila módulos Python e executa o smoke test Compose em `dry-run`. Não verifica inserções, todos os validadores MongoDB ou todos os geradores; `chat_feedback` consulta MongoDB mesmo em `dry-run` e fica fora desse smoke test. | `python -m compileall -q dataload`; `docker compose -f docker-compose.test.yml run --build --rm dry-run`. |
+O comando de referência para cada componente fica em seu README e em `.github/workflows/` na revisão usada pela PR. Para reproduzir um job localmente, use o mesmo runtime, dependências e comando declarados no YAML.
 
-## Bancos de dados
+## Resultado e correção
 
-Use Docker Engine e Docker Compose v2 ativos para os comandos que iniciam serviços. Os bancos de teste são descartáveis e não usam credenciais de produção.
+Quando um job falha, abra seus logs e identifique a primeira etapa com erro. Os relatórios de teste e cobertura ajudam a localizar o problema; falhas de instalação ou de configuração aparecem nas etapas anteriores à suíte.
 
-| Repositório | O que o CI valida | Execução local |
-| --- | --- | --- |
-| `delta-sql-database` | PostgreSQL 16 temporário. Carrega schema, otimização, auditoria e roles; verifica tabelas, FK, função `fn_user_is_active` e constraint de região. Não cobre todas as funções, procedures, triggers, permissões ou dataload. | `docker compose -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from smoke`; depois `docker compose -f docker-compose.test.yml down --volumes --remove-orphans`. |
-| `delta-mongo-database` | MongoDB temporário. Aplica coleções e índices; verifica presença, validadores e rejeição de documento inválido em `user_preferences`. Não acessa Atlas nem executa roles/seeds. | `docker compose -p delta-mongo-ci -f docker-compose.test.yml up --abort-on-container-exit --exit-code-from runner`; depois `docker compose -p delta-mongo-ci -f docker-compose.test.yml down`. |
-| `delta-neo4j-database` | Neo4j 5 temporário. Compila `load_graph.py`, carrega setup e seed e verifica quantidades de usuários, dias e relações. Não acessa Aura nem cobre todas as consultas e regras. O setup apaga os nós do banco selecionado: nunca o execute em produção. | Configure `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` e `NEO4J_DATABASE` para um Neo4j descartável; instale `neo4j` e `python-dotenv`; rode `python -m py_compile load_graph.py`, `python load_graph.py setup.cypher` e `python load_graph.py seed.cypher`. |
+Envie a correção pela mesma branch. O novo commit recebe uma nova execução e a política Sonar consulta a análise correspondente a esse SHA. A revisão e a integração seguem as regras configuradas no repositório.
 
-## Documentação, governança e template
+## Arquivos de referência
 
-| Repositório | O que o CI valida | Execução local |
-| --- | --- | --- |
-| `.github` | Compilação dos scripts Python e 12 testes unitários existentes. Os testes usam respostas simuladas e não chamam a API do GitHub. A governança local continua em `local_checks.yml`. | `python -m compileall -q scripts tests`; `python -m unittest discover -s tests -v`. |
-| `delta-business-intelligence` | Sintaxe dos scripts Python em `v1` com Python 3.9, sem executá-los ou conectar a bancos, Glue ou Databricks. | `python -m compileall -q v1`. |
-| `delta-handbook` | Arquivos Markdown rastreados pelo Git: leitura UTF-8, conteúdo não vazio e marcadores comuns de conflito. Não valida links, sintaxe Markdown completa ou correção do conteúdo. Arquivos novos precisam estar no índice Git para a validação local incluí-los. | `python scripts/validate_markdown.py`. |
-| `delta-template-repository` | Sintaxe YAML, `LICENSE` e `.gitignore` não vazios e regras essenciais de ignore para `.env`, `node_modules`, `target` e a exceção `.env.example`. A análise YAML não verifica semântica do Actions. | Com Ruby e Git: `ruby -e 'require "psych"; Dir.glob(".github/workflows/*.{yml,yaml}").each { |f| Psych.parse_file(f); puts "OK: #{f}" }'`; `test -s LICENSE && test -s .gitignore`; valide as regras com `git check-ignore --no-index`. |
-
-## Falhas vistas na primeira execução
-
-Na primeira execução das novas PRs, o smoke test de `delta-sql-database` falhou porque `script-roles.sql` referencia o schema `stage`, que não existe no banco temporário criado pelo Compose. Em `delta-rpa`, os testes unitários passaram, mas o pipeline com fixtures tentou inserir `NULL` em `tb_user_property.property_id`, que é obrigatório. Os workflows reportam essas falhas em vez de ignorá-las. Consulte as PRs correspondentes para o estado atual dos checks.
+- [Workflows compartilhados](https://github.com/delta-app-ofc/.github/tree/main/.github/workflows)
+- [Política Sonar](https://github.com/delta-app-ofc/.github/blob/main/scripts/sonar_policy.py)
+- [CI do handbook](https://github.com/delta-app-ofc/delta-handbook/blob/main/.github/workflows/test.yml)
+- [Convenções de desenvolvimento](convencoes-desenvolvimento.md)
+- [Revisão de PRs](pr-review-rules.md)

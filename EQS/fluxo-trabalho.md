@@ -73,7 +73,7 @@ git push origin feat/cadastro-de-usuarios
 
 2. Abra uma Pull Request para a branch principal definida pelo projeto.
 3. Siga o template de Pull Request.
-4. Aguarde revisão.
+4. Aguarde os checks técnicos e de governança e acompanhe a revisão conforme o [fluxo de aprovação de PRs](../DEVOPS/pr-review-rules.md).
 
 ### 5. Revisão de Código
 
@@ -88,8 +88,9 @@ Após abrir a Pull Request:
 
 Após aprovação:
 
-1. Verifique se não existem conflitos.
-2. Realize o merge seguindo a estratégia definida pelo projeto.
+1. Verifique se não existem conflitos, se os checks obrigatórios da versão atual passaram e se as revisões e conversas atendem às regras da branch.
+2. Confira a [política Sonar](../DEVOPS/politica-sonar.md), quando aplicável, incluindo eventual aprovação adicional.
+3. Realize o merge seguindo a estratégia definida pelo projeto e acompanhe os workflows posteriores.
 
 ### 7. Conclusão da Tarefa
 

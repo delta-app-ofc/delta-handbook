@@ -4,7 +4,7 @@
 ![Validação](https://img.shields.io/badge/CI%20documental-Python%203.12-3776AB?logo=python&logoColor=white)
 ![Projeto](https://img.shields.io/badge/Projeto-Delta-2E8B57)
 
-O handbook é o mapa compartilhado do Projeto Delta: reúne arquitetura, modelagem de dados, regras de negócio, operação, requisitos e acordos de trabalho. Use-o para entender como os componentes se relacionam; a implementação de cada componente continua no seu próprio repositório.
+Este repositório reúne a documentação do Projeto Delta: arquitetura, modelagem de dados, regras de negócio, operação, requisitos e acordos de trabalho. Os scripts e aplicações ficam nos repositórios dos componentes.
 
 **Tags:** `documentação` · `engenharia-de-dados` · `postgresql` · `mongodb` · `business-intelligence` · `devops` · `requisitos` · `ux`
 
@@ -20,7 +20,7 @@ O handbook é o mapa compartilhado do Projeto Delta: reúne arquitetura, modelag
 
 ## Visão geral
 
-O Delta é uma plataforma acadêmica de monitoramento inteligente de consumo residencial de água. O handbook descreve os componentes e decisões do projeto sem substituir os repositórios que contêm seus scripts ou aplicações. A arquitetura de dados documentada usa PostgreSQL para dados relacionais e MongoDB para telemetria e dados documentais; outros componentes devem ser entendidos conforme seu estado registrado nas páginas correspondentes.
+O Projeto Delta é uma plataforma acadêmica de monitoramento inteligente do consumo residencial de água. A arquitetura de dados documentada usa PostgreSQL para dados relacionais e MongoDB para telemetria e dados documentais. As páginas de cada área descrevem seus componentes, decisões e fluxos.
 
 | Área | O que você encontra |
 |---|---|
@@ -29,7 +29,7 @@ O Delta é uma plataforma acadêmica de monitoramento inteligente de consumo res
 | IA | Arquitetura, agentes, RAG, memória, conexões, configurações e observabilidade. |
 | DevOps | Convenções de branch e commit, CI, revisão e governança de Pull Requests. |
 | EQS | Requisitos funcionais, fluxo de trabalho, dinâmica de equipe e padrões de projeto e teste. |
-| UX | Fluxos e funcionalidades previstos para as experiências do produto. |
+| UX | Fluxos e funcionalidades das experiências do produto. |
 
 ## Navegação por assunto
 
@@ -51,7 +51,7 @@ delta-handbook/
 │   └── SQL/             # Modelagem, regras, auditoria, acesso e camada analítica
 ├── DEVOPS/              # Convenções, CI e governança de Pull Requests
 ├── EQS/                 # Requisitos, fluxo e práticas da equipe
-├── GERAL/               # Área reservada para documentação geral
+├── GERAL/               # Documentação geral
 ├── IA/                  # Arquitetura, implementação e operação de IA
 ├── UX/                  # Fluxos e funcionalidades
 ├── scripts/             # Validador dos documentos Markdown
@@ -63,18 +63,18 @@ delta-handbook/
 - Escreva em português claro e comece cada documento com título e objetivo.
 - Use nomes em minúsculas com palavras separadas por hífens, por exemplo `modelagem-relacional.md`.
 - Prefira links relativos e confirme que o destino existe.
-- Registre contexto, justificativas e limitações; diferencie recurso implementado de plano ou proposta.
+- Registre contexto e justificativas; diferencie recursos implementados de planos ou propostas.
 - Use tabelas para comparações e blocos de código para comandos e exemplos.
 
 ## Validar documentos
 
-O repositório inclui um validador local e um workflow de CI documental. Com Python 3.12 instalado, execute na raiz:
+Com Python 3.12 instalado, execute na raiz:
 
 ```bash
 python scripts/validate_markdown.py
 ```
 
-O validador verifica os arquivos Markdown rastreados pelo Git e sinaliza documentos vazios ou marcadores de conflito de merge. A CI documental faz essa verificação; ela não executa as aplicações nem substitui as suítes de teste dos repositórios de código.
+O validador confere os arquivos Markdown rastreados pelo Git e sinaliza documentos vazios ou marcadores de conflito de merge. O workflow de CI documental executa esse validador; os testes das aplicações ficam nos respectivos repositórios.
 
 ## Contribuir
 
@@ -85,3 +85,7 @@ Antes de criar uma página, procure o assunto nas pastas acima e atualize a refe
 - [delta-sql-database](https://github.com/delta-app-ofc/delta-sql-database) — scripts do banco PostgreSQL.
 - [delta-mongo-database](https://github.com/delta-app-ofc/delta-mongo-database) — scripts de configuração do MongoDB.
 - [delta-business-intelligence](https://github.com/delta-app-ofc/delta-business-intelligence) — pipelines e consultas de BI.
+
+## Processos de DevOps
+
+Consulte o [guia de DevOps](DEVOPS/README.md) para configurar CI/CD, publicar aplicações no Render e operar os pipelines Glue e Databricks.

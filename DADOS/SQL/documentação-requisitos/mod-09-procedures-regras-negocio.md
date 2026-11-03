@@ -6,9 +6,11 @@
 - [Script que agrega as Functions e Procedures](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-optimization.sql)
 - [Procedure de reajuste de tarifa](https://github.com/delta-app-ofc/delta-sql-database/blob/main/procedures/sp_change_region_rate.sql)
 - [Procedure de cadastro de propriedade](https://github.com/delta-app-ofc/delta-sql-database/blob/main/procedures/sp_register_property.sql)
-- [Documentação das Functions e Procedures](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/otimizacao.md)
+- [Documentação das Functions e Procedures](../otimizacao.md)
 
 - [Print das cinco Procedures do schema public](../anexos/evidencias-requisitos/mod-09-procedures-01.png)
+- [Chamada de `sp_change_region_rate`](../anexos/evidencias-requisitos/mod-09-chamada-sp-change-region-rate.png)
+- [Tarifa anterior encerrada e nova tarifa registrada](../anexos/evidencias-requisitos/mod-09-tarifa-encerrada-e-nova.png)
 
 **Localização e como comprovar:**
 
@@ -29,6 +31,6 @@ As Procedures (`CALL`) agrupam alterações em mais de uma tabela. Quando uma va
 #### Como comprovar
 
 1. Executar `script-schema.sql`, `script-optimization.sql`, `script-audit.sql` e `script-dataload.sql`.
-2. Executar `CALL sp_change_region_rate(1, 1, 31.00, CURRENT_DATE);` e consultar `tb_region_rate` para ver a tarifa anterior encerrada e a nova registrada.
+2. Em um banco de teste, iniciar `BEGIN;` e executar `CALL sp_change_region_rate(1, 1, 31.00, CURRENT_DATE);` e consultar `tb_region_rate` para ver a tarifa anterior encerrada e a nova registrada.
 3. Consultar `tb_log_region_rate` e conferir os registros de auditoria gerados pela alteração.
-4. Executar `CALL sp_disable_user(<id>);` e conferir `is_active = FALSE` no usuário e nos dispositivos.
+4. Executar `CALL sp_disable_user(1);` e consultar `SELECT id, is_active FROM tb_user WHERE id = 1;` e `SELECT d.id, d.is_active FROM tb_device d JOIN tb_user_property up ON up.property_id = d.property_id WHERE up.user_id = 1;`. Conferir `is_active = FALSE` e finalizar com `ROLLBACK;` para preservar os dados de teste.

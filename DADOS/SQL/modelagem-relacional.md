@@ -422,10 +422,10 @@ espelhos automáticos das tabelas principais.
 
 ## 📈 17. Tabela: `tb_user_access_log`
 
-Registra cada acesso de um usuário ao sistema, base do cálculo de DAU (Daily Active User). É gravada pela procedure `sp_register_user_access` e consultada pela function `fn_get_dau`, ver `otimizacao.md`.
+Registra cada acesso de um usuário ao sistema, base do cálculo de DAU (Daily Active User). É gravada pela procedure `sp_register_user_access` e consultada pela function `fn_get_dau`, ver [otimizacao.md](otimizacao.md).
 
 ### 📌 Atributos
 - **id (PK)**: Identificador.
 - **user_id (FK)**: Referência para `tb_user`, com `ON DELETE CASCADE`.
-- **access_channel**: Canal do acesso, `WEB`, `MOBILE` ou `CHATBOT` (CHECK).
+- **access_channel**: Canal opcional do acesso: `WEB`, `MOBILE`, `CHATBOT` ou `NULL`. O `CHECK` limita os valores não nulos; a procedure usa `NULL` quando o canal é omitido.
 - **accessed_at**: Data e hora do acesso, preenchida por padrão com `CURRENT_TIMESTAMP`.

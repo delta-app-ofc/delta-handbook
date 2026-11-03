@@ -3,11 +3,11 @@
 **Evidência direta:**
 
 - [Script de criação do banco e tabelas](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-schema.sql)
-- [Documentação do modelo relacional](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-relacional.md)
-- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica.png)
-- [Modelagem conceitual da arquitetura](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-conceitual.png)
-- [Documentação das regras de negócio](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/regras-negocio.md)
-- [Mapeamento de municípios e regiões tarifárias](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/mapeamento-cidade-regiao.md)
+- [Documentação do modelo relacional](../modelagem-relacional.md)
+- [Diagrama lógico do banco](../anexos/modelagem-logica.png)
+- [Modelagem conceitual da arquitetura](../anexos/modelagem-conceitual.png)
+- [Documentação das regras de negócio](../regras-negocio.md)
+- [Mapeamento de municípios e regiões tarifárias](../mapeamento-cidade-regiao.md)
 
 - [Inventário de tabelas — parte 1](../anexos/evidencias-requisitos/mod-01-tabelas-01.png)
 - [Inventário de tabelas — parte 2](../anexos/evidencias-requisitos/mod-01-tabelas-02.png)
@@ -55,7 +55,7 @@ As tabelas associativas mantêm as informações próprias de cada relacionament
 
 Um exemplo importante está em `tb_user_habit`: durante a evolução do projeto, foi removida a restrição que impedia um usuário de cadastrar o mesmo hábito mais de uma vez. Isso ocorreu porque uma pessoa pode ter rotinas diferentes para o mesmo hábito, como tomar banho em horários distintos durante a semana e o fim de semana.
 
-Para atender a essa necessidade, os dias foram separados em `tb_user_habit_day`, enquanto triggers aplicam a regra de não permitir o mesmo hábito no mesmo dia e horário de início. Assim, a estrutura atende à realidade do uso do sistema sem limitar artificialmente os registros.
+Para atender a essa necessidade, os dias foram separados em `tb_user_habit_day`, enquanto triggers verificam se o mesmo hábito já existe no mesmo dia e horário de início. Essa checagem não usa bloqueio para serializar cadastros simultâneos; sua garantia se aplica às operações sem concorrência entre essas verificações. Assim, a estrutura atende à realidade do uso do sistema sem limitar artificialmente os registros.
 
 #### 3. Terceira Forma Normal (3FN) — Separação de informações independentes
 

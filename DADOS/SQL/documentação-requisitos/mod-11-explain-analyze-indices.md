@@ -6,7 +6,8 @@
 - [Índice da camada `stage`](https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/stage/indexes/idx_stage_consumption_summary_device_window.sql)
 - [Índice da camada `gold`](https://github.com/delta-app-ofc/delta-sql-database/blob/main/datamart/gold/indexes/idx_gold_dm_property_organization.sql)
 - [Índice da tabela de auditoria](https://github.com/delta-app-ofc/delta-sql-database/tree/main/audit-tables/indexes)
-- [Documentação da camada de BI, seção 7](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
+- [Documentação da camada de BI, seção 7](../camada-bi.md)
+- [`EXPLAIN (ANALYZE, BUFFERS)` sobre `gold.dm_property`](../anexos/evidencias-requisitos/mod-11-explain-analyze.png)
 
 **Localização e como comprovar:**
 

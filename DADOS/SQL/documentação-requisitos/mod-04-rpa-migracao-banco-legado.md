@@ -15,6 +15,8 @@
 - [Ambiente de integração com Docker](https://github.com/delta-app-ofc/delta-rpa/blob/main/docker-compose.test.yml)
 - [Workflow de testes e integração contínua](https://github.com/delta-app-ofc/delta-rpa/blob/main/.github/workflows/test.yml)
 - [Workflow de execução automatizada do RPA](https://github.com/delta-app-ofc/delta-rpa/blob/main/.github/workflows/rpa.yml)
+- [Execução #44 do RPA no GitHub Actions: sucesso](../anexos/evidencias-requisitos/mod-04-rpa-execucao-github-actions.png)
+- [Log da execução: extração, validação, transformação, carga e COMMIT](../anexos/evidencias-requisitos/mod-04-rpa-log-execucao.png)
 
 **Localização e como comprovar:**
 
@@ -168,7 +170,7 @@ A carga inteira, incluindo exclusões, inserções e atualizações, ocorre dent
 
 Isso garante que uma falha durante qualquer operação de escrita interrompa a transação e provoque `ROLLBACK`, evitando deixar o banco novo parcialmente atualizado.
 
-O mapa de IDs também possui um controle importante: ele só é salvo depois que a transação é confirmada com `COMMIT`.
+O mapa de IDs só é salvo depois do `COMMIT`. Uma falha na gravação desse arquivo não desfaz a transação já confirmada: o banco pode ter sido atualizado mesmo que a execução seja registrada com erro. Extração, validação, transformação e registro de execução também ficam fora da transação de carga.
 
 O módulo `app/modules/state.py` utiliza um arquivo temporário e a operação `os.replace()` para atualizar o JSON. Isso evita corromper o arquivo anterior caso a gravação seja interrompida durante sua atualização.
 
@@ -248,7 +250,7 @@ O projeto também possui `docker-compose.test.yml`, que provisiona dois bancos P
 
 O RPA implementa a migração e a sincronização de oito tabelas selecionadas entre o banco legado e o novo PostgreSQL normalizado. O funcionamento é estruturado em um pipeline ETL com validação, transformação, remapeamento de identificadores, operações de UPSERT, sincronização de exclusões e controle transacional.
 
-O tratamento de falhas utiliza rollback integral da carga, preservação do mapa de identificadores, logs estruturados e registro do resultado de cada execução em `tb_log_rpa`.
+O tratamento de falhas aplica rollback à carga quando o erro ocorre antes do commit. O mapa é persistido após a confirmação, e logs estruturados e `tb_log_rpa` registram o resultado da execução.
 
 A implementação também contempla testes automatizados para extração, validação, transformação, carga, integridade referencial, transações e orquestração, além de um ambiente de integração com dois bancos PostgreSQL provisionados por Docker.
 

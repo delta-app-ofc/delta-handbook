@@ -6,7 +6,7 @@
 - [Tabela de auditoria `tb_log_region_rate`](https://github.com/delta-app-ofc/delta-sql-database/blob/main/audit-tables/tb_log_region_rate.sql)
 - [Function de auditoria que preenche `previous_log_id`](https://github.com/delta-app-ofc/delta-sql-database/blob/main/audit-functions/fn_log_region_rate.sql)
 - [Índice de apoio à recursão](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-indexes.sql)
-- [Documentação da camada de BI, seção 6](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/camada-bi.md)
+- [Documentação da camada de BI, seção 6](../camada-bi.md)
 
 - [Print da cadeia recursiva com três níveis](../anexos/evidencias-requisitos/mod-15-cadeia-recursiva.png)
 

@@ -3,8 +3,14 @@
 **Evidência direta:**
 
 - [Script de criação do banco — script-schema.sql](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-schema.sql)
-- [Diagrama lógico do banco](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-logica.png)
-- [Documentação do modelo relacional](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/modelagem-relacional.md)
+- [Diagrama lógico do banco](../anexos/modelagem-logica.png)
+- [Documentação do modelo relacional](../modelagem-relacional.md)
+- [Print das constraints, parte 1](../anexos/evidencias-requisitos/mod-02-pks-fks-01.png)
+- [Print das constraints, parte 2](../anexos/evidencias-requisitos/mod-02-pks-fks-02.png)
+- [Print das constraints, parte 3](../anexos/evidencias-requisitos/mod-02-pks-fks-03.png)
+- [Print das constraints, parte 4](../anexos/evidencias-requisitos/mod-02-pks-fks-04.png)
+- [Print das constraints, parte 5](../anexos/evidencias-requisitos/mod-02-pks-fks-05.png)
+- [Print das constraints, parte 6](../anexos/evidencias-requisitos/mod-02-pks-fks-06.png)
 
 **Localização e como comprovar:**
 

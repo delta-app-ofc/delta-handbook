@@ -3,8 +3,8 @@
 **Evidência direta:**
 
 - [Script da carga de dados](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-dataload.sql)
-- [Documentação da carga e contagem por tabela](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/dataload.md)
-- [Mapeamento de municípios e regiões tarifárias](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/mapeamento-cidade-regiao.md)
+- [Documentação da carga e contagem por tabela](../dataload.md)
+- [Mapeamento de municípios e regiões tarifárias](../mapeamento-cidade-regiao.md)
 
 - [Contagem executada — parte 1](../anexos/evidencias-requisitos/mod-03-contagem-01.png)
 - [Contagem executada — parte 2](../anexos/evidencias-requisitos/mod-03-contagem-02.png)
@@ -104,7 +104,7 @@ Essas diferenças permitem representar situações distintas sem obrigar que tod
 
 A própria documentação `dataload.md` apresenta uma consulta SQL de verificação que utiliza `COUNT(*)` em cada uma das 22 tabelas.
 
-A consulta está disponível ao final da documentação e também é apresentada no script de carga.
+A consulta completa das 22 tabelas está em `dataload.md`. O script atualizado na branch `docs/readme-modelagem` também inclui `tb_municipality`; as capturas anexadas mostram a seleção anterior de 21 tabelas.
 
 Para comprovar o requisito:
 

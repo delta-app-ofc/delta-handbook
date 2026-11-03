@@ -2,10 +2,10 @@
 
 **Evidência direta:**
 
-- [README que reúne tudo](https://github.com/delta-app-ofc/delta-sql-database/blob/main/README.md)
-- [Entrega da seção de Modelagem de Dados](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos/entrega-modelagem-dados.md)
-- [Pasta com a justificativa de cada requisito](https://github.com/delta-app-ofc/delta-handbook/tree/main/DADOS/SQL/documenta%C3%A7%C3%A3o-requisitos)
-- [Modelagem conceitual da arquitetura](https://github.com/delta-app-ofc/delta-handbook/blob/main/DADOS/SQL/anexos/modelagem-conceitual.png)
+- [README que reúne tudo](https://github.com/delta-app-ofc/delta-sql-database/blob/docs/readme-modelagem/README.md)
+- [Entrega da seção de Modelagem de Dados](entrega-modelagem-dados.md)
+- [Pasta com a justificativa de cada requisito](.)
+- [Modelagem conceitual da arquitetura](../anexos/modelagem-conceitual.png)
 
 **Localização e como comprovar:**
 

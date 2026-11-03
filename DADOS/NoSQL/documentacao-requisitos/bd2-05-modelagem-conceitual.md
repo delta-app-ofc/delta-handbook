@@ -49,7 +49,7 @@ A unidade em `property` entra em `org:properties`, recebe os dias de `consumptio
 #### 3. Neo4j: nós, relacionamentos e propriedades
 
 ```
-(User:Pessoa)-[:OWNS]->(Property:Casa|Predio:Residencial|Comercial)
+(User:Pessoa)-[:OWNS {associationDate}]->(Property:Casa|Predio:Residencial)
 (Property)-[:LOCATED_AT]->(Address)-[:IN_REGION]->(Region)-[:HAS_RATE]->(RegionRate)
 (Property)-[:HAS_DEVICE]->(Device)
 (User)-[:HAS_BILL]->(WaterBill)
@@ -63,9 +63,14 @@ A unidade em `property` entra em `org:properties`, recebe os dias de `consumptio
 | `Property` | `id`, `name`, `registrationDate` |
 | `Address` | `id`, `cep`, `city`, `state` |
 | `Region` | `id`, `name` |
-| `RegionRate` | `id`, `m3Value`, `initialValidity`, `finalValidity` |
+| `RegionRate` | `id`, `m3Value` (preço por m³), `initialValidity`, `finalValidity` |
+| `Device` | `id`, `deviceId`, `isActive`, `installationDate` |
+| `WaterBill` | `id`, `month`, `totalValue`, `m3Value` (consumo em m³) |
 | `UserHabit` | `id`, `frequency` |
-| `Habit`, `Day` | `id`, `name` |
+| `Habit` | `id`, `name`, `description` |
+| `Day` | `id`, `name` |
+
+O relacionamento `OWNS` guarda a propriedade `associationDate`. Os demais relacionamentos não têm propriedades. O rótulo `:Comercial` está previsto no modelo, mas nenhum imóvel carregado o usa.
 
 O nó `UserHabit` é uma interseção: a frequência e o dia de um hábito variam por usuário, e não pelo hábito do catálogo. Esse é o equivalente a uma tabela associativa no modelo relacional.
 

@@ -38,13 +38,8 @@ Parecer crítico é rejeitado. Aprovação com gravidade diferente de `no_error`
 | `reject`, `unavailable` ou correção esgotada | Mensagem segura e gráfico nulo. |
 
 
-## Limites da garantia
-
-O julgamento não é garantia de verdade, diagnóstico de vazamento ou validação de transação. Os thresholds controlam decisões do código, sem constituir acurácia medida no domínio.
-
-Cadastro de hábito já pode ter sido gravado antes desse parecer. Rejeitar a candidata não desfaz o cadastro. O guardrail final pode limpar texto aprovado e descartar gráfico, sem um segundo julgamento do texto limpo.
-
-Testes versionados: `test_ci_judge.py`, `test_ci_judge_specialist.py` e integração no grafo. A inspeção desses testes não equivale à execução real com Jev ou à avaliação de qualidade semântica.
+## Persistência antes de julgamento do Juiz
+O Delta só possui uma tool de escrita que é extremamente rigorosa em sua permissão. É necessário passar pelas constraints e checks específicos que já barram em caso de inconsistência. Portanto, optamos por não alterar o processo de julgamento do Juiz, e ele se mantém após essa tool.
 
 ## Código relacionado
 

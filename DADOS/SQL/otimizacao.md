@@ -130,7 +130,7 @@ Retorna o valor do metro cúbico da água.
 
 ####  Descrição
 
-A função verifica se um usuário possui todos os requisitos necessários para que o sistema possa gerar uma estimativa de consumo.
+A função valida o primeiro imóvel associado ao usuário (`ORDER BY tb_user_property.id`). A assinatura com um argumento usa `CURRENT_DATE`; a assinatura de dois argumentos usa `p_reference_date`. O contexto de previsão passa `p_today` para manter a mesma data em todas as validações.
 
 *Validações realizadas*
 
@@ -144,9 +144,8 @@ A função verifica se um usuário possui todos os requisitos necessários para 
 #### Assinatura
 
 ```sql
-fn_user_can_estimate(
-    p_user_id INTEGER
-)
+fn_user_can_estimate(p_user_id INTEGER)
+fn_user_can_estimate(p_user_id INTEGER, p_reference_date DATE)
 ```
 
 #### Retorno
@@ -262,14 +261,13 @@ Tabela com `full_date`, `total_liters` — uma linha por dia com consumo agregad
 
 #### Descrição
 
-Soma `total_liters`/`cost_value` do último mês calendário fechado antes de `p_today`. Como o dado real de
-telemetria organizacional ainda é escasso, quando o mês fechado não tem nenhuma linha a function cai num
-fallback: soma todo o histórico disponível das propriedades, rotulado com o mês da leitura mais recente.
+Soma `total_liters` e `cost_value` do mês calendário anterior a `p_today`. Se esse mês não tem leituras, seleciona o mês fechado mais recente com dados e soma apenas suas leituras. O mês corrente e leituras futuras são excluídos. Se não houver mês fechado disponível, não retorna linha.
 
 #### Assinatura
 
 ```sql
 fn_organization_last_billed_period(
+    p_user_id INTEGER,
     p_property_ids INTEGER[],
     p_today        DATE
 )
@@ -278,7 +276,7 @@ fn_organization_last_billed_period(
 #### Retorno
 
 Tabela com `reference_month`, `total_liters`, `total_cost` — uma linha, ou nenhuma se as propriedades não
-tiverem telemetria alguma.
+tiverem leituras em nenhum mês fechado.
 
 ---
 
@@ -434,17 +432,24 @@ fn_create_user_habit(
     p_user_id    INTEGER,
     p_habit_name VARCHAR,
     p_frequency  INTEGER,
-    p_days       VARCHAR[] DEFAULT ARRAY[]::VARCHAR[]
+    p_days       VARCHAR[] DEFAULT ARRAY[]::VARCHAR[],
+    p_start_time TIME      DEFAULT NULL,
+    p_end_time   TIME      DEFAULT NULL
 )
 ```
+
+`p_start_time` e `p_end_time` são opcionais e permitem cadastrar o mesmo hábito em horários diferentes.
 
 #### Retorno
 
 O `id` do registro criado em `tb_user_habit`. A function interrompe com erro quando:
 
 * o hábito não existe em `tb_habit`;
-* o usuário já possui esse hábito;
+* o usuário já possui esse hábito no mesmo dia da semana e no mesmo horário de início (erro lançado pela
+  trigger `trg_check_user_habit_day_conflict`; o mesmo hábito em outro dia ou horário é permitido);
 * algum dia informado não existe em `tb_day_of_week`.
+
+A regra de conflito está descrita em `modelagem-relacional.md` (tabela `tb_user_habit`).
 
 ---
 
@@ -569,6 +574,17 @@ A procedure executa:
 
 ---
 
+### 5. sp_register_user_access()
+
+Valida que o usuário existe e está ativo e registra um acesso em `tb_user_access_log`. O horário vem de `CURRENT_TIMESTAMP`. O canal é opcional e aceita `WEB`, `MOBILE`, `CHATBOT` ou `NULL`.
+
+```sql
+CALL sp_register_user_access(1, 'WEB');
+SELECT fn_get_dau(CURRENT_DATE);
+```
+
+`fn_get_dau(p_date DATE)` conta usuários distintos na data informada. A procedure rejeita usuários inativos, e o `CHECK` da tabela rejeita canais inválidos não nulos.
+
 ### Resumo
 #### Functions Implementadas
 
@@ -584,13 +600,15 @@ A procedure executa:
 | `fn_user_organization_properties()` | Function | Lista as propriedades de todas as organizações do usuário. |
 | `fn_organization_can_estimate()` | Function | Verifica se existe telemetria real em pelo menos uma propriedade da organização. |
 | `fn_organization_consumption_history()` | Function | Soma o consumo diário das propriedades informadas numa janela de dias. |
-| `fn_organization_last_billed_period()` | Function | Soma consumo/custo do último mês fechado, com fallback pro histórico disponível. |
+| `fn_organization_last_billed_period()` | Function | Soma consumo/custo do último mês fechado, com fallback para o mês fechado mais recente com leituras. |
 | `fn_organization_effective_rate()` | Function | Calcula a tarifa efetiva (R$/m³) numa janela de dias, a partir do consumo real. |
 | `fn_organization_forecast_context()` | Function | Compõe as 6 functions organizacionais acima num único round-trip para o Agente de Previsão. |
 | `fn_user_habits()` | Function | Lista os hábitos do usuário com os dias da semana. |
 | `fn_user_habits_by_day()` | Function | Lista os hábitos do usuário em um dia da semana. |
 | `fn_user_location()` | Function | Devolve cidade e estado do primeiro imóvel do usuário. |
 | `fn_create_user_habit()` | Function | Cadastra um hábito do usuário e vincula os dias da semana. |
+| `fn_check_user_habit_day_conflict()` | Function (trigger) | Barra o mesmo hábito, no mesmo dia e horário de início, ao inserir ou alterar um dia do hábito. |
+| `fn_check_user_habit_conflict()` | Function (trigger) | Mesma regra, ao alterar `user_id`, `habit_id` ou `start_time` de `tb_user_habit`. |
 
 ---
 
@@ -600,6 +618,7 @@ A procedure executa:
 |---|---|---|
 | `sp_change_region_rate()` | Procedure | Atualiza tarifas de uma região e categoria de imóvel mantendo o histórico de valores e controle de vigência. |
 | `sp_register_property()` | Procedure | Realiza o cadastro de uma propriedade e cria automaticamente o vínculo com o usuário responsável. |
+| `sp_register_user_access()` | Procedure | Registra o acesso de usuário ativo para o cálculo de DAU. |
 | `sp_disable_user()` | Procedure | Desativa usuários e seus dispositivos relacionados mantendo os dados históricos. |
 | `sp_update_property_classification()` | Procedure | Atualiza a categoria de classificação de um imóvel já cadastrado. |
 

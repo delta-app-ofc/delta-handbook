@@ -17,11 +17,13 @@ O template de Pull Request funciona como uma linha de defesa para a qualidade do
 
 ## 📂 2. Implementação no Repositório
 
-Para que o provedor de Git (como o GitHub ou GitLab) carregue este template automaticamente sempre que um novo Pull Request for aberto, o arquivo deve ser salvo exatamente no seguinte caminho do repositório:
+No GitHub, um repositório pode manter seu próprio template no caminho abaixo. Quando não há template próprio, os repositórios elegíveis herdam o template padrão do repositório organizacional `.github`, onde ele fica em `pull_request_template.md`:
 
 > **Caminho:** `.github/pull_request_template.md`
 
 ---
+
+Consulte o [template organizacional completo](https://github.com/delta-app-ofc/.github/blob/main/pull_request_template.md). O esquema a seguir explica as seções; não substitui os textos e opções oficiais usados pela automação.
 
 ## 📝 3. Estrutura Oficial do Template
 O template de Pull Request deve conter as seguintes seções, organizadas de forma clara e objetiva:
@@ -60,8 +62,25 @@ O template de Pull Request deve conter as seguintes seções, organizadas de for
 ## ⚙️ 4. Diretrizes de Preenchimento para a Equipe
 Para garantir que o fluxo de integração contínua ocorra sem problemas, os desenvolvedores devem se atentar às seguintes regras ao preencher o PR:
 
-- Conventional Commits: O título do Pull Request deve refletir o tipo de alteração principal (ex: feat: adiciona tabela tbl_alerta). 
+- Conventional Commits: O título do Pull Request deve refletir o tipo de alteração principal (ex: feat: adiciona tabela tb_alerta).
 - Descrições válidas: A descrição deve ser clara, objetiva e, no caso do 2° ano, deve mencionar o RF específico que está sendo atendido.
 - Checklist de Rigor Técnico: Todos os itens aplicáveis devem ser marcados para garantir a qualidade do código antes do Code Review.
 - Seleção de Módulos: Marcar corretamente os módulos impactados para facilitar a revisão e a rastreabilidade.
 - Evidências de IA: O preenchimento do bloco de Inteligência Artificial é obrigatório. Ocultar o uso de IA ou omitir os prompts no Memorial Descritivo invalidará a entrega do 1° ano.
+
+## 5. Responsabilidade de preenchimento e automação
+
+Preserve os títulos `## 📄 Descrição` e `## ✨ Tipo de PR`, os textos dos checkboxes e os itens obrigatórios. A descrição precisa conter pelo menos 30 caracteres úteis, sem contar as instruções padrão. Para alterações de processo ou infraestrutura sem RF de produto, explique essa não aplicabilidade em vez de inventar um requisito.
+
+| Item | Quem preenche ou confirma |
+| --- | --- |
+| Descrição, tipo e módulos | Autor da PR; marque pelo menos um tipo e um módulo reconhecidos. |
+| Uso de IA | Autor da PR; informe se houve auxílio e mantenha as evidências acadêmicas exigidas. |
+| Conventional Commits | Validador dos commits marca a opção após sucesso. O título da PR sozinho não comprova os commits. |
+| Proteção de `.env` | Validador de `.gitignore` e arquivos rastreados marca a opção após sucesso. |
+| Código testado | Reporter marca ou desmarca conforme o resultado dos jobs técnicos para a versão atual da PR. |
+| Demais itens técnicos | Autor e revisores avaliam conforme aplicabilidade; justifique N/A sem declarar verificações não realizadas. |
+
+O validador de checklist exige os itens de commits e testes, além de descrição, tipo, escopo e uso de IA. Os demais itens continuam relevantes para a revisão, mesmo sem uma checagem automática específica. Em uma PR documental, descreva a revisão do conteúdo, a validação Markdown e a conferência dos links; não declare testes de aplicação que não ocorreram.
+
+Não marque uma caixa para contornar um check reprovado. Confira o resultado da versão atual em Checks e aguarde a atualização automática. Veja o [fluxo de revisão e merge](pr-review-rules.md) para corrigir falhas de governança, reporter ou permissões.

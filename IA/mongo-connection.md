@@ -33,46 +33,15 @@ campos obrigatórios produzem `DatabaseDataError`, uma subclasse de
 `app.data.db_mongo.close_clients()`, que fecha os dois clientes e limpa ambos
 os caches.
 
-## Verificação de conectividade e leitura
+## Verificação atual
 
-Com os dois alvos configurados e acessíveis, execute na raiz do repositório:
+O CLI `python -m scripts.check_mongo` e seu modo `--fixture` não fazem parte do serviço. Os comandos anteriormente documentados foram retirados deste guia para evitar instrução inexistente.
 
-```bash
-python -m scripts.check_mongo
-```
+`tests/conftest.py` tem fixture com MongoDB real para histórico, `DELTA_TEST_MONGO_URI` (default `mongodb://localhost:27018`) e database **`delta_test_historico`**. Ela apaga esse database de teste no preparo/limpeza. Execute esses testes somente contra serviço descartável destinado aos testes; o nome fixo pode colidir com outra execução.
 
-O comando valida cada alvo, executa `ping` e lê no máximo um documento de
-`user_preferences` (app) e `consumption_summary` (telemetria), usando o nome de
-database configurado. O resultado identifica database e coleção e informa
-`documento_encontrado` ou `sem_documento`; nenhum conteúdo do documento é
-impresso. Um alvo indisponível faz o comando terminar com código diferente de
-zero, mas o outro alvo ainda é verificado. Sucesso sem documento comprova a
-consulta à coleção configurada, mas não valida conversão de um documento.
+Sem Mongo acessível, esses casos são pulados. A suíte verde com skips não prova persistência real. Outros testes usam substitutos para filtros, conversão e falhas.
 
-Para inserir, converter e remover documentos sintéticos, use a opção explícita
-`--fixture` somente em um Mongo local isolado:
-
-```powershell
-$env:APP_ENV = "test"
-$env:MONGODB_APP_URI = "mongodb://127.0.0.1:27018"
-$env:MONGODB_TELEMETRY_URI = "mongodb://127.0.0.1:27018"
-$env:MONGO_DB_APP = "delta_test_app"
-$env:MONGO_DB_TELEMETRY = "delta_test_telemetry"
-python -m scripts.check_mongo --fixture
-```
-
-O modo fixture exige `APP_ENV=test`, URIs `mongodb://` com porta explícita e
-um único host loopback (`localhost`, `127.0.0.1` ou `::1`), dois nomes de
-database distintos prefixados `delta_test_`, e ambos os alvos configurados.
-Ele cria documentos compatíveis em `user_preferences` e
-`consumption_summary`, lê-os pelos acessos de dados da aplicação, confere os
-valores convertidos e remove somente os dois `_id` que acabou de gerar. Se os
-databases ou coleções de teste ainda não existirem, o MongoDB poderá
-materializá-los ao inserir a fixture. Nunca use essa opção contra Atlas ou
-outro host; o script não cria nem altera schema, índices, validadores ou
-permissões de produção.
-
-## Resultado desta execução
+## Registro de verificação de conectividade
 
 Em 4 de outubro de 2026, `python -m scripts.check_mongo` terminou com código
 1. Os alvos `app` e `telemetry` retornaram a mensagem segura de falha de
@@ -81,7 +50,7 @@ os padrões de desenvolvimento apontaram para `localhost:27018`, mas o Docker
 Engine estava desligado e não havia serviço escutando nessa porta. O comando
 não tentou reconectar nem acessar clusters Atlas.
 
-Portanto, ping e leitura real de coleção com documento sintético continuam
+Naquela execução, ping e leitura real de coleção com documento sintético ficaram
 pendentes. Os 26 testes de `db_mongo` substituem clientes, databases e
 coleções; outros 3 testes cobrem o CLI, incluindo a falha independente de um
 alvo e a limpeza exata da fixture. Esses testes verificam filtros, ordenações,
@@ -89,3 +58,25 @@ conversão, erros e recusa de alvos não isolados, sem comprovar conectividade
 real. A suíte completa, executada com
 `python -m pytest -q -p no:cacheprovider`, terminou com 122 testes aprovados e
 uma advertência de depreciação da dependência `google.genai`.
+
+O comando e as contagens de testes acima descrevem essa execução anterior, não uma instrução para executar um módulo ausente. Os scripts de diagnóstico antigos não fazem parte do serviço.
+
+## Dados usados
+
+- Telemetria: janelas em `consumption_summary`, filtradas pelo usuário e recorte temporal.
+- App: preferências e meta diária, `alerts_history`, `weather_daily`, `chat_sessions` e `observability_requests`, conforme cada consumidor.
+- Clima é histórico armazenado por localização; não é chamada meteorológica em tempo real.
+- Sessões validam ObjectId, proprietário e exclusão lógica; detalhes em [memória](implementacao-memoria-sessoes.md).
+
+Falha de conexão ou autorização não vira lista vazia legítima. `_run_query` traduz erros de driver e documentos inválidos para exceções seguras; documento inválido pode gerar `DatabaseDataError`. As ferramentas podem traduzir isso para um status de indisponibilidade, conforme seu contrato.
+
+## Fechamento e persistência
+
+`close_clients` fecha os dois clientes inicializados e limpa caches, tentando encerrar ambos mesmo se um falhar. A função existe, mas não está ligada ao `lifespan` atual da API. Não confunda disponibilidade da função com execução automática no encerramento.
+
+Schema, índices, permissões e TTL precisam ser aplicados pelo responsável do banco; a IA não é substituto dos scripts oficiais do `delta-mongo-database`. A gravação de histórico e de métricas tem caminhos próprios e pode falhar sem impedir a resposta final do chatbot.
+
+## Código relacionado
+
+- [app/data/db_mongo.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/data/db_mongo.py)
+- [tests/conftest.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/tests/conftest.py)

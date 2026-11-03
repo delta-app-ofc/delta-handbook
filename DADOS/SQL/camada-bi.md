@@ -5,7 +5,7 @@ camadas, modelagem dimensional (star schema), CTEs, Window Functions, índices e
 partir do MongoDB. Cobre o perfil comercial/industrial (unidades operadas por organização) e o resumo
 analítico do perfil residencial já existente.
 
-🔗 Repositório: https://github.com/delta-app-ofc/delta-database (pasta `datamart/`)
+🔗 Repositório: https://github.com/delta-app-ofc/delta-sql-database (pasta `datamart/`)
 
 ---
 
@@ -28,13 +28,13 @@ não fingir dado de produção, e sim rodar um teste de capacidade separado, iso
 
 | Camada | Papel | Materialização |
 |---|---|---|
-| `stage` | Cópia bruta, sem tratamento, do que vem de fora do Postgres (hoje só telemetria do MongoDB) | Tabela, com `loaded_at` |
+| `stage` | Cópia bruta do MongoDB: `consumption_summary`, `user_preferences` e `alerts_history` | Tabela, com `loaded_at` |
 | `silver` | Dado tratado: tipado, deduplicado, no grão original (ainda sem chave substituta) | Tabela |
 | `gold` | Modelo dimensional final - star schema, chave substituta, pronto pra consumo analítico | Tabela |
-| `dw` | Só views (`dw.vw_*`) - a camada de consumo do BI, CTEs + Window Functions, lendo só do `gold` | View |
+| `dw` | Só views (`dw.vw_*`) - a camada de consumo do BI, CTEs + Window Functions; `vw_ft_user_goal` também lê `tb_user_property`, e a view recursiva lê auditoria | View |
 
 Dado cadastral do Postgres que já chega limpo (propriedade, pessoa, fatura, cenário de investimento) **pula
-a `stage`** e entra direto na `silver` - só o que vem de fora (hoje, telemetria do MongoDB) precisa do
+a `stage`** e entra direto na `silver` - só o que vem de fora (telemetria, preferências e alertas do MongoDB) precisa do
 espelho bruto. Isso é uma decisão de desenho, não uma inconsistência: `stage` existe para isolar o formato
 de uma fonte externa, e dado que já nasce no Postgres não tem esse problema.
 
@@ -42,8 +42,8 @@ de uma fonte externa, e dado que já nasce no Postgres não tem esse problema.
 
 ## 3. Modelo dimensional (star schema)
 
-Star schema puro (sem snowflake - nenhuma dimensão referencia outra dimensão), com `gold.dm_date` como
-dimensão conformada compartilhada por duas tabelas fato:
+O núcleo de consumo, faturas e alertas segue Star Schema, com `gold.dm_date` como
+dimensão conformada compartilhada pelas tabelas fato temporais:
 
 ```
                     gold.dm_date (dimensão conformada)
@@ -58,9 +58,10 @@ gold.dm_property--+--gold.ft_consumption_daily      gold.ft_water_bill_monthly--
 | `gold.dm_date` | 1 linha por dia | `date_key` (INTEGER, YYYYMMDD) | - (dimensão raiz, gerada por `generate_series`) |
 | `gold.dm_property` | 1 linha por propriedade | `property_key` (substituta) | `property_id` (único, aponta pra `tb_property.id`) |
 | `gold.dm_person` | 1 linha por pessoa | `person_key` (substituta) | `user_id` (único, aponta pra `tb_user.id`) |
+| `gold.dm_user_preference` | 1 linha de preferências por pessoa | `preference_key` | Pessoa e metas de consumo |
 
 `gold.dm_property` traz o nome da organização já denormalizado na própria linha (`organization_name`) - é
-isso que mantém o desenho como star, não snowflake: dado de organização não vira uma dimensão à parte.
+isso preserva a organização dentro da dimensão de propriedade. A extensão de preferências referencia `gold.dm_person` por `person_key`, acrescentando uma relação entre dimensões.
 
 ### Fatos
 
@@ -68,6 +69,7 @@ isso que mantém o desenho como star, não snowflake: dado de organização não
 |---|---|---|---|---|
 | `gold.ft_consumption_daily` | 1 linha por propriedade x dia | `fact_key` | `property_key`, `date_key` | `total_liters`, `avg_flow_lmin`, `cost_value` |
 | `gold.ft_water_bill_monthly` | 1 linha por pessoa x mês | `fact_key` | `person_key`, `date_key` | `total_value`, `m3_value` |
+| `gold.ft_alert` | 1 linha por ocorrência de alerta | `alert_key` | `property_key`, `person_key`, `date_key` | Instantes de disparo/resolução; tempo de resolução calculado pela view |
 | `gold.ft_investment_scenario` | 1 linha por cenário (fato degenerado, sem FK de dimensão - não cruza com tempo/propriedade/pessoa) | `scenario_key` | - | `investment_value`, `reduction_pct`, `annual_savings_value`, `payback_months` |
 
 `gold.ft_investment_scenario` é fato (tem medida numérica analisável - ranking por payback) mas não é
@@ -77,8 +79,8 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
 
 ## 4. Fluxo de dados por conjunto
 
-- **Consumo (telemetria industrial)** - o único fluxo que passa pelas 4 camadas de verdade, porque é o
-  único dado que chega de fora do Postgres:
+- **Consumo (telemetria industrial)** - um fluxo que passa pelas 4 camadas, por ser
+  um dos conjuntos que chegam de fora do Postgres:
 
   `MongoDB db_delta_telemetry.consumption_summary` (real) → `bi_etl.py` → `stage.consumption_summary`
   (cópia 1:1, `mongo_id` único e idempotente) → `silver.sp_load_ft_consumption_reading` (`JOIN tb_device`
@@ -86,7 +88,7 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
   `UNIQUE (device_id, read_at)`, porque uma propriedade pode ter mais de 1 dispositivo instalado) →
   `silver.sp_load_ft_consumption_daily` (CTE de agregação por dia, soma todos os devices de uma
   propriedade) → `silver.ft_consumption_daily` →
-  `gold.sp_load_ft_consumption_daily` (chave substituta + `fn_get_current_region_rate` pro custo) →
+  `gold.sp_load_ft_consumption_daily` (chave substituta + consulta `LATERAL` em `tb_region_rate` para o custo) →
   `gold.ft_consumption_daily` → `dw.vw_ft_consumption_daily` / `vw_ft_property_ranking` / `vw_ft_monthly_variation`
   / `vw_ft_consumption_distribution`.
 
@@ -107,6 +109,8 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
   `stage`/`silver`: `tb_investment_scenario` → `gold.sp_load_ft_investment_scenario` (só chave substituta)
   → `gold.ft_investment_scenario` → `dw.vw_ft_capex_comparison`.
 
+- **Alertas e metas** - `MongoDB alerts_history` e `user_preferences` → `bi_etl.py` → respectivas tabelas de `stage` → procedures de `silver` e `gold` → `dw.vw_ft_alert` e `dw.vw_ft_user_goal`. A view de metas também associa as propriedades às pessoas por `tb_user_property`.
+
 - **Auditoria (cadeia de reajuste de tarifa)** - fora do star schema, é a estrutura avançada da seção 6:
   `tb_region_rate` (operações reais) → `trg_log_region_rate`/`fn_log_region_rate` (auditoria já existente)
   → `tb_log_region_rate` → `dw.vw_audit_history_chain` (CTE recursiva direto sobre o log de auditoria).
@@ -117,11 +121,11 @@ transacional: é referência estática, por isso não tem dimensão de tempo ass
 
 ### CTEs (`WITH`)
 
-Todas as 7 views de `dw` usam pelo menos uma CTE, além de 1 procedure de carga:
+Oito das nove views de `dw` usam CTEs, além da procedure de carga; `vw_ft_alert` usa um `SELECT` direto:
 
 - `silver.sp_load_ft_consumption_daily` - agrega leituras por propriedade/dia antes do `INSERT`.
 - `dw.vw_ft_consumption_daily` - CTE monta os `JOIN`s (propriedade, data) antes das window functions -
-  necessário, porque o Postgres não permite `JOIN` depois de `OVER` no mesmo nível.
+  organiza a leitura em etapas; o PostgreSQL também permite `JOIN` e window functions na mesma consulta.
 - `dw.vw_ft_property_ranking` - 2 CTEs em cadeia: agrega consumo/custo, depois calcula litros/m² - evita
   repetir a divisão em cada `OVER` do `SELECT` final.
 - `dw.vw_ft_consumption_distribution` - agrega os totais diários, depois calcula os percentis
@@ -130,6 +134,7 @@ Todas as 7 views de `dw` usam pelo menos uma CTE, além de 1 procedure de carga:
 - `dw.vw_ft_capex_comparison` - CTE simples, por padronização com as outras views.
 - `dw.vw_ft_residential_efficiency_ranking` - monta os `JOIN`s antes das window functions.
 - `dw.vw_audit_history_chain` - `WITH RECURSIVE` (seção 6).
+- `dw.vw_ft_user_goal` - média de consumo por pessoa nos últimos 30 dias antes da comparação com a meta.
 
 ### Window Functions
 
@@ -211,8 +216,7 @@ necessário. Pra responder "esse índice vai ajudar quando o volume crescer de v
 7. Compara os dois planos reais - nunca usando `SET enable_seqscan=off` pra forçar um resultado.
 8. Container descartado ao final.
 
-**Rodada 1** testou os 2 índices que já existiam (ver tabela abaixo). **Rodada 2**, depois de a autora
-pedir um teste mais rigoroso, testou sistematicamente **as 7 views de `dw`, uma por uma**, em volume grande
+**Rodada 1** testou os 2 índices que já existiam (ver tabela abaixo). **Rodada 2** testou sistematicamente **as 7 views de `dw`, uma por uma**, em volume grande
 (até 730.000 linhas em `gold.ft_consumption_daily`), pra confirmar se sobrava algum índice faltando -
 processo descrito na íntegra a seguir.
 
@@ -266,7 +270,7 @@ cresce.
 
 ## 8. Extração real de dados (MongoDB → Postgres)
 
-`bi_etl.py` (raiz do `delta-database`) extrai `db_delta_telemetry.consumption_summary` do MongoDB real e
+`bi_etl.py` (raiz do `delta-sql-database`) extrai `db_delta_telemetry.consumption_summary` do MongoDB real e
 carrega a cadeia `stage → silver → gold`:
 
 1. Lê o watermark atual (`MAX(window_started_at)` em `stage.consumption_summary`); se vazio, busca todo o
@@ -292,21 +296,12 @@ correspondente no Mongo ainda.
 
 ---
 
-## 9. Pendências conhecidas
+## 9. Quem consome o PostgreSQL
 
-- **Simulador não usa o `device_id` real do Postgres**: o `delta-hardware-data-simulator` ainda se
-  autonumera, em vez de puxar os `device_id` cadastrados em `tb_device`. Fora do escopo do
-  `delta-database` corrigir (é código de outro repositório).
-- **Agentes de IA não leem o perfil comercial/industrial**: o Agente de Previsão
-  (`delta-artificial-intelligence`) depende inteiramente de `tb_user_property` (posse residencial direta) -
-  um usuário vinculado só por `tb_user_organization` nunca passa em `fn_user_can_estimate`, mesmo com
-  telemetria real na camada `gold`. `TASK.md` completo criado naquele repositório para fechar essa lacuna.
-- **`tb_user.is_manager` x `tb_user_organization`**: duas fontes de verdade pro mesmo fato (bater 1:1 nos
-  dados de teste atuais). Mantidas as duas por decisão de escopo; unificação registrada como pendência
-  futura.
-- **Redis/Neo4j**: documentados como planejados em toda a arquitetura do projeto (ver
-  `DADOS/infra-bancos.md`, seção 4.2), sem código em nenhum repositório - nada a fazer aqui. Se o ranking
-  Web em Redis (`ZSET`) for implementado no futuro, ele seria um cache de leitura alimentado por
-  `dw.vw_ft_property_ranking`, não um substituto dela.
-- **Coleções MongoDB do perfil industrial** (alerta, escalonamento, relatório agendado) - fora do escopo
-  deste repositório (só Postgres); pendência de modelagem pra quem cuidar do MongoDB do perfil industrial.
+| Consumidor | O que lê |
+|---|---|
+| `delta-api-postgres` (API REST, Java) | Tabelas de cadastro, as seis views `dw.vw_ft_*` de rankings e consumo e `dw.vw_audit_history_chain` (`AnalyticsController`), `sp_register_property` e `fn_calculate_water_cost` |
+| `delta-artificial-intelligence` (agentes de IA) | `dw.vw_ft_consumption_daily`, as Functions `fn_user_*` e `fn_organization_*` e tabelas como `tb_last_water_bill` e `tb_investment_scenario` |
+| `delta-business-rules` (regras de detecção) | `tb_user_property`, `tb_property` e `fn_get_property_classification_group` |
+| `delta-redis-database` (ranking em tempo real) | Propriedades e consumo do PostgreSQL, buscados pela `delta-api-postgres` na rota `/sync` |
+| Web app e mobile app | Dados do PostgreSQL pela `delta-api-postgres` |

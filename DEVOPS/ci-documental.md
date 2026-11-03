@@ -7,3 +7,6 @@ python scripts/validate_markdown.py
 ```
 
 O comando verifica os arquivos Markdown rastreados pelo Git: leitura em UTF-8, conteúdo não vazio e marcadores comuns de conflito de merge. Arquivos novos precisam estar adicionados ao índice Git para serem incluídos na verificação local. A validação não confere links, sintaxe completa de Markdown ou a correção do conteúdo.
+
+
+No fluxo de PR do handbook, esse comando corresponde a `ci-tecnico`. O check `Testes Sonar` depende do sucesso dessa validação e publica N/A para análise e cobertura Sonar. Depois, o reporter tenta atualizar o checklist, e a governança verifica o template e solicita revisores. Consulte o [fluxo completo de aprovação](pr-review-rules.md).

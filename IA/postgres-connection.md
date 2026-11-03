@@ -1,17 +1,10 @@
 # Conexão PostgreSQL
 
-O módulo `app/data/db_postgres.py` abre uma conexão `psycopg2` por operação e
-fecha cursor e conexão ao concluir a consulta ou ao ocorrer uma falha. O
-projeto não mantém um pool de conexões.
+O módulo `app/data/db_postgres.py` empresta conexões de um pool `psycopg2.pool.ThreadedConnectionPool` por processo. Cria o pool no primeiro uso, fecha o cursor de cada operação e devolve a conexão ao concluir ou falhar. A aplicação chama `close_pool()` no encerramento.
 
 ## Configuração
 
-Use `DATABASE_URL` para uma URI PostgreSQL completa ou configure as cinco
-variáveis `HOST_DB`, `PORT_DB`, `USER_DB`, `PASSWORD_DB` e `NAME_DB`. Um conjunto
-separado completo tem precedência sobre `DATABASE_URL`; se qualquer variável
-separada for informada sem completar o conjunto, a validação falha antes de
-chamar o driver. A URI completa é passada ao `psycopg2` sem ser remontada, para
-preservar opções como TLS e senhas percent-encoded.
+Use `DATABASE_URL` para uma URI PostgreSQL completa. A URI é passada ao `psycopg2` sem ser remontada, preservando opções como TLS e senhas percent-encoded. O conector não lê as cinco variáveis SQL separadas anteriormente usadas.
 
 Os limites são definidos em segundos:
 
@@ -20,34 +13,28 @@ Os limites são definidos em segundos:
 | `DB_CONNECT_TIMEOUT_SECONDS` | Passado ao `psycopg2` como `connect_timeout`, em segundos. |
 | `DB_QUERY_TIMEOUT_SECONDS` | Convertido para milissegundos e aplicado à sessão PostgreSQL como `statement_timeout`. |
 
-Se a URI já declarar opções do libpq, como `search_path`, a aplicação acrescenta
-`statement_timeout` às opções existentes. O timeout de conexão limita a abertura
-da conexão; o timeout de consulta limita a execução no servidor.
+O `statement_timeout` é configurado localmente à transação via `set_config`, para não vazar entre usos do pool. O timeout de conexão limita a abertura da conexão; o timeout de consulta limita a execução no servidor.
 
 ## Verificação
 
-Com as variáveis de ambiente configuradas e o PostgreSQL acessível, execute:
+Com as variáveis de ambiente configuradas e um PostgreSQL de teste acessível, o benchmark de leitura permite verificar conexão direta e pool:
 
 ```bash
-python -m scripts.check_postgres
+python -m scripts.bench_pool --ops 20 --threads 2
 ```
 
-O comando valida somente a configuração PostgreSQL, abre a conexão e executa
-`SELECT 1`. Ele não exige chaves de LLM nem depende das tabelas, funções ou views
-do produto. Sucesso retorna código zero; falha retorna código diferente de zero
-e imprime somente um diagnóstico seguro.
+Ele executa `SELECT 1` sem depender das tabelas do produto e compara operações diretas com o pool. Não exige LLM. O antigo `scripts.check_postgres` não faz parte do serviço.
 
 Uma resposta de `SELECT 1` confirma conectividade, autenticação e acesso ao banco
 indicado. Ela não comprova que esse banco tenha as tabelas e funções usadas pelo
 Agente de Previsão.
 
-Na execução de **4 de outubro de 2026**, o comando retornou código 1 com o
+Na execução de **4 de outubro de 2026**, o antigo diagnóstico `scripts.check_postgres` retornou código 1 com o
 diagnóstico seguro `Não foi possível conectar ao PostgreSQL.`. O Docker Engine
 local estava indisponível, a porta local 5432 não tinha serviço escutando e
 esta execução não dispunha de `DATABASE_URL` nem das variáveis separadas. A
 configuração padrão de desenvolvimento apontou para o serviço local. Portanto,
-o `SELECT 1` real continua pendente; a verificação usa um serviço local quando
-ele estiver disponível e não foi executada contra o banco oficial.
+o `SELECT 1` real ficou pendente naquela execução, que não acessou o banco oficial. Esse registro não substitui uma verificação do ambiente utilizado.
 
 ## Banco local e banco oficial
 
@@ -57,3 +44,22 @@ oficial do schema permanece no repositório
 [`delta-sql-database`](https://github.com/delta-app-ofc/delta-sql-database). Uma conexão validada no
 container local não valida acesso ao PostgreSQL oficial nem garante que suas
 views e dados organizacionais estejam disponíveis.
+
+## Ciclo de uma operação
+
+`_cursor` adquire uma vaga, obtém conexão, prepara timeout transacional e entrega cursor. Sucesso faz commit; a limpeza fecha cursor, devolve ou descarta conexão e libera vaga. Transação aberta após falha é desfeita ao devolver conexão saudável ao pool.
+
+Uma conexão quebrada pode ser trocada uma vez **antes de executar o SQL da operação**. Esse preparo não repete uma escrita já concluída. Erros de driver viram exceções públicas seguras; ausência de linha não deve ser confundida com indisponibilidade.
+
+`close_pool` fecha conexões e permite recriação, inclusive após recarga controlada de settings. A API o chama no `lifespan`. `get_conn` permanece como conexão direta de diagnóstico, fora do pool.
+
+## Consultas e dependências
+
+A IA depende de cadastro ativo, vínculos, unidades autorizadas, tarifas, contas e hábitos. Consumo/previsão organizacionais leem camada consolidada SQL, incluindo `dw.vw_ft_consumption_daily` e funções auxiliares. Cadastro de hábito usa `fn_create_user_habit`, cuja disponibilidade e permissão precisam ser conferidas no banco alvo.
+
+Consultas usam parâmetros e IDs vinculados ao usuário. A seleção de unidade precisa ocorrer antes da leitura. Não ter dados suficientes é diferente de falha de conexão ou função/view ausente.
+
+## Código relacionado
+
+- [app/data/db_postgres.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/data/db_postgres.py)
+- [scripts/bench_pool.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/scripts/bench_pool.py)

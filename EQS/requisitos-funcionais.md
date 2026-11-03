@@ -1,64 +1,48 @@
-Definição dos requisitos funcionais e mais detalhes sobre cada um.
+# Documento de Requisitos Funcionais do Projeto Delta
 
-## 1 - Cadastro Da Rotina
+Este documento tem como objetivo registrar e organizar os requisitos funcionais do Projeto Delta, descrevendo as principais funcionalidades e comportamentos que o sistema deve oferecer aos usuários e aos demais componentes envolvidos. Os requisitos apresentados servem como base para o desenvolvimento, validação e acompanhamento das funcionalidades do sistema, garantindo alinhamento entre as necessidades do projeto e sua implementação.
 
-- Características da residência (gasto em banhos, cozinha, lavagem de roupa, rega de plantas, piscina, entre outros) para análises melhores e maior precisão dos algoritmos.
+RF = Requisito Funcional
 
----
+## RF - Autenticação e Gerenciamento de Usuários
+- RF01 -> O sistema deve permitir que novos usuários realizem seu cadastro, fornecendo as informações pessoais necessárias.
+- RF02 -> O sistema deve permitir que usuários cadastrados realizem login utilizando suas credenciais.
+- RF03 -> O sistema deve validar as informações fornecidas durante o cadastro e informar ao usuário quando houver dados inválidos.
+- RF04 -> O sistema deve permitir que usuários autenticados encerrem sua sessão.
+- RF05 -> O sistema deve permitir que o usuário consulte suas informações de perfil.
+- RF06 -> O sistema deve permitir que o usuário altere suas informações de perfil.
 
-## 2 - Limites e Metas de Consumo
+## RF - Monitoramento do Consumo de Água
+- RF07 -> O sistema deve receber automaticamente os dados de consumo de água enviados pelos dispositivos de monitoramento.
+- RF08 -> O sistema deve registrar as medições recebidas, associando-as ao dispositivo responsável e ao momento da coleta.
+- RF09 -> O sistema deve calcular o volume de água consumido a partir das medições recebidas.
+- RF10 -> O sistema deve permitir que o usuário visualize seu consumo de água acumulado.
+- RF11 -> O sistema deve permitir que o usuário consulte seu histórico de consumo de água.
+- RF12 -> O sistema deve permitir que o usuário visualize informações sobre a vazão de água registrada pelos dispositivos.
+- RF13 -> O sistema deve apresentar indicadores e gráficos relacionados ao consumo de água do usuário.
+- RF14 -> O sistema deve permitir a consulta dos dados de consumo por períodos determinados.
 
-- Definição de limites em litros (L), metros cúbicos (m³) ou valor monetário (R$) para o controle proativo do consumo.
+## RF - Detecção de vazamentos e alertas
+- RF15 -> O sistema deve analisar os dados de consumo para identificar padrões que indiquem possíveis vazamentos.
+- RF16 -> O sistema deve identificar períodos de consumo contínuo ou anormal que possam representar desperdício de água.
+- RF17 -> O sistema deve gerar alertas quando identificar indícios de vazamento.
+- RF18 -> O sistema deve permitir que o usuário consulte os alertas de possíveis vazamentos identificados.
+- RF19 -> O sistema deve enviar notificações ao usuário sobre situações relevantes relacionadas ao consumo ou a possíveis vazamentos.
 
----
+## RF - Inteligência Artificial e Sistema Multiagente
+- RF20 -> O sistema deve permitir que o usuário interaja com um chatbot para realizar consultas relacionadas ao consumo de água.
+- RF21 -> O sistema deve interpretar as perguntas do usuário e encaminhá-las ao módulo especializado correspondente.
+- RF22 -> O sistema deve permitir que o usuário solicite análises sobre seu histórico de consumo de água por meio do chatbot.
+- RF23 -> O sistema deve permitir que o usuário consulte possíveis vazamentos identificados por meio do chatbot.
+- RF24 -> O sistema deve gerar previsões de consumo de água com base nos dados históricos disponíveis.
+- RF25 -> O sistema deve permitir que o usuário consulte previsões de consumo por meio do chatbot.
+- RF26 -> O sistema deve consultar informações de uma base de conhecimento para responder a perguntas relacionadas ao uso consciente da água.
+- RF27 -> O sistema deve verificar as respostas produzidas pelos agentes antes de apresentá-las ao usuário, conforme critérios de validação definidos.
+- RF28 -> O sistema deve manter o contexto da conversa durante uma sessão de interação com o chatbot.
 
-## 3 - Monitoramento em Tempo Semi-Real
-
-- Acompanhamento do consumo em intervalos configuráveis (5, 10, 15 minutos).
-- Visualização do consumo acumulado, vazão média, histórico recente e evolução temporal.
-
----
-
-## 4 - Conversão de Consumo em Valor Monetário
-
-- Conversão automática do consumo registrado em estimativa financeira com base no valor do m3 do mês passado.
-
----
-
-## 5 - Alertas Inteligentes
-
-- Notificações das quebras de limites definidos, ou fuga do padrão esperado.
-- Alertas preditivos sobre ultrapassagem de metas faixas tarifadas.
-
----
-
-## 6 - Detecção de Vazamentos
-
-- Analises do fluxo da água e identificação de possíveis vazamentos automaticamente.
-
----
-
-## 7 - Previsão da Conta Final de Água
-
-- Utilização dos dados de consumo e histórico para estimativa do valor pago na próxima fatura.
-
----
-
-## 8 - API de Clima Tempo Integrada
-
-- Integração com API de Clima para fornecer informações meteorológicas em tempo real para região do usuário, afim de auxiliar na organização da rotina e no consumo de água.
-- Dados como temperatura, probabilidade de chuva e condições climáticas, auxiliam no apoio para as decisões para dia a dia, como a realização de atividades externas que envolvem consumo de água.
-
----
-
-## 9 - Chatbot Inteligente
-
-- Consultas em linguagem natural aos dados de consumo. picos, vazamentos, clima, valor futuro, entre outros.
-
----
-
-## 10 - Dashboard Gerencial
-
-- Painel central de visualização dos dados de consumo diário/semanal/mensal, evolução histórica, conta estimada, meta atual, alertas ativos e vazamentos identificados.
-
----
+## RF - Funcionalidades Adicionais
+- RF29 -> O sistema deve permitir que o usuário associe dispositivos de monitoramento a um imóvel.
+- RF30 -> O sistema deve permitir que o usuário defina metas de consumo de água.
+- RF31 -> O sistema deve acompanhar o consumo em relação às metas estabelecidas.
+- RF32 -> O sistema deve estimar o valor financeiro do consumo de água com base em tarifas configuradas.
+- RF33 -> O sistema deve permitir que o usuário consulte recomendações para reduzir o desperdício de água.

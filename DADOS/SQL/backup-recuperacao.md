@@ -82,7 +82,7 @@ Do cenário mais simples ao mais grave:
    (ex.: o próprio Neon ficou inacessível por tempo indeterminado, ou
    ainda não existe nenhum backup rodado). Como último recurso, dá pra
    criar um projeto novo no Neon, aplicar o schema do zero (os scripts
-   presentes no `delta-database`) e rodar o `delta-rpa` apontando pra esse
+   presentes no `delta-sql-database`) e rodar o `delta-rpa` apontando pra esse
    banco novo — ele importa o dado do banco legado. Isso **não recupera os
    registros recentes**, só o dado fundacional que o RPA migra do banco
    legado, mas devolve o sistema a um estado funcional em vez de ficar

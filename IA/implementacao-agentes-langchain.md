@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Implementar os agentes especializados do Delta — Previsão, Vazamento e Hábitos — usando **LangChain** para estruturar o ciclo de raciocínio do modelo de IA com ferramentas (tools) que acessam dados reais.
+Implementar os agentes especializados do Delta — Consumo, Previsão, Vazamento, Hábitos e RAG — usando **LangChain** para estruturar o ciclo de raciocínio do modelo de IA com ferramentas (tools) que acessam dados reais.
 
 ## Contexto
 
@@ -32,9 +32,10 @@ class AgentResult:
     response: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     chart_data: dict | None = None  # gráfico Plotly, quando gerado
+    sources: list[str] = field(default_factory=list)
 ```
 
-`ToolCall` registra o nome da tool, os argumentos usados e o resultado — útil para o Agente Juiz futuramente verificar se a resposta é coerente com os dados consultados.
+`ToolCall` registra o nome da tool, os argumentos usados e o resultado — usado pelo Agente Juiz para verificar se a resposta é coerente com os dados consultados.
 
 ---
 
@@ -46,9 +47,9 @@ class AgentResult:
 
 | Tool | O que faz | Fonte |
 |------|-----------|-------|
-| `get_consumption_history` | Busca histórico de consumo mensal | MongoDB |
-| `get_last_water_bill` | Última conta de água (valor e consumo) | PostgreSQL |
-| `get_tariff` | Tarifa da região do usuário | PostgreSQL |
+| `get_consumption_history` | Busca histórico recente de consumo | MongoDB residencial / PostgreSQL organizacional |
+| `get_last_bill` | Última conta de água (valor e consumo) | PostgreSQL |
+| `get_region_rate` | Tarifa da região do usuário | PostgreSQL |
 | `calculate_forecast` | Calcula previsão determinística | cálculo interno |
 
 ### Gráfico gerado
@@ -90,7 +91,7 @@ O motor de detecção usa regras explicáveis (fluxo contínuo, consumo de madru
 
 | Tool | O que faz |
 |------|-----------|
-| `check_anomaly_status` | Verifica se há anomalia ativa na última janela |
+| `get_anomalous_windows` | Lê janelas já sinalizadas como anômalas no período |
 | `get_alerts_history` | Lista alertas históricos do usuário |
 | `summarize_anomalous_windows` | Resume janelas temporais com consumo atípico |
 
@@ -106,7 +107,7 @@ O motor de detecção usa regras explicáveis (fluxo contínuo, consumo de madru
 |------|-----------|-------|
 | `list_habits` | Lista hábitos com frequência e dias | PostgreSQL |
 | `get_habits_by_day` | Filtra hábitos por dia da semana | PostgreSQL |
-| `get_realtime_weather` | Condições climáticas atuais | API Tomorrow.io |
+| `get_weather_history` | Histórico meteorológico por localização | MongoDB `weather_daily` |
 
 O agente de hábitos inclui ferramentas de clima porque hábitos ao ar livre (regar plantas, lavar quintal, lavar carro) dependem do tempo.
 
@@ -141,14 +142,14 @@ Os identificadores (nomes de variáveis, funções) são em inglês; os prompts 
 
 ## Modelos de IA — `app/services/llms.py`
 
-Dois modelos configurados:
+Os papéis de modelo são selecionados por `LLM_PROVIDER`:
 
 | Variável | Modelo padrão | Uso |
 |----------|---------------|-----|
-| `llm_gemini` | `gemini-2.5-flash` (fallback: `openai/gpt-oss-120b` via Groq) | Agentes especializados |
-| `llm_rapido` | `openai/gpt-oss-20b` via Groq | Router, resumos, contexto |
+| `llm_especialista` | `OPENAI_MODEL=gpt-6-luna` por padrão; `GEMINI_MODEL` no modo Gemini | Agentes especializados |
+| `llm_rapido` | Mesmo modelo OpenAI com raciocínio próprio; `GROQ_FAST_MODEL` no modo Gemini | Guarda, roteador, síntese, metadados e resumos |
 
-Os modelos efetivos são lidos das variáveis de ambiente `GEMINI_MODEL`, `GROQ_SPECIALIST_MODEL` e `GROQ_FAST_MODEL`; os valores acima são os defaults definidos em `app/config.py`. O fallback para Groq garante que, se a cota do Gemini acabar ou o modelo estiver indisponível, a aplicação continua funcionando com outro provedor.
+Os modelos e parâmetros são configurados em `app/config.py`; veja [modelos](llm-models.md). O adaptador especialista permite fallback para Groq em falhas transitórias reconhecidas, quando habilitado e configurado. Isso oferece uma alternativa de provedor, sem garantir resposta se ambos falharem. `llm_gemini` é o cliente individual Gemini, sem fallback próprio.
 
 ---
 
@@ -169,3 +170,36 @@ def test_forecast_agent_runs():
 ## Referência arquitetural
 
 Ver [arquitetura-inteligencia-artificial.md](arquitetura-inteligencia-artificial.md) — seções "Responsabilidade dos Agentes" e "LangChain".
+
+## Agente de Consumo
+
+`ConsumptionAgent` está registrado no roteador. Soma registros, compara períodos, lista unidades autorizadas e encontra picos diários. O recorte temporal, a diferença entre ausência e zero e a autorização estão detalhados em [consumo](consumption-agent.md).
+
+## Agente RAG
+
+`RagAgent` recupera regras do produto com `search_knowledge_base` e práticas gerais por `search_external_knowledge`, vinculada ao perfil. Veja [recuperação documental](rag-retrieval.md) e [MCP](mcp-conhecimento-externo.md).
+
+## Ferramentas adicionais
+
+Além das consultas acima, previsão expõe elegibilidade, meta, baseline de hábitos, simulação percentual, troca de meta e cenários de investimento. Vazamento expõe `get_habit_windows` para contexto residencial. Hábitos expõe cadastro, estimativas de litros e custo. Os contratos completos estão em [previsões e simulações](previsoes-simulacoes.md) e [hábitos](habitos.md).
+
+## Ciclo de ferramentas
+
+`app/agents/_runtime.py` oferece `run_agent`: recebe modelo, prompt, ferramentas e pergunta; vincula ferramentas com `bind_tools`; chama o modelo; executa as ferramentas solicitadas; acrescenta `AIMessage`/`ToolMessage` e repete até obter texto. O limite padrão é seis iterações; depois pede resposta final sem novas ferramentas.
+
+`AgentResult` contém `response`, `tool_calls`, `chart_data` e `sources`. Cada `ToolCall` registra nome, entrada e output efetivo. O runtime remove chaves `user_id` do output apresentado ao modelo; a autorização já está aplicada na construção das ferramentas.
+
+Ferramentas são executadas pela aplicação. O modelo escolhe entre operações expostas, mas não deve definir o usuário confiável nem calcular números que as funções determinísticas retornam.
+
+## Prompts, gráficos e revisão
+
+`app/services/prompts.py` delimita papéis e incorpora regras do perfil. Ter texto de prompt para um papel não o torna um agente registrado.
+
+Os gráficos são construídos em `app/tools/charts.py` a partir dos resultados das ferramentas e devolvidos como dicionários Plotly. Não são evidência independente de medição. Na composição multiagente, a saída usa o primeiro gráfico disponível.
+
+O runtime aceita feedback e contexto de revisão em mensagens separadas da pergunta. O grafo preserva evidências anteriores para o [Juiz](agente-juiz.md). Hábitos retira `create_habit` da segunda execução; isso evita novo cadastro pela revisão, sem desfazer a escrita inicial.
+
+## Código relacionado
+
+- [app/agents/_runtime.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/_runtime.py)
+- [app/tools/leak/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/leak/tools.py)

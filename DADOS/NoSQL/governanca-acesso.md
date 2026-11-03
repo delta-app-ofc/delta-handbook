@@ -20,6 +20,7 @@ Coleções atualmente planejadas e implementadas nos schemas dos clusters NoSQL:
 * `chat_sessions`
 * `chat_feedback`
 * `weather_daily`
+* `observability_requests`
 
 > **Nota de Arquitetura:** No MongoDB, todas as Custom Roles são registradas centralmente no banco `admin`, porém seus privilégios (escopo de atuação) aplicam-se especificamente às coleções de cada banco de dados (`db_delta_telemetry` ou `db_delta_app`).
 
@@ -97,7 +98,7 @@ Permissões:
 
 * Acesso exclusivo e restrito à coleção `alerts_history`
 * `find` e `createIndex` na coleção `alerts_history`
-* Sem acesso às outras coleções do database (`user_preferences`, `chat_sessions`, `chat_feedback`, `weather_daily`) ou escrita de dados
+* Sem acesso às outras coleções do database (`user_preferences`, `chat_sessions`, `chat_feedback`, `observability_requests`, `weather_daily`) ou escrita de dados
 
 ---
 

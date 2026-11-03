@@ -2,7 +2,16 @@
 
 Este documento descreve a modelagem relacional do banco de dados PostgreSQL do Projeto Delta, responsável por armazenar informações de usuários, imóveis, dispositivos IoT, hábitos de consumo e regras regionais de tarifação de água.
 
-🔗 Repositório: https://github.com/delta-app-ofc/delta-database
+🔗 Repositório: https://github.com/delta-app-ofc/delta-sql-database
+
+## 🗺️ Diagramas
+
+| Diagrama | Conteúdo |
+|---|---|
+| [Modelagem conceitual](anexos/modelagem-conceitual.png) | Arquitetura de dados completa: PostgreSQL, MongoDB, RPA, Data Mart, auditoria e backup |
+| [Modelagem lógica](anexos/modelagem-logica.png) | Entidades, chaves e cardinalidades do banco relacional |
+| [Modelagem lógica da auditoria](anexos/modelagem-logica-log.png) | Tabelas `tb_log_*` |
+| [Modelagem lógica da camada analítica](anexos/modelagem-logica-camada-analitica.png) | Star Schema do Data Mart |
 
 ---
 
@@ -15,7 +24,16 @@ da Grande SP (essas cobram a mesma tarifa entre si).
 ### 📌 Atributos
 - **id (PK)**: Identificador da região.
 - **name**: Nome da região.
-  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`
+  - Valores permitidos: `GRANDE_SP`, `LINS`, `PRESIDENTE_PRUDENTE`, `ADAMANTINA_PIRAPOZINHO`, `BRAGANCA_PAULISTA`, `LITORAL`, `VALE_DO_RIBEIRA`, `INTERIOR`, `VALE_DO_PARAIBA`
+
+### 🏙️ Tabela de apoio: `tb_municipality`
+
+Liga cada município atendido pela Sabesp ao seu grupo tarifário. A API usa essa tabela para preencher `tb_address.region_id` a partir de `city` (depois de conferir que `state` é `SP`); município que não está nela não pode ser cadastrado. Detalhes, fontes e lista de municípios em [mapeamento-cidade-regiao.md](mapeamento-cidade-regiao.md).
+
+- **id (PK)**: Identificador do município.
+- **name**: Nome do município, como a API de CEP devolve (único).
+- **ibge_code**: Código IBGE de 7 dígitos (único).
+- **region_id (FK)**: Referência para `tb_region`.
 
 ---
 
@@ -50,12 +68,12 @@ Armazena os endereços dos imóveis cadastrados.
 
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
-- **region_id (FK)**: Referência para `tb_region`.
-- **cep**: CEP (8 dígitos numéricos).
+- **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` (ver `tb_municipality`); o aplicativo não envia esse campo.
+- **cep**: CEP (8 dígitos numéricos). Não é único: vários endereços e imóveis podem compartilhar o mesmo CEP.
 - **city**: Cidade.
 - **state**: Estado.
-- **latitude** *(opcional)*: Latitude geográfica do endereço (entre -90 e 90).
-- **longitude** *(opcional)*: Longitude geográfica do endereço (entre -180 e 180).
+- **latitude** *(obrigatória)*: Latitude geográfica do endereço (entre -90 e 90).
+- **longitude** *(obrigatória)*: Longitude geográfica do endereço (entre -180 e 180).
 
 ---
 
@@ -73,11 +91,6 @@ Armazena os usuários do sistema.
 - **registration_date**: Data de cadastro (padrão: CURRENT_DATE).
 - **is_active**: Indica se o usuário está ativo.
 - **is_admin**: Indica se o usuário é administrador.
-- **is_manager**: Indica se o usuário é gerente, para a versão comercial.
-  - ⚠️ Coluna antiga, nunca lida por nenhuma function/procedure. Desde a extensão comercial/industrial
-    (seção 12), o vínculo pessoa-organização passou a ser modelado de verdade por `tb_user_organization`,
-    que bate 1:1 com `is_manager` nos dados de teste atuais. As duas colunas descrevem o mesmo fato hoje;
-    unificação registrada como pendência, ainda não implementada.
 
 ---
 
@@ -114,6 +127,21 @@ imóveis comerciais).
   - Valores permitidos: `RESIDENCIAL_NORMAL`, `RESIDENCIAL_SOCIAL`, `RESIDENCIAL_FAVELA`, `RESIDENCIAL_ESPECIAL`, `COMERCIAL_NORMAL_INDUSTRIAL`, `COMERCIAL_ESPECIAL`, `COMERCIAL_ENTIDADE_ASSISTENCIA_SOCIAL`, `PUBLICA_COM_CONTRATO`
 - **group_name**: Grupo da categoria.
   - Valores permitidos: `RESIDENCIAL`, `COMERCIAL`
+
+### 📚 Origem das categorias
+
+As categorias vêm da estrutura tarifária real da Sabesp, publicada pela ARSESP:
+
+- [Tabela Geral de Tarifas da Sabesp](http://www.arsesp.sp.gov.br/ArquivosRegulamentacao/Tarifas/Saneamento/tabela%20de%20tarifas-sabesp-geral.pdf) — versão mais antiga, usa o nome "Favela".
+- [Nota Técnica do 1º Reajuste Tarifário, URAE-1 Sudeste](https://www.arsesp.sp.gov.br/Documentosgerais/NT_1__REAJUSTE_TARIFARIO_DA_SABESP__Tarifa_Aplicacao___URAE1___assinado.pdf) — versão de 2026, tabelas por região no Anexo I, categoria chamada "Vulnerável".
+
+Diferenças entre o projeto e a fonte:
+
+- `RESIDENCIAL_FAVELA` segue o nome da tabela antiga; a de 2026 chama a mesma categoria de "Residencial Vulnerável".
+- `RESIDENCIAL_ESPECIAL` e `COMERCIAL_ESPECIAL` só têm tarifa publicada em alguns municípios do interior, não na Grande SP. Onde falta, a tarifa da categoria "Normal" é usada como aproximação (ver `tariffs/README.md` no `delta-business-rules`).
+- `PUBLICA_COM_CONTRATO` está no grupo `COMERCIAL` por decisão do projeto, não da Sabesp.
+
+Quem define a categoria de um imóvel é quem o cadastra: `sp_register_property` recebe o nome da categoria e `sp_update_property_classification` troca depois. O sistema não deduz a categoria. Na Sabesp real, quem enquadra o cliente é a própria Sabesp (a tarifa social, por exemplo, exige CadÚnico).
 
 ---
 
@@ -175,6 +203,27 @@ Relaciona usuários aos seus hábitos de consumo.
 - **start_time** *(opcional)*: Horário de início do hábito.
 - **end_time** *(opcional)*: Horário de término do hábito. Obrigatório quando `start_time` informado; deve ser depois do início.
 - **estimated_liters** *(opcional)*: Estimativa de litros consumidos por execução do hábito.
+
+### 📏 Regra de repetição do hábito
+O mesmo usuário pode cadastrar o mesmo hábito mais de uma vez, para representar rotinas diferentes (por exemplo,
+"Banho longo" às 07:00 de segunda a sexta e às 20:00 no fim de semana). Por isso a tabela **não** tem mais
+`UNIQUE (user_id, habit_id)` (constraint `uq_tb_user_habit_user_habit`, removida).
+
+A regra que vale no lugar dela: o mesmo usuário **não pode ter o mesmo hábito, no mesmo dia da semana, com o
+mesmo horário de início**. Como o dia fica em `tb_user_habit_day`, um `UNIQUE` simples não consegue checar isso,
+então a regra é aplicada por triggers `BEFORE`:
+
+| Trigger | Tabela | Quando dispara |
+| --- | --- | --- |
+| `trg_check_user_habit_day_conflict` | `tb_user_habit_day` | ao inserir ou alterar um dia |
+| `trg_check_user_habit_conflict` | `tb_user_habit` | ao alterar `user_id`, `habit_id` ou `start_time` |
+
+Hábitos sem horário (`start_time` nulo) contam como "sem horário": dois hábitos iguais, sem horário, não podem
+dividir o mesmo dia. Em caso de conflito o banco lança a exceção
+`O usuário já possui esse hábito nesse dia e horário.`
+
+> Limitação conhecida: a checagem é feita por trigger, sem lock. Duas requisições simultâneas, do mesmo usuário,
+> hábito, dia e horário, poderiam passar juntas. Foi considerado improvável para o uso do projeto e não foi tratado.
 
 ---
 
@@ -368,3 +417,15 @@ espelhos automáticos das tabelas principais.
 - **description**: Descrição da coluna.
 - **business_rule**: Regra de negócio associada à coluna, quando houver.
 - **access_level**: Classificação de sensibilidade — `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL` (este último para PII/LGPD, ex. e-mail, telefone, senha, data de nascimento).
+
+---
+
+## 📈 17. Tabela: `tb_user_access_log`
+
+Registra cada acesso de um usuário ao sistema, base do cálculo de DAU (Daily Active User). É gravada pela procedure `sp_register_user_access` e consultada pela function `fn_get_dau`, ver [otimizacao.md](otimizacao.md).
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **user_id (FK)**: Referência para `tb_user`, com `ON DELETE CASCADE`.
+- **access_channel**: Canal opcional do acesso: `WEB`, `MOBILE`, `CHATBOT` ou `NULL`. O `CHECK` limita os valores não nulos; a procedure usa `NULL` quando o canal é omitido.
+- **accessed_at**: Data e hora do acesso, preenchida por padrão com `CURRENT_TIMESTAMP`.

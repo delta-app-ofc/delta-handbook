@@ -29,17 +29,30 @@ o MongoDB **não duplica** esse domínio.
 
 ## 2. Organização em Databases
 
-A modelagem oficial usa **dois databases** dentro do mesmo cluster Atlas, separando a carga de máquina
+A modelagem usa **dois databases**, previstos em clusters separados nos scripts de infraestrutura, separando a carga de máquina
 (alto volume, escrita constante) da carga de usuário (baixo volume, leitura predominante):
 
 | Database             | Conteúdo                                                               | Padrão de carga                                            |
 |----------------------|------------------------------------------------------------------------|------------------------------------------------------------|
 | `db_delta_telemetry` | `consumption_summary`, `device_status`                   | Escrita pesada e constante (ESP32 → API a cada 5 min)      |
-| `db_delta_app`       | `user_preferences`, `alerts_history`, `chat_sessions`, `chat_feedback`, `weather_daily` | Leitura predominante, escrita esporádica (ação do usuário) |
+| `db_delta_app`       | `user_preferences`, `alerts_history`, `user_hour_baseline`, `chat_sessions`, `chat_feedback`, `weather_daily`, `observability_requests` | Dados do app e escrita do baseline quando uma janela elegível é processada |
 
 > A separação em dois databases também define o perímetro das *custom roles* documentadas na governança
-> de acesso: a credencial que a API usa para ingestão de telemetria não precisa (e não deve) ter acesso ao
-> database de aplicativo, e vice-versa.
+> de acesso. **Planejado / implementação local (PRs abertas):** o detector da API Mongo também precisa de
+> acesso ao banco da aplicação, com conexão própria. No `delta-api-mongo` (PR #16, `AppMongoConfig`
+> e `application.properties`) os nomes são `appMongoTemplate`, `MONGODB_APP_URI` e
+> `MONGODB_APP_DATABASE` ([fonte da API, revisão c056aa8](https://github.com/delta-app-ofc/delta-api-mongo/blob/c056aa8/src/main/resources/application.properties)); a IA usa outro nome para o banco, `MONGO_DB_APP` (ver
+> [IA/settings.md](../../IA/settings.md)). Cada serviço lê a variável do seu próprio repositório. Não se
+> deve presumir que a URI de telemetria alcança o cluster da aplicação. A habilitação em produção
+> depende de migrações e índices; o papel de serviço da API não cria esses índices.
+>
+> `user_hour_baseline` tem chave única `(device_id, hour_of_week)`: slots 0–167 e estado em -1.
+> O fuso padrão é `America/Sao_Paulo`; o código atual usa um fuso global configurável.
+> O contrato local de `alerts_history` inclui `source`, `property_id`, `title`, `message`,
+> `dismissed_at`, `dedup_key`, `rule` e `evidence`; `device_id` não é obrigatório para IA/sistema.
+> O índice parcial de `dedup_key` impede duas ocorrências abertas com a mesma chave.
+> Consulte [detecção e contrato de alertas](../../IA/deteccao-anomalias.md) para os campos,
+> escritores, endpoints, estado da implantação e divergências ainda pendentes.
 
 ---
 
@@ -76,11 +89,11 @@ Documento consolidado e leve, calculado pelo hardware e enviado diretamente para
 > **Quem calcula `anomaly_detected`?** Não é o agente de chat (`delta-artificial-intelligence`,
 > Agente de Vazamento) — ele só *lê* este campo e o histórico de `alerts_history`, nunca decide
 > limiar por conta própria (regra explícita do prompt desse agente: "nunca invente limiares/padrões").
-> Quem calcula é um componente separado, o motor de detecção
-> (`delta-business-rules/detection/`): regras explicáveis (fluxo contínuo, consumo de
-> madrugada, desvio da baseline estatística do próprio usuário), sem modelo de ML, reagindo
-> quase em tempo real via MongoDB Change Streams sobre as janelas recém-inseridas nesta
-> coleção. Ver `detection/README.md` naquele repositório para o detalhe completo.
+> A implementação de destino calcula esse campo no `delta-api-mongo`, após a inserção,
+> usando regras de fluxo, referência robusta e regime. O detector Java está desligado por
+> padrão; o motor antigo de `delta-business-rules/detection/` e seu Change Stream só devem
+> ser removidos depois da validação em produção. `null` significa não avaliado.
+> Ver [detecção e contrato](../../IA/deteccao-anomalias.md) para o estado da migração.
 
 Esta é a coleção **permanente** do banco de telemetria: não tem TTL e é ela quem sustenta o histórico do
 app e a exportação diária para as tabelas de dashboard no PostgreSQL.
@@ -150,7 +163,7 @@ de notificações do usuário.
 | Campo          | Tipo      | Obrigatório | Descrição                                                         |
 |----------------|-----------|-------------|-------------------------------------------------------------------|
 | `_id`          | ObjectId  | Sim         | Identificador do documento                                        |
-| `device_id`    | string    | Sim         | Dispositivo que originou o alerta                                 |
+| `device_id`    | string    | Não (obrigatório só para alertas do detector) | Dispositivo que originou o alerta; alertas gerais da IA/sistema não têm |
 | `user_id`      | int       | Não         | Usuário notificado                                                |
 | `alert_type`   | string    | Sim         | Ex.: `vazamento_continuo`, `fluxo_atipico`, `dispositivo_offline` |
 | `triggered_at` | timestamp | Sim         | Momento de abertura do alerta                                     |
@@ -169,12 +182,12 @@ de notificações do usuário.
 }
 ```
 
-> **Coleção relacionada:** o motor de detecção (`delta-business-rules/detection/`)
-> mantém, na mesma database, `user_hour_baseline` — um documento por `user_id`
-> (`int`, mesma representação de `alerts_history.user_id`) + hora do dia, com a
-> média/desvio de consumo daquele usuário naquele horário, atualizado de
-> forma incremental. É estado interno do motor de detecção (não telemetria
-> bruta nem dado consumido pelo app) — ver `detection/README.md`.
+> **Coleção relacionada:** a implementação Java mantém `user_hour_baseline` neste
+> banco, por `device_id` e hora da semana (0–167), mais um documento de estado (-1).
+> Usa mediana/MAD, referência exponencial e estado das regras e do regime.
+> O destinatário do alerta vem da API Postgres; uma propriedade com vários usuários
+> recebe um alerta para cada usuário. A IA e o sistema usam a mesma `alerts_history`
+> pelos endpoints internos da API Mongo. Ver [contrato](../../IA/deteccao-anomalias.md).
 
 ### 4.3. `chat_sessions`
 
@@ -325,6 +338,61 @@ O script de índices ainda cria `idx_location_date_unique`, único, sobre `{ "lo
 
 A intenção é garantir um documento por localização e dia, mas isso depende de alinhar o índice a `weather_date`. Esta atualização é documental e não modifica o script nem os índices de um banco existente.
 
+### 4.6. `observability_requests`
+
+Uma linha por requisição de chat da API de IA (`delta-artificial-intelligence`), com custo estimado, tokens, latência por etapa e resultado. Alimenta o painel e o relatório de observabilidade (ver `IA/observabilidade.md`). **Não guarda pergunta, resposta nem `user_id`**: o usuário aparece só como `user_hash`, um HMAC com segredo do servidor, que serve para contar usuários distintos e não pode ser revertido.
+
+Ciclo de vida: **temporário**. Um índice TTL apaga cada documento 90 dias depois de `created_at`.
+
+Acesso: a API de IA grava e lê com `role_api_service` (CRUD em todas as coleções de `db_delta_app`, sem permissão de índices). Os índices, inclusive o TTL, são criados pelo script `script-indexes.js` do repositório `delta-mongo-database`, executado por quem tem `role_devops_engineer`. O schema e os scripts estão na branch `feat/colecao-observability-requests` e ainda precisam ser aplicados no cluster do app.
+
+| Campo                 | Tipo      | Obrigatório | Descrição                                                                                   |
+|-----------------------|-----------|-------------|---------------------------------------------------------------------------------------------|
+| `_id`                 | ObjectId  | Sim         | Identificador do documento                                                                  |
+| `request_id`          | string    | Sim         | Mesmo valor do cabeçalho `X-Request-ID`; único                                              |
+| `created_at`          | date (BSON) | Sim       | Fim da requisição; base do TTL. Precisa ser data BSON: texto não expira                      |
+| `mode`                | string    | Sim         | `chat` ou `judge`                                                                           |
+| `client`              | string    | Não         | `app`, `web`, `playground` ou `unknown` (cabeçalho `X-Client`)                              |
+| `user_hash`           | string    | Não         | HMAC do `user_id` com `OBS_HASH_SECRET`; só conta usuários distintos                        |
+| `outcome`             | string    | Sim         | `success`, `partial`, `error` ou `rejected`                                                 |
+| `resolved`            | bool      | Não         | Resposta publicada sem erro e sem bloqueio do Juiz                                          |
+| `total_ms`            | number    | Sim         | Tempo total em milissegundos                                                                |
+| `overhead_ms`         | number    | Não         | Tempo fora das etapas do grafo                                                              |
+| `nodes_ms`            | object    | Não         | Tempo por etapa do grafo                                                                    |
+| `agents_ms`           | object    | Não         | Tempo por agente especialista                                                               |
+| `revisions`           | int       | Não         | Correções pedidas pelo Juiz                                                                 |
+| `input_tokens`        | number    | Não         | Tokens de entrada dos modelos de chat (devolvidos pelo provedor)                            |
+| `output_tokens`       | number    | Não         | Tokens de saída dos modelos de chat                                                         |
+| `embedding_tokens`    | number    | Não         | Tokens dos embeddings, contados pelo `count_tokens` do Google                               |
+| `embedding_uncounted` | int       | Não         | Embeddings sem contagem; o custo deles não é estimado                                       |
+| `jev_tokens`          | number    | Não         | Tokens de entrada do Jev, devolvidos pela API                                               |
+| `model_calls`         | int       | Não         | Chamadas aos modelos de chat                                                                |
+| `fallback_calls`      | int       | Não         | Chamadas ao modelo reserva                                                                  |
+| `by_component`        | object    | Não         | Chamadas, tokens, tempo e custo por componente do grafo                                     |
+| `llm_cost_usd`        | number    | Não         | Custo dos modelos de chat em USD                                                            |
+| `embedding_cost_usd`  | number    | Não         | Custo dos embeddings em USD                                                                 |
+| `jev_cost_usd`        | number    | Não         | Custo do Jev em USD                                                                         |
+| `cost_usd`            | number    | Sim         | Custo total estimado em USD                                                                 |
+| `unpriced_models`     | array     | Não         | Modelos usados sem preço cadastrado                                                         |
+
+```json
+{
+  "_id": { "$oid": "61a8f9c2b9d1b2bad723c0a1" },
+  "request_id": "9f1c2a7e0b3d4c5f8a6b1d2e3f4a5b6c",
+  "created_at": { "$date": "2026-11-01T12:00:00Z" },
+  "mode": "chat",
+  "client": "app",
+  "outcome": "success",
+  "resolved": true,
+  "total_ms": 8120.4,
+  "nodes_ms": { "context": 410.1, "execute": 6900.0, "judge": 500.3 },
+  "input_tokens": 5120,
+  "output_tokens": 240,
+  "model_calls": 5,
+  "cost_usd": 0.000666
+}
+```
+
 ---
 
 ## 5. Índices e Configurações de Coleção
@@ -336,9 +404,16 @@ A intenção é garantir um documento por localização e dia, mas isso depende 
 | `device_status`       | `{ device_id: 1 }`                      | **Único**                               | A coleção segue padrão *upsert* (um documento por dispositivo). O índice único é o que garante essa unicidade e viabiliza `updateOne({ device_id }, ..., { upsert: true })` sem duplicatas.                                                                                          |
 | `alerts_history`      | `{ user_id: 1, triggered_at: -1 }`      | Composto                                | Alimenta a tela de notificações do app, sempre lida por usuário e ordenada por data.                                                                                                                                                                                                 |
 | `alerts_history`      | `{ device_id: 1, resolved_at: 1 }`      | Composto (parcial, `resolved_at: null`) | Consulta rápida de "alertas ainda ativos" por dispositivo, sem varrer o histórico já resolvido.                                                                                                                                                                                      |
+| `alerts_history`      | `{ device_id: 1, rule: 1, resolved_at: 1 }` | Composto | Busca dos alertas abertos do detector por dispositivo e regra a cada janela. |
+| `alerts_history`      | `{ dedup_key: 1 }` | **Único parcial** (`dedup_key` string e `resolved_at: null`) | Só um alerta aberto por chave de deduplicação (detector, IA e sistema). |
+| `alerts_history`      | `{ user_id: 1, severity: 1, triggered_at: -1 }` | Composto | Filtro da tela de alertas por severidade. |
 | `user_preferences`    | `{ user_id: 1 }`                        | **Único**                               | Cada usuário deve ter exatamente um documento de preferências; o back-end lê esse documento a cada pacote de telemetria processado para checar `quiet_hours`.                                                                                                                        |
 | `chat_sessions`       | `{ user_id: 1, last_activity_at: -1 }`  | Composto                                | Lista de "atendimentos anteriores" do usuário, ordenada por atividade recente.                                                                                                                                                                                                       |
 | `chat_sessions`       | `{ user_id: 1, is_open: 1 }`            | Composto                                | Localiza rapidamente uma sessão em aberto para decidir entre reabrir ou criar uma nova.                                                                                                                                                                                              |
+| `observability_requests` | `{ created_at: 1 }` (`expireAfterSeconds: 7776000`) | **TTL (90 dias)** | Evita crescimento sem limite; o painel só olha as últimas semanas |
+| `observability_requests` | `{ request_id: 1 }`                  | **Único**                               | Uma linha por requisição |
+| `observability_requests` | `{ client: 1, created_at: -1 }`      | Composto                                | Custo e uso por canal (app, web, playground) |
+| `observability_requests` | `{ user_hash: 1, created_at: -1 }`   | Composto (parcial, `user_hash` existe)  | Usuários distintos por semana |
 | `chat_feedback`       | `{ session_id: 1 }`                     | Simples                                 | Suporta o cruzamento (via `$lookup` em agregação) entre sessão e sua avaliação, usado em métricas de satisfação do bot.                                                                                                                                                              |
 
 ---

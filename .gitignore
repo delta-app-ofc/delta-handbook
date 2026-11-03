@@ -77,6 +77,7 @@ nbdist/
 Thumbs.db
 desktop.ini
 TASK*.md
+
+# Relatorios de testes e scanner
 reports/
 .scannerwork/
---- FIM DO .gitignore OBRIGATÓRIO ---

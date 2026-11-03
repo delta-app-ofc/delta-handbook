@@ -46,13 +46,29 @@ Os rulesets devem exigir os nomes efetivamente publicados no repositório. Workf
 | Handbook | Verificação dos Markdown rastreados pelo Git. |
 | Template | Verificação dos arquivos de configuração e regras de ignore. |
 
-O comando de referência para cada componente fica em seu README e em `.github/workflows/` na revisão usada pela PR. Para reproduzir um job localmente, use o mesmo runtime, dependências e comando declarados no YAML.
+## Cobertura de código e limites por repositório
 
-## Resultado e correção
+A política compartilhada exige 100% dos testes aprovados e pelo menos 70% de cobertura **somente nas linhas novas ou alteradas que possam ser instrumentadas**. O percentual não representa a cobertura global do repositório. Testes de comportamento e cobertura de linhas são evidências diferentes: não converta asserções em um percentual fictício.
 
-Quando um job falha, abra seus logs e identifique a primeira etapa com erro. Os relatórios de teste e cobertura ajudam a localizar o problema; falhas de instalação ou de configuração aparecem nas etapas anteriores à suíte.
+| Repositório | Evidência automatizada | Cobertura de linhas |
+| --- | --- | --- |
+| `delta-sql-database` | Integra PostgreSQL temporario e testa bi_etl.py offline com adaptadores simulados. | Python ETL gera XML/JUnit; arquivos SQL sao validados por comportamento, sem cobertura de linhas SQL. Exigir ambos os checks. |
+| `delta-mongo-database` | Smoke em MongoDB temporário verifica validação e índices; Sonar analisa estaticamente os scripts JavaScript. | O runner `mongosh` não gera LCOV e não declara percentual. Isso não concede isenção automática para mudanças JavaScript: antes de alterá-los, a cobertura instrumentada deve ser compatibilizada com a política central. |
+| `delta-redis-database` | Testes pytest exercitam a aplicação Python contra Redis 7 descartável e produzem JUnit, XML de cobertura e relatório HTML. | Instrumentada para Python; o mínimo de 70% se aplica apenas às linhas Python novas ou alteradas, não ao repositório inteiro. |
+| `delta-neo4j-database` | Testes pytest instrumentam o loader Python com driver simulado; um job separado valida setup e seed em Neo4j temporário. | Instrumentada para `load_graph.py`; arquivos `.cypher` não são contabilizados como cobertura e não recebem percentual inventado. |
+| `delta-app-mobile` e `delta-mobile-app` | CI valida arquivos documentais essenciais. Nenhum dos dois repositórios tem código mobile, stack ou build versionados na `main` inspecionada. | N/A enquanto não houver código de aplicação instrumentável. Não se cria uma suite de aplicação vazia. |
+| `delta-template-repository` | CI valida YAML dos workflows, licença e regras essenciais de `.gitignore`; não há aplicativo executável no scaffold atual. | N/A enquanto o repositório contiver apenas arquivos de template e configuração. |
+| `delta-handbook` | Valida Markdown e instrumenta o codigo Python do validador em scripts/. | Cobertura Python medida para o validador. Os documentos Markdown em si nao recebem percentual de cobertura. |
 
-Envie a correção pela mesma branch. O novo commit recebe uma nova execução e a política Sonar consulta a análise correspondente a esse SHA. A revisão e a integração seguem as regras configuradas no repositório.
+Quando um repositório não contém código instrumentável, o handbook registra a razão de N/A. Se código testável for adicionado, a suite, o relatório e o critério de cobertura devem acompanhar essa mudança no repositório responsável. Não abra uma alteração sem efeito apenas para produzir um percentual ou um workflow vazio.
+
+## Politica Sonar e ativacao
+
+O scanner recebe relatorios produzidos depois de todos os testes obrigatorios passarem. A politica usa somente achados novos graves: Critical/Blocker no modelo legado e High/Blocker nos impactos. Seguranca grave nova bloqueia; confiabilidade grave nova exige uma aprovacao humana a mais do que a maior exigencia normal da branch/rulesets; manutenibilidade apenas avisa. Graves antigos da main aparecem somente no comentario como divida, para nao bloquear a PR que os corrige.
+
+O comentario Sonar e independente do comentario CI/Compose. As aprovacoes devem pertencer ao SHA atual e a pessoas com escrita diferentes do autor. A ausencia de analise ou de configuracao nao e aprovada automaticamente. O plano Free nao exige Quality Gate personalizado: a regra e implementada pelo check proprio `Delta / Politica Sonar` (veja o nome exato com acento no workflow).
+
+Consulte [a configuracao compartilhada](https://github.com/delta-app-ofc/.github/blob/ci/validacao-relatorios-sonar/docs/sonar.md). Secrets `SONAR_TOKEN`, `SONAR_POLICY_TOKEN` e o token organizacional existente devem estar disponiveis aos repos participantes. Crie repository secrets ou organization secrets; estes workflows nao usam environment secrets.
 
 ## Arquivos de referência
 

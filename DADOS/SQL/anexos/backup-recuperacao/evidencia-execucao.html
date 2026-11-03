@@ -1,0 +1,65 @@
+<!DOCTYPE html><html lang="pt-BR"><meta charset="utf-8">
+<title>Delta — Evidência da execução local</title>
+<style>body{font:16px system-ui;background:#191b1c;color:#e4e4e4;max-width:1100px;margin:40px auto;padding:20px}h1,h2{color:#9dbdff}.ok{color:#88e7bc}table{border-collapse:collapse;width:100%}td,th{padding:10px;border:1px solid #536586;text-align:left}pre{background:#10151c;padding:20px;white-space:pre-wrap;border-radius:12px}@media print{body{background:white;color:black}pre{background:#eee}}</style>
+<h1>Delta · Execução e restauração verificadas</h1><p>02/11/2026 13:10 (Brasília)</p>
+<p class="ok">Backup restaurado no PostgreSQL 18 local: 47 tabelas públicas com contagens correspondentes ao manifesto.</p>
+<h2>Scripts executados pelo setup_db.py</h2><p>Carga complementar de referências, catálogo relacional, catálogo do Data Mart e comentários. Scripts de referência inserem apenas registros ausentes; catálogos usam ON CONFLICT para atualizar as descrições existentes.</p>
+<table><tr><th>Tabela alterada</th><th>Antes</th><th>Depois</th></tr><tr><td>public.tb_backup_restore_log</td><td>0</td><td>94</td></tr><tr><td>public.tb_data_catalog</td><td>128</td><td>261</td></tr><tr><td>public.tb_log_region</td><td>5</td><td>9</td></tr><tr><td>public.tb_log_region_rate</td><td>46</td><td>78</td></tr><tr><td>public.tb_municipality</td><td>0</td><td>371</td></tr><tr><td>public.tb_region</td><td>5</td><td>9</td></tr><tr><td>public.tb_region_rate</td><td>40</td><td>72</td></tr></table>
+<p>As outras 58 tabelas conferidas mantiveram as mesmas contagens. Banco de restauração: container separado delta-evidence-postgres-20261102 / delta_restore.</p>
+<h2>Saída real do teste de restauração</h2><pre>.env: /app/.env
+Dump: /app/reports/evidencias/backups/delta_2026-11-02_1608.dump
+Banco de teste: postgres@delta-evidence-postgres-20261102:5432/delta_restore
+Rodando pg_restore...
+Conferindo contagens...
+   [OK] tb_address: esperado=162 restaurado=162
+   [OK] tb_backup_restore_log: esperado=47 restaurado=47
+   [OK] tb_data_catalog: esperado=261 restaurado=261
+   [OK] tb_day_of_week: esperado=7 restaurado=7
+   [OK] tb_device: esperado=162 restaurado=162
+   [OK] tb_habit: esperado=6 restaurado=6
+   [OK] tb_investment_scenario: esperado=3 restaurado=3
+   [OK] tb_last_water_bill: esperado=206 restaurado=206
+   [OK] tb_log_address: esperado=321 restaurado=321
+   [OK] tb_log_day_of_week: esperado=7 restaurado=7
+   [OK] tb_log_device: esperado=164 restaurado=164
+   [OK] tb_log_habit: esperado=6 restaurado=6
+   [OK] tb_log_investment_scenario: esperado=3 restaurado=3
+   [OK] tb_log_last_water_bill: esperado=206 restaurado=206
+   [OK] tb_log_organization: esperado=6 restaurado=6
+   [OK] tb_log_property: esperado=164 restaurado=164
+   [OK] tb_log_property_classification: esperado=8 restaurado=8
+   [OK] tb_log_property_operation_day: esperado=37 restaurado=37
+   [OK] tb_log_property_operational_profile: esperado=7 restaurado=7
+   [OK] tb_log_property_shift: esperado=11 restaurado=11
+   [OK] tb_log_property_water_usage: esperado=16 restaurado=16
+   [OK] tb_log_region: esperado=9 restaurado=9
+   [OK] tb_log_region_rate: esperado=78 restaurado=78
+   [OK] tb_log_rpa: esperado=3 restaurado=3
+   [OK] tb_log_user: esperado=212 restaurado=212
+   [OK] tb_log_user_habit: esperado=832 restaurado=832
+   [OK] tb_log_user_habit_day: esperado=435 restaurado=435
+   [OK] tb_log_user_organization: esperado=5 restaurado=5
+   [OK] tb_log_user_property: esperado=156 restaurado=156
+   [OK] tb_log_water_usage_type: esperado=4 restaurado=4
+   [OK] tb_municipality: esperado=371 restaurado=371
+   [OK] tb_organization: esperado=4 restaurado=4
+   [OK] tb_property: esperado=161 restaurado=161
+   [OK] tb_property_classification: esperado=8 restaurado=8
+   [OK] tb_property_operation_day: esperado=27 restaurado=27
+   [OK] tb_property_operational_profile: esperado=5 restaurado=5
+   [OK] tb_property_shift: esperado=7 restaurado=7
+   [OK] tb_property_water_usage: esperado=12 restaurado=12
+   [OK] tb_region: esperado=9 restaurado=9
+   [OK] tb_region_rate: esperado=72 restaurado=72
+   [OK] tb_user: esperado=211 restaurado=211
+   [OK] tb_user_access_log: esperado=3 restaurado=3
+   [OK] tb_user_habit: esperado=422 restaurado=422
+   [OK] tb_user_habit_day: esperado=423 restaurado=423
+   [OK] tb_user_organization: esperado=3 restaurado=3
+   [OK] tb_user_property: esperado=154 restaurado=154
+   [OK] tb_water_usage_type: esperado=4 restaurado=4
+[OK] 47 linha(s) registrada(s) em tb_backup_restore_log.
+
+Teste de restauracao OK: todas as tabelas bateram.
+</pre>
+</html>

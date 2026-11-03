@@ -34,6 +34,7 @@ Exemplo:
 | tb_address | tb_log_address |
 | tb_user | tb_log_user |
 | tb_property | tb_log_property |
+| tb_property_classification | tb_log_property_classification |
 | tb_user_property | tb_log_user_property |
 | tb_device | tb_log_device |
 | tb_region_rate | tb_log_region_rate |

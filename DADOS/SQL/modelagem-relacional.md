@@ -2,7 +2,16 @@
 
 Este documento descreve a modelagem relacional do banco de dados PostgreSQL do Projeto Delta, responsável por armazenar informações de usuários, imóveis, dispositivos IoT, hábitos de consumo e regras regionais de tarifação de água.
 
-🔗 Repositório: https://github.com/delta-app-ofc/delta-database
+🔗 Repositório: https://github.com/delta-app-ofc/delta-sql-database
+
+## 🗺️ Diagramas
+
+| Diagrama | Conteúdo |
+|---|---|
+| [Modelagem conceitual](anexos/modelagem-conceitual.png) | Arquitetura de dados completa: PostgreSQL, MongoDB, RPA, Data Mart, auditoria e backup |
+| [Modelagem lógica](anexos/modelagem-logica.png) | Entidades, chaves e cardinalidades do banco relacional |
+| [Modelagem lógica da auditoria](anexos/modelagem-logica-log.png) | Tabelas `tb_log_*` |
+| [Modelagem lógica da camada analítica](anexos/modelagem-logica-camada-analitica.png) | Star Schema do Data Mart |
 
 ---
 
@@ -60,11 +69,11 @@ Armazena os endereços dos imóveis cadastrados.
 ### 📌 Atributos
 - **id (PK)**: Identificador do endereço.
 - **region_id (FK)**: Referência para `tb_region`. Definida pela API a partir de `city` (ver `tb_municipality`); o aplicativo não envia esse campo.
-- **cep**: CEP (8 dígitos numéricos).
+- **cep**: CEP (8 dígitos numéricos). Não é único: vários endereços e imóveis podem compartilhar o mesmo CEP.
 - **city**: Cidade.
 - **state**: Estado.
-- **latitude** *(opcional)*: Latitude geográfica do endereço (entre -90 e 90).
-- **longitude** *(opcional)*: Longitude geográfica do endereço (entre -180 e 180).
+- **latitude** *(obrigatória)*: Latitude geográfica do endereço (entre -90 e 90).
+- **longitude** *(obrigatória)*: Longitude geográfica do endereço (entre -180 e 180).
 
 ---
 
@@ -82,11 +91,6 @@ Armazena os usuários do sistema.
 - **registration_date**: Data de cadastro (padrão: CURRENT_DATE).
 - **is_active**: Indica se o usuário está ativo.
 - **is_admin**: Indica se o usuário é administrador.
-- **is_manager**: Indica se o usuário é gerente, para a versão comercial.
-  - ⚠️ Coluna antiga, nunca lida por nenhuma function/procedure. Desde a extensão comercial/industrial
-    (seção 12), o vínculo pessoa-organização passou a ser modelado de verdade por `tb_user_organization`,
-    que bate 1:1 com `is_manager` nos dados de teste atuais. As duas colunas descrevem o mesmo fato hoje;
-    unificação registrada como pendência, ainda não implementada.
 
 ---
 
@@ -413,3 +417,15 @@ espelhos automáticos das tabelas principais.
 - **description**: Descrição da coluna.
 - **business_rule**: Regra de negócio associada à coluna, quando houver.
 - **access_level**: Classificação de sensibilidade — `PUBLICO`, `INTERNO`, `RESTRITO` ou `SENSIVEL` (este último para PII/LGPD, ex. e-mail, telefone, senha, data de nascimento).
+
+---
+
+## 📈 17. Tabela: `tb_user_access_log`
+
+Registra cada acesso de um usuário ao sistema, base do cálculo de DAU (Daily Active User). É gravada pela procedure `sp_register_user_access` e consultada pela function `fn_get_dau`, ver [otimizacao.md](otimizacao.md).
+
+### 📌 Atributos
+- **id (PK)**: Identificador.
+- **user_id (FK)**: Referência para `tb_user`, com `ON DELETE CASCADE`.
+- **access_channel**: Canal opcional do acesso: `WEB`, `MOBILE`, `CHATBOT` ou `NULL`. O `CHECK` limita os valores não nulos; a procedure usa `NULL` quando o canal é omitido.
+- **accessed_at**: Data e hora do acesso, preenchida por padrão com `CURRENT_TIMESTAMP`.

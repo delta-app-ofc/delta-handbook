@@ -86,7 +86,7 @@ style: remove espaços em branco
 
 * Utilizar nomes descritivos.
 * Evitar commits muito grandes.
-* Dividir commits para gerar histórico.
+* Agrupar commits por alteração lógica, inclusive quando envolver vários arquivos relacionados.
 * Manter branches atualizadas.
 * Documentar alterações relevantes.
 * Priorizar código simples e legível.
@@ -96,3 +96,17 @@ style: remove espaços em branco
 ### Atualizações
 
 Este documento pode ser atualizado conforme a evolução dos processos e necessidades da organização.
+
+## 4. Validação automática dos commits e abertura da PR
+
+Crie a branch a partir da branch principal atualizada e mantenha a alteração em uma branch própria. Para documentação, use `docs/<descricao>` e commits `docs: ...`.
+
+O validador aceita `<tipo>(escopo opcional): descrição`, com `!` opcional para indicar incompatibilidade. Além dos tipos recomendados acima, aceita `chore`, `merge` e `wip`, títulos de merge gerados pelo Git e `Initial Commit`. Essa compatibilidade não dispensa uma descrição clara nem recomenda entregar trabalho incompleto para merge.
+
+```text
+fix(api): corrige validação do usuário
+feat(api)!: altera contrato de consulta
+chore: atualiza dependências
+```
+
+Todos os commits incluídos na PR são verificados. Alterar apenas o título da PR não corrige mensagens inválidas. Após a validação, a automação marca o item correspondente no checklist. Consulte o [fluxo completo de PR](pr-review-rules.md) e as [instruções do template](template-prs.md) antes de solicitar revisão.

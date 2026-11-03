@@ -358,7 +358,7 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 | `GET` | `/sessions/{session_id}/messages` | Mensagens de uma sessão do usuário |
 | `POST` | `/sessions/{session_id}/close` | Encerra a sessão e grava o resumo na memória de longo prazo |
 
-> **Em atualização:** o back-end (`delta-api-postgres`) já emite o token em **RS256**, e a API de IA passa a
+> O back-end (`delta-api-postgres`) já emite o token em **RS256**, e a API de IA passa a
 > conferi-lo com a chave pública dele, em vez do segredo HS256 compartilhado descrito abaixo. Ver
 > [Autenticação da API de IA](autenticacao.md); o HS256 fica só para desenvolvimento e teste.
 
@@ -374,8 +374,8 @@ O histórico de conversas da lista do app está implementado na API de IA sobre 
 - **Título, prévia e ícone:** gerados por um modelo de linguagem rápido na primeira troca de mensagens e gravados
   em `title`, `preview` e `icon`.
 
-Status: implementado e testado com MongoDB real em banco descartável; o limite de 50–100 mensagens por sessão ainda
-não existe na API de IA. A emissão do JWT é do back-end (já existe, em RS256; ver [Autenticação da API de IA](autenticacao.md)).
+Status: implementado e testado com MongoDB real em banco descartável; a emissão do JWT é responsabilidade do back-end. A API de IA ainda não faz rotação automática
+por limite de 50–100 mensagens em uma sessão.
 
 ---
 

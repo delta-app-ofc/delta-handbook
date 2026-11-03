@@ -1,9 +1,6 @@
 # Agente de Consumo
 
-O agente ConsumptionAgent responde sobre consumo efetivamente registrado. Ele é
-standalone: run(question) devolve AgentResult(response, tool_calls) pelo runtime
-compartilhado, sem API, grafo, previsão ou agente de vazamento. user_id vem do
-chamador e fica preso às tools; não aparece nos argumentos do modelo.
+O `ConsumptionAgent` responde sobre consumo efetivamente registrado. Está registrado no roteador e pode ser executado diretamente; `run(question)` devolve `AgentResult` pelo runtime compartilhado. O ID vem do chamador confiável e fica preso às tools, sem aparecer como argumento livre do modelo. No chat, a resposta passa pelo grafo, Juiz e guardrail final.
 
 Para execução manual:
 
@@ -115,7 +112,17 @@ real nem comprovam a integração com serviços externos. A validação com Mong
 PostgreSQL e provedor LLM reais continua dependente desses serviços e de suas
 credenciais.
 
-A regressão completa do conjunto integrado das cinco tarefas passou com
+Registro histórico da implementação inicial: a regressão completa do conjunto integrado das cinco tarefas passou com
 160 testes em 4,29 segundos. Houve uma advertência de depreciação em
 `google.genai`, sem falhas de teste. Os imports dos três agentes e dos
 conectores também foram validados sem credenciais nem chamadas externas.
+
+## Reutilização por pergunta
+
+Unidades e leituras equivalentes são reutilizadas durante a pergunta, evitando consultas repetidas. O escopo temporal é renovado em cada execução. Isso não é cache global de respostas ou autorização entre usuários. Veja [redução de latência](reducao-latencia.md).
+
+## Código relacionado
+
+- [app/agents/consumption.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/agents/consumption.py)
+- [app/tools/consumption/tools.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/consumption/tools.py)
+- [app/tools/consumption/analysis.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/tools/consumption/analysis.py)

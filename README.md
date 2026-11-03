@@ -58,6 +58,10 @@ delta-handbook/
 └── README.md            # Ponto de entrada desta documentação
 ```
 
+## Inteligência artificial
+
+A documentação do chatbot está em [IA/leia-me.md](IA/leia-me.md), com arquitetura, API, agentes, Juiz, memória, RAG/MCP, configuração e operação do serviço.
+
 ## Padrões de documentação
 
 - Escreva em português claro e comece cada documento com título e objetivo.

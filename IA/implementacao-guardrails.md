@@ -14,26 +14,16 @@ Os guardrails combinam verificações determinísticas (regex, palavras-chave) c
 
 ## Arquitetura
 
-```
-POST /chat
+```text
+POST /chat → autenticação + sessão → run_workflow()
   │
-  ▼
-anonymize()            ← substitui CPF, CNPJ, telefone e e-mail por tokens
-  │
-  ▼
-validate_input()       ← GUARDRAIL DE ENTRADA
-  │  ok? → agente recebe mensagem anonimizada
-  │
-  ▼
-run_workflow()         ← LangGraph + agentes
-  │
-  ▼
-validate_output()      ← GUARDRAIL DE SAÍDA
-  │  ok? → salva no MongoDB + retorna resposta limpa
-  │  falha? → HTTP 500
+  ├─ validate_input_rules()  ← tamanho, PII, injeção e dados internos
+  ├─ prepare                ← classify_input() em paralelo com contexto/roteamento
+  ├─ especialistas → composição → Juiz
+  └─ output_guard           ← PII, ownership, limpeza e histórico
 ```
 
-Se `validate_input` falhar, nenhum agente é chamado e nada é salvo. Se `validate_output` falhar, a resposta é descartada. O MongoDB recebe sempre a mensagem **original** do usuário (não a anonimizada) e a resposta **revisada** (com PII omitida).
+Se as regras de entrada recusarem a mensagem, os especialistas não são chamados. A classificação semântica precisa liberar antes de sua execução, mas contexto/roteamento podem ter iniciado em paralelo. No chat autenticado, o histórico recebe a pergunta anonimizada no estado e a resposta tratada; o console tem um caminho próprio que salva a pergunta original. Falha de saída troca o texto por mensagem segura e descarta gráfico, sem implicar HTTP 500.
 
 ---
 
@@ -52,7 +42,7 @@ PII_PATTERNS = [
 ]
 ```
 
-Uma mensagem como `"meu CPF é 123.456.789-00"` vira `"meu CPF é [PII_CPF_a3f9c1]"` antes de chegar ao agente. O mapa `{token: valor_original}` é passado ao guardrail de saída para desfazer ou omitir os tokens.
+Uma mensagem como `"meu CPF é 123.456.789-00"` vira `"meu CPF é [PII_CPF_a3f9c1]"` antes de chegar ao agente. O mapa `{token: valor_original}` é passado ao guardrail de saída para omitir os tokens, sem restaurar os valores originais.
 
 ### Etapa 2 — Validações básicas
 
@@ -62,7 +52,9 @@ Uma mensagem como `"meu CPF é 123.456.789-00"` vira `"meu CPF é [PII_CPF_a3f9c
 | Mensagem não vazia | Não pode ser só espaços | 422 |
 | Tamanho máximo | Máximo 2.000 caracteres | 422 |
 
-### Etapa 3 — Detecção de prompt injection (15 padrões)
+### Etapa 3 — Detecção de prompt injection
+
+Exemplos de padrões; a lista também inclui tentativas de assumir outra identidade ou consultar outro usuário:
 
 ```python
 _INJECTION_PATTERNS = [
@@ -126,7 +118,7 @@ Se o LLM estiver indisponível, a classificação é ignorada — os filtros det
 
 ### Etapa 1 — Redação de PII gerada pelo modelo
 
-Usa os mesmos `PII_PATTERNS` do guardrail de entrada para remover qualquer dado pessoal que o modelo possa ter inserido diretamente na resposta:
+Usa os mesmos `PII_PATTERNS` do guardrail de entrada para mascarar os dados que correspondem aos padrões de CPF, CNPJ, telefone e e-mail:
 
 ```python
 response = pattern.sub(f"[{label} OMITIDO]", response)
@@ -146,35 +138,57 @@ Captura construções como `senha: abc123` ou `password=xyz`.
 
 ### Por que a saída não bloqueia na PII?
 
-Diferente do guardrail de entrada, a saída **nunca bloqueia** por PII — ela **redige**. Bloquear geraria um HTTP 500 ao usuário sem motivo aparente. Redigir é mais seguro: a resposta chega limpa.
+Diferente do guardrail de entrada, a saída **nunca bloqueia** por PII — ela **redige**. Mascarar permite manter o restante da resposta. Credenciais ou referência explícita a outro usuário podem provocar substituição por mensagem segura; as regex não garantem detecção de todo dado pessoal.
 
 ---
 
 ## Integração em `app/routes/chat.py`
 
+A rota valida autenticação e propriedade da sessão e chama o grafo:
+
 ```python
-guard = validate_input(req.user_id, req.message)
-if not guard["ok"]:
-    raise HTTPException(status_code=422, detail=guard["reason"])
-
-anonymized = guard["message"]   # mensagem sem PII → vai para o agente
-pii_map    = guard["pii_map"]   # tokens → usados na saída
-
-state = run_workflow(user_id=req.user_id, session_id=session_id, question=anonymized)
-
-out_guard = validate_output(state["response"], pii_map=pii_map)
-if not out_guard["ok"]:
-    raise HTTPException(status_code=500, detail=out_guard["reason"])
-
-append_turn(session_id, req.user_id, "human", req.message)          # original
-append_turn(session_id, req.user_id, "assistant", out_guard["response"])  # revisada
+state = run_workflow(user_id, session_id, req.message)
+if state.get("_blocked"):
+    raise HTTPException(status_code=422, detail=state["response"])
 ```
+
+Dentro do grafo, o resultado de `validate_input_rules` alimenta `question` e `pii_map`; `classify_input` roda durante `prepare`. Depois dos especialistas e do Juiz, `output_guard` chama `validate_output` e `validate_ownership`, trata texto/gráfico e anexa o turno quando a persistência está habilitada. Não há parâmetro de usuário escolhido pelo cliente nesse caminho.
 
 ---
 
 ## Limitações e evolução prevista
 
-- Verificação de coerência numérica (ex.: consumo de 50.000 litros em um dia provavelmente é erro do agente)
-- Validação de fontes do RAG (quando o Agente RAG estiver ativo)
+- Coerência numérica depende dos cálculos determinísticos e da comparação com evidências pelo Juiz; um volume alto isoladamente não demonstra erro.
+- O RAG está ativo e leva fontes/trechos ao Juiz. Similaridade vetorial não comprova relevância ou verdade.
+- Regex podem ter falsos positivos e negativos, sem proteção universal contra PII ou injeção.
 
 Ver [arquitetura-inteligencia-artificial.md](arquitetura-inteligencia-artificial.md) — seção "Guardrails".
+
+## Julgamento e saída
+
+O [Juiz](agente-juiz.md) avalia a candidata pronta e as evidências, com até uma revisão. Não substitui as regras de saída.
+
+`validate_output` recusa resposta vazia, mascara os mesmos padrões de PII e troca tokens pelo rótulo de omissão, sem restaurar os dados originais. Expressão de possível credencial (`senha`, `password` ou `secret` com atribuição) bloqueia a saída.
+
+`validate_ownership` procura referência explícita ao ID de outro usuário no texto. `chart_mentions_other_user` percorre dicionários/listas e descarta gráfico com campo `user_id` diferente do autenticado. São verificações por padrões/campos, sem capacidade de provar a origem de toda frase ou ponto de gráfico.
+
+Após aprovação dessas regras, `hide_technical_details` remove frases que expõem nomes de agentes, ferramentas, status, bancos e erros técnicos. Se não restar conteúdo útil, usa mensagem genérica. `capitalize_habit_names` apresenta os nomes do catálogo em formato de título. Esse tratamento ocorre depois do Juiz, sem nova avaliação da versão limpa.
+
+## Persistência e erros públicos
+
+A entrada bloqueada termina o grafo; chat JSON retorna 422 e tenta remover a sessão recém-criada vazia. Em SSE já aberto, o bloqueio vira evento `error` com status 422.
+
+Recusa do guardrail final substitui o texto por mensagem segura e remove gráfico; não é automaticamente erro HTTP. O turno pode ser salvo com essa resposta. O histórico recebe a pergunta do estado, já anonimizada pelas regras, e o texto final tratado. As duas gravações não formam transação única.
+
+O console pode testar um especialista isoladamente e não deve ser confundido com o fluxo completo de autenticação, perfil, Juiz e saída da aplicação.
+
+## Verificação e limites
+
+`test_guardrails.py`, `test_hide_technical_details.py` e `tests/isolation/` cobrem padrões, saída e isolamento em cenários controlados. Proteção depende também de identidade vinda do JWT, seleção autorizada de unidades, consultas parametrizadas e ferramentas com escopo fixo.
+
+Regras de texto podem ter falsos positivos/negativos. Não há promessa de detecção universal de injeção, PII ou conteúdo indevido.
+
+## Código relacionado
+
+- [app/guardrails/input.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/guardrails/input.py)
+- [app/guardrails/output.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/guardrails/output.py)

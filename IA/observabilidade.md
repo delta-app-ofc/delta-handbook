@@ -18,22 +18,22 @@ Os caminhos abaixo são do repositório `delta-artificial-intelligence`.
 | Projeção por linha de comando | `python -m scripts.cost_projection --pdf relatorio.pdf` |
 | LangSmith opcional | `app/observability/langsmith.py`, `scripts/langsmith_reconcile.py` |
 
-Só requisições de chat completo (`/chat` e as abas Chat e Juiz) são registradas. Cada registro fica na coleção `observability_requests` do MongoDB do app, sem pergunta nem resposta. Sem MongoDB, o painel usa os registros do processo atual; depois de uma falha de conexão o banco é ignorado por 60 s, para o painel não esperar o timeout a cada leitura.
+Requisições dos modos completos `chat` e `judge` são registradas, incluindo o caminho `/chat/stream` e as abas Chat e Juiz. Cada registro fica na coleção `observability_requests` do MongoDB do app, sem pergunta nem resposta. Sem MongoDB, o painel usa os registros do processo atual; depois de uma falha de conexão o banco é ignorado por 60 s, para o painel não esperar o timeout a cada leitura.
 
 ### A coleção `observability_requests`
 
-Ela é definida no repositório `delta-mongo-database` (schema com validador, índices e documentação em `collections/db_delta_app.md`), na branch `feat/colecao-observability-requests`. O papel `role_api_service` já tem permissão de escrita em `db_delta_app`. Os índices são:
+A definição de schema, validador, índices e permissões pertence ao repositório `delta-mongo-database`, com documentação em `collections/db_delta_app.md`. A especificação de `observability_requests` prevê os índices abaixo; é necessário conferir sua aplicação no cluster utilizado:
 
 - TTL de 90 dias em `created_at`, para a coleção não crescer sem limite;
 - único em `request_id`;
 - `client` + `created_at`, para o custo por canal;
 - parcial em `user_hash` + `created_at`, para contar usuários distintos.
 
-O `user_id` nunca é gravado. O campo `user_hash` é um HMAC do usuário com o segredo `OBS_HASH_SECRET` (16 caracteres ou mais), não reversível; sem o segredo, a contagem de usuários distintos fica indisponível.
+O `user_id` bruto não é gravado no registro de métricas. O campo `user_hash` é um HMAC do usuário com o segredo `OBS_HASH_SECRET` (16 caracteres ou mais), não reversível; sem o segredo, a contagem de usuários distintos fica indisponível.
 
 ### Cliente, usuários e custo por canal
 
-O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `web`. Sem o cabeçalho (ou com outro valor) o registro fica como `unknown`, e o console de testes é sempre `playground`. O app e a plataforma web precisam enviar esse cabeçalho em toda chamada ao `/chat`. Com ele, o painel mostra o custo por cliente, qual cliente mais gasta, os usuários distintos e as perguntas por usuário (medidas, não mais um cenário).
+O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `web`. Sem o cabeçalho (ou com outro valor) o registro fica como `unknown`, e o console de testes é sempre `playground`. O app e a plataforma web precisam enviar esse cabeçalho nas chamadas ao `/chat` e `/chat/stream`. Com ele, o painel mostra o custo por cliente, qual cliente mais gasta, os usuários distintos e as perguntas por usuário (medidas, não mais um cenário).
 
 ### Embeddings e Jev no custo (sem estimativa)
 
@@ -47,7 +47,7 @@ O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `
 - **Resolução** = resposta publicada com sucesso, sem erro de agente e sem bloqueio do Juiz.
 - **Custo por resolução** = custo de IA ÷ resoluções.
 - **ROI** = (resoluções × custo de um atendimento − custo de IA) ÷ custo de IA. Acima de 0 há retorno. Só o custo de tokens entra no denominador; hospedagem, bancos, desenvolvimento e manutenção ficam de fora, então o ROI é um limite superior.
-- **SLO**: p95 do tempo total ≤ 8 s e índice de erros ≤ 5%. Sem requisições, o SLO aparece como "sem dados".
+- **SLO**: p95 do tempo total ≤ 15 s e índice de erros ≤ 5%. Sem requisições, o SLO aparece como "sem dados".
 
 ## Indicadores da aba Monitor
 
@@ -62,6 +62,8 @@ O cliente é informado pelo cabeçalho **`X-Client`**, com os valores `app` ou `
 Todas as variáveis são lidas e validadas em `app/config.py` (`get_observability_config`), como as demais configurações; valor inválido ou negativo gera erro claro.
 
 ### Preço dos modelos (USD por 1 milhão de tokens, tarifa Standard)
+
+Os valores abaixo registram as premissas da tabela interna e as fontes utilizadas para defini-las. Não há atualização automática de preços: confirme os valores do provedor antes de utilizá-los em uma decisão financeira.
 
 | Modelo | Entrada | Saída | Fonte | Situação |
 | --- | --- | --- | --- | --- |
@@ -83,7 +85,7 @@ O Groq só atua como fallback do especialista. Para corrigir um preço sem alter
 | --- | --- | --- |
 | `OBS_USD_TO_BRL` | 5,4212 | PTAX de venda do Banco Central em 30/10/2026, pela [API Olinda do BCB](https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/aplicacao#!/recursos/CotacaoDolarDia). Atualize na data da apresentação |
 | `OBS_QUESTIONS_PER_USER_WEEK` | 0 (usar o medido) | **Não existe fonte externa confiável.** Sem valor definido, o relatório usa a taxa **medida** (perguntas por usuário ÷ semanas observadas), e só depois de 7 dias de dados; antes disso a projeção aparece como "n/d" |
-| `OBS_LATENCY_P95_LIMIT_MS` | 8000 | Meta de SLO definida pela equipe, não é referência externa |
+| `OBS_LATENCY_P95_LIMIT_MS` | 15000 | Meta de SLO definida pela equipe, não é referência externa |
 | `OBS_ERROR_RATE_LIMIT` | 0,05 | Meta de SLO definida pela equipe, não é referência externa |
 | `OBS_PRICES_JSON` | tabela interna | Sobrescreve preços, ex. `{"gpt-6-luna": [0.10, 0.50]}` |
 
@@ -98,7 +100,7 @@ Limites: tokens vêm do que o provedor devolve ou do `count_tokens`; o custo rea
 3. Suba a API normalmente: os traces aparecem no projeto, agrupados por `session_id`.
 4. `python -m scripts.langsmith_reconcile` compara tokens, custo e latência do LangSmith com o cálculo local.
 
-Use só com dados de teste: prompts e respostas vão para um serviço externo. Em `APP_ENV=test` o `.env` é ignorado, mas variáveis `LANGSMITH_*` definidas no processo ainda ligam o envio.
+Por padrão, `LANGSMITH_SEND_CONTENT=false` configura ocultação de inputs/outputs: prompts e respostas não devem ser enviados por essa integração. Com `true`, use somente dados de teste apropriados. Quando `APP_ENV=test` está no processo, `.env` é ignorado, mas variáveis `LANGSMITH_*` herdadas ainda podem ligar tracing.
 
 ## Validado e pendente
 
@@ -121,9 +123,9 @@ Use só com dados de teste: prompts e respostas vão para um serviço externo. E
 - **Preço de saída do Jev** e limites de uso: a TypeSafe não publica; confirmar em typesafe.ai/contact.
 - **Preço da Gartner**: a página original não pôde ser aberta; o valor vem do resumo e de cópias. Conferir.
 - **Cabeçalho `X-Client`**: o app e a plataforma web ainda precisam enviá-lo para o custo por cliente deixar de aparecer como `unknown`.
-- **Coleção no cluster real**: `observability_requests` existe só nos scripts do `delta-mongo-database` (branch `feat/colecao-observability-requests`); falta aplicá-los no cluster do app.
+- **Coleção no cluster real**: conferir se schema, índices e TTL de `observability_requests` foram aplicados no cluster do app; a presença de scripts não comprova aplicação.
 - **Área administrativa**: ver a seção seguinte.
-- **LangSmith em produção**: ele envia prompts e respostas para fora. Em produção, deixe desligado ou use só com amostragem e depois do guardrail que mascara dados pessoais. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.
+- **LangSmith em produção**: mantenha `LANGSMITH_SEND_CONTENT=false` para ocultar inputs/outputs. O envio explícito de conteúdo exige tratamento apropriado de dados pessoais e configuração do ambiente. Cada run leva `session_id` e `client` nos metadados, para filtrar por canal no próprio LangSmith.
 
 ## Área administrativa (planejada)
 
@@ -132,8 +134,39 @@ O painel de observabilidade existe só no console de testes da API de IA, que é
 Dependências:
 
 1. **Papel de administrador no JWT**, a combinar com quem emite o token no back-end.
-2. **Endpoint administrativo de observabilidade** na API de IA, protegido por esse papel. Depende de `app/auth.py`, que ainda não está na `main` do repositório de IA. Até lá não há endpoint com autenticação.
+2. **Endpoint administrativo de observabilidade** na API de IA, protegido por esse papel. A autenticação de chat/sessões já existe em `app/auth.py`, mas não há router administrativo de observabilidade registrado. Esse acesso precisa de autorização por papel, além da autenticação.
 3. **Cabeçalho `X-Client`** enviado pelo app e pela web.
 4. **Segredo `OBS_HASH_SECRET`** (16 caracteres ou mais) na API de IA, para contar usuários distintos.
 
 O relatório só é confiável com muitas requisições medidas; por isso essa área é urgente.
+
+## Rastreamento de uma requisição
+
+O servidor gera `X-Request-ID`, coloca-o na resposta e mantém o contexto ao longo dos nós, modelos, ferramentas e fases do RAG. Não reutiliza ID arbitrário do cliente. Erros são representados de forma segura, preservando tipos, localização e cadeia de causas sem expor texto bruto de credenciais/SDKs.
+
+`set_event_sink` permite integrar um consumidor de eventos; a existência desse ponto não configura armazenamento ou handlers de logs externos. `public_data` trata dados do diagnóstico e não deve ser considerado detecção universal de PII. O console pode exibir informações de teste e candidatas para inspeção; o contrato público de `/chat` é mais restrito.
+
+## Registro e recuperação
+
+São gravados modos de fluxo completo `chat` e `judge`, incluindo SSE quando a rota define o modo do trace. O registro de métricas não guarda pergunta, resposta ou `user_id` bruto. Ele reúne tempos, modelos, tokens, custo, revisões, resultado e canal.
+
+A coleção é `observability_requests` no Mongo de app. Persistência ocorre em thread daemon; falha não altera a resposta. Há buffer de até 2000 registros em RAM e leitura de até 1000 registros de banco por padrão, mesclados por ID. Após falha do Mongo, novas tentativas ficam suspensas por 60 segundos. Reinício perde o buffer; não é fila durável.
+
+A IA não garante aplicação de validador, índices ou TTL no cluster. A referência de schema/governança deve ser conferida no `delta-mongo-database`. A especificação anterior previa TTL de 90 dias e índices por request/canal/usuário; a aplicação desses scripts precisa ser verificada no cluster.
+
+`X-Client: app` ou `web` identifica canal. Console usa `playground`; ausente/inválido vira `unknown`. `OBS_HASH_SECRET` com pelo menos 16 caracteres habilita HMAC do usuário; sem ele não há contagem confiável de usuários distintos. Não é o ID original nem deve ser usado como identificador público.
+
+## Métricas e interpretação
+
+- Latência total acompanha chegada até encerramento HTTP, incluindo streaming. Há p50/p95/p99 e tempos por nó/agente/fase RAG.
+- Falhas 5xx, rejeições e resultados parciais são separados. Uma falha recuperada por fallback pode deixar o atendimento parcial.
+- `resolved` significa resultado `success`, modo completo e ausência do nó de bloqueio do Juiz. **Não exige provar que uma ferramenta trouxe dados suficientes**; explicação de indisponibilidade sem erro registrado pode contar como resolução.
+- Custo por resolução divide custo de IA pelas resoluções. ROI usa `(resoluções × custo de atendimento humano − custo IA) / custo IA`; não inclui infraestrutura, manutenção ou desenvolvimento.
+- SLO padrão atual: **p95 até 15 segundos**, erro até 5%, configuráveis. Sem dados, não há avaliação.
+- Tempos de nós podem se sobrepor pela preparação paralela. `overhead_ms` usa máximo entre zero e total menos soma de nós; não é decomposição rigorosa de tempo exclusivo.
+
+## Código relacionado
+
+- [app/observability/http.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/observability/http.py)
+- [app/observability/metrics.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/observability/metrics.py)
+- [app/observability/langsmith.py](https://github.com/delta-app-ofc/delta-artificial-intelligence/blob/main/app/observability/langsmith.py)

@@ -40,6 +40,7 @@ O Projeto Delta é uma plataforma acadêmica de monitoramento inteligente do con
 - [Arquitetura de Inteligência Artificial](IA/arquitetura-inteligencia-artificial.md) e [observabilidade](IA/observabilidade.md).
 - [Convenções de desenvolvimento](DEVOPS/convencoes-desenvolvimento.md), [CI](DEVOPS/ci-workflows.md) e [regras de revisão de PR](DEVOPS/pr-review-rules.md).
 - [Requisitos funcionais](EQS/requisitos-funcionais.md), [fluxo de trabalho](EQS/fluxo-trabalho.md) e [fluxos de UX](UX/fluxos-e-funcionalidades.md).
+- [Histórico técnico das alterações do Delta em 2026](GERAL/historico-alteracoes-2026.md), com escopo por repositório e pendências de comprovação.
 
 ## Estrutura do repositório
 

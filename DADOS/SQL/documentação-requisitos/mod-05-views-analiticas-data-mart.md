@@ -47,7 +47,15 @@ O schema `dw` contém **nove views**. As views analíticas leem `gold`; `vw_ft_u
 | `dw.vw_ft_alert` | Alertas por propriedade e pessoa, com severidade e tempo de resolução em minutos |
 | `dw.vw_ft_user_goal` | Consumo médio dos últimos 30 dias de cada pessoa comparado à meta diária de litros |
 
-#### 3. Como comprovar
+Na branch de indicadores `feat/indicadores-views-medalhao`, há views adicionais de metas e organização, como `vw_ft_property_monthly`, `vw_ft_organization_monthly_kpi`, `vw_ft_organization_esg`, `vw_ft_monitoring_hourly`, `vw_ft_leak`, `vw_ft_device_status`, `vw_ft_organization_device_summary` e `vw_ft_investment_impact`. A presença delas nessa branch não significa que façam parte da `main` ou do banco publicado. A lista acima descreve a versão do requisito documentada nesta branch do handbook; atualize-a após confirmar o merge e a migração correspondente.
+
+#### 3. Fonte e persistência das cargas
+
+O ETL Python do repositório SQL espelha quatro coleções do MongoDB: `consumption_summary` e `device_status` de `db_delta_telemetry`, além de `user_preferences` e `alerts_history` de `db_delta_app`. Os arquivos individuais das tabelas `stage`, procedures `silver`/`gold` e views `dw` devem acompanhar o script consolidado `script-datamart.sql`; `bi_etl.py` realiza as cargas de Mongo para Stage, e `silver.sp_load()`/`gold.sp_load()` transformam os dados.
+
+Isso descreve o código-fonte. Uma prova de gravação real exige logs de uma execução bem-sucedida e comparação de contagens/IDs entre as coleções de origem e as tabelas `stage`, seguida de confirmação de execução das procedures. Testes offline não acessam os bancos reais. O cron e os secrets também devem ser conferidos na branch padrão do repositório, não inferidos de um branch de feature.
+
+#### 4. Como comprovar
 
 1. Executar os scripts na ordem de `setup_db.py`, incluindo `script-datamart.sql` e `script-datamart-dataload.sql`.
 2. Listar as views com `\dv dw.*` e conferir as nove views.

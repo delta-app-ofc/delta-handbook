@@ -7,6 +7,7 @@
 - [Script do Data Mart](https://github.com/delta-app-ofc/delta-sql-database/blob/main/script-datamart.sql)
 - [Documentação da camada de BI, seção 5](../camada-bi.md)
 - [Resultado da view com CTE `vw_ft_consumption_daily`](../anexos/evidencias-requisitos/mod-06-view-consumo-diario.png)
+- [ETL MongoDB → Stage (`bi_etl.py`)](https://github.com/delta-app-ofc/delta-sql-database/blob/main/bi_etl.py)
 
 **Localização e como comprovar:**
 
@@ -30,6 +31,8 @@ As CTEs (`WITH`) organizam a transformação em etapas legíveis, uma por respon
 | `vw_ft_user_goal` | Agrega a média dos últimos 30 dias por pessoa antes de compará-la à meta |
 
 `vw_ft_alert` usa um `SELECT` direto, sem CTE.
+
+O pipeline Python e as procedures SQL têm papéis separados: `bi_etl.py` extrai documentos MongoDB e insere/atualiza tabelas `stage`; as procedures `silver.sp_load_*` e `gold.sp_load_*` transformam e carregam as camadas analíticas. A existência de CTE nas procedures comprova a técnica de transformação SQL, mas não prova que o job Python rodou contra bancos reais. Essa confirmação depende do log do workflow e de contagens/IDs nas tabelas de destino, como detalhado em [camada de BI](../camada-bi.md#escopo-do-etl-e-evidencia-de-gravacao).
 
 #### 3. Por que CTEs
 

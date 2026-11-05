@@ -20,6 +20,21 @@ firmware. Em imóvel compartilhado, user_id recebe o menor ID vinculado para
 compatibilidade; user_ids preserva todos os usuários. O cadastro SQL é a origem
 destes campos, inclusive property_id.
 
+## Requisitos funcionais
+
+Referência: [documento oficial](../EQS/requisitos-funcionais.md).
+
+| Requisitos | Entrega |
+| --- | --- |
+| RF07, RF08 | Ingestão e associação cadastral da janela |
+| RF15, RF16, RF17 | Detector determinístico, baseline e alertas com evidências |
+| RF11, RF13, RF14, RF18 | Consulta de alertas, série de evidências e gráfico |
+| RF23 | LeakAgent lê motivos e evidências persistidos |
+| RF24, RF25, RF31, RF32 | Contrato da previsão e alertas de meta/conta na IA |
+
+RF19 não está concluído por esta entrega: o histórico é gravado, mas o envio de
+notificações depende do dispatcher e das preferências do usuário.
+
 ## Habilitação
 
 1. Aplicar schemas, migrações de baseline/alertas/anomalias e índices antes do
@@ -81,3 +96,20 @@ notifications_enabled e quiet_hours ao enviar push/e-mail.
 
 A última conta é alternativa somente sem consumo medido. Zero é medição.
 Sem tarifa e com medições, a previsão monetária fica indisponível.
+
+## Verificação local em 02/11/2026
+
+| Escopo | Resultado |
+| --- | --- |
+| API Mongo | Suíte de 264 casos, 11 opcionais ignorados, sem falhas; 22 testes direcionados e pacote final aprovados |
+| Sincronização HTTP | Script completo aprovado com PostgreSQL 16 e MongoDB 7 novos; vínculo, coorte, ingestão, 409, visita, evidências, alerta único e isolamento 404 |
+| Schemas Mongo | Smoke test aprovado com metadados compartilhados, coorte, auditoria e índices |
+| Web | TypeScript, build Vite e 61 testes aprovados, incluindo refresh Postgres após 401 no Mongo |
+| Android | APK debug, 386 testes sem falhas e lint aprovados; sem ensaio em aparelho/emulador |
+| IA | 20 testes de contrato aprovados; CLI de ajuda verificada; sem chamadas a LLM |
+| Business rules | 11 testes restantes aprovados e Compose validado |
+| Calibração | 24 combinações sintéticas executadas; candidato versionado, sem adoção automática |
+
+O Swagger público do Postgres no Render respondeu 200 nesta verificação, mas ainda
+não listava a rota interna de proprietário do PR #52. Nenhuma escrita foi feita
+no Render; os resultados acima não representam validação em produção.

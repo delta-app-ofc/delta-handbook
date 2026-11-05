@@ -1,307 +1,232 @@
-# 📊 Camada de BI (Data Mart) - PostgreSQL (Projeto Delta)
+# Camada de BI do PostgreSQL
 
-Este documento descreve a camada de BI/Data Mart do banco PostgreSQL do Projeto Delta: arquitetura em
-camadas, modelagem dimensional (star schema), CTEs, Window Functions, índices e a extração real de dados a
-partir do MongoDB. Cobre o perfil comercial/industrial (unidades operadas por organização) e o resumo
-analítico do perfil residencial já existente.
+Este documento descreve a implementação atual da camada analítica do Delta: de onde os dados vêm, como são transformados e como interpretar cada indicador que a API e a aplicação web consomem. O SQL é a fonte das fórmulas; o front apresenta os resultados e só agrega quando a consulta reúne mais de uma organização.
 
-🔗 Repositório: https://github.com/delta-app-ofc/delta-sql-database (pasta `datamart/`)
+## Repositórios e fonte de verdade
 
----
+- Implementação SQL: [delta-sql-database](https://github.com/delta-app-ofc/delta-sql-database), principalmente `datamart/` e `script-migration-indicadores.sql`.
+- API de leitura: [delta-api-postgres](https://github.com/delta-app-ofc/delta-api-postgres), `AnalyticsRepository` e projeções de `modules/analytics/`.
+- Web: [delta-web-app](https://github.com/delta-app-ofc/delta-web-app), serviços em `src/services/indicators.ts` e agregações em hooks de cada página.
 
-## 1. Objetivo e motivação
+Confira esses repositórios antes de alterar fórmulas. A view SQL define a regra analítica; formatação, seleção de período e agregação de resultados ficam na API ou no front conforme descrito abaixo. Uma view existente no branch de desenvolvimento não prova, por si só, que a migração correspondente já foi aplicada ao banco publicado.
 
-O requisito de disciplina pedia uma camada de BI com Views Analíticas em Modelagem Dimensional (Star
-Schema), ETL via CTEs, Window Functions (Running Total, Ranking) e otimização com `EXPLAIN ANALYZE` +
-Índices, além de uma estrutura avançada (CTE Recursiva ou Herança de Tabelas). Esta camada foi construída
-para atender isso usando dado real sempre que possível: telemetria real do MongoDB local (gerada pelo
-`delta-hardware-data-simulator`), dado cadastral real já existente no Postgres, e cenários de investimento
-com valores pesquisados (não fictícios).
+## Fluxo de dados
 
-Onde o volume real de dados era pequeno demais para o `EXPLAIN ANALYZE` mostrar diferença de plano (a
-telemetria real hoje cobre só 3 propriedades), isso é registrado explicitamente na seção 7 - a decisão foi
-não fingir dado de produção, e sim rodar um teste de capacidade separado, isolado, nunca commitado.
+```text
+MongoDB (telemetria, alertas e estado dos dispositivos)
+        │ bi_etl.py
+        ▼
+stage (espelho de entrada)
+        │ procedures silver.sp_load_*
+        ▼
+silver (tipos, deduplicação e associação de device/property)
+        │ procedures gold.sp_load_*
+        ▼
+gold (fatos e dimensões analíticas)
+        │ views dw.vw_*
+        ▼
+API delta-api-postgres ──► web e mobile
+```
 
----
+Dados cadastrais e de referência que já estão no PostgreSQL, como unidades, organizações, metas e cenários, entram nas cargas silver/gold sem espelhamento pelo Mongo. As views de serviço `dw.vw_ft_*` leem o modelo gold; a view de trilha de auditoria lê `tb_log_region_rate` diretamente. O fluxo de ranking Redis é separado e não deve ser tratado como uma view desta camada.
 
-## 2. Arquitetura em 4 camadas (medalhão)
+### Grãos que afetam as fórmulas
 
-| Camada | Papel | Materialização |
+| Objeto | Grão principal | Origem/transformação |
 |---|---|---|
-| `stage` | Cópia bruta do MongoDB: `consumption_summary`, `user_preferences` e `alerts_history` | Tabela, com `loaded_at` |
-| `silver` | Dado tratado: tipado, deduplicado, no grão original (ainda sem chave substituta) | Tabela |
-| `gold` | Modelo dimensional final - star schema, chave substituta, pronto pra consumo analítico | Tabela |
-| `dw` | Só views (`dw.vw_*`) - a camada de consumo do BI, CTEs + Window Functions; `vw_ft_user_goal` também lê `tb_user_property`, e a view recursiva lê auditoria | View |
+| `gold.ft_consumption_reading` | dispositivo × instante de leitura | `stage.consumption_summary`, resolvido por `tb_device.device_id`; conflito `(device_id, read_at)` é ignorado |
+| `gold.ft_consumption_daily` | unidade × dia | soma dos volumes das leituras associadas à unidade naquele dia; custo calculado com a tarifa válida naquele dia |
+| `gold.ft_water_bill_monthly` | pessoa × mês de fatura | faturas residenciais e dimensões de pessoa/data |
+| `gold.ft_alert` | ocorrência de alerta | histórico de alertas tratado e associado às dimensões |
+| `gold.dm_device_status` | dispositivo | estado mais recente carregado pela integração de status |
+| `gold.ft_investment_scenario` | cenário de investimento | cópia dos valores cadastrados em `tb_investment_scenario`; a view de comparação não estima esses campos |
 
-Dado cadastral do Postgres que já chega limpo (propriedade, pessoa, fatura, cenário de investimento) **pula
-a `stage`** e entra direto na `silver` - só o que vem de fora (telemetria, preferências e alertas do MongoDB) precisa do
-espelho bruto. Isso é uma decisão de desenho, não uma inconsistência: `stage` existe para isolar o formato
-de uma fonte externa, e dado que já nasce no Postgres não tem esse problema.
+`volume_liters`/`consumption_liters` ficam em litros. A tarifa `m3_value` é aplicada como R$/m³: `litros / 1000 × tarifa`. O custo diário é arredondado a centavos na carga gold. Se não houver tarifa vigente para a classificação e a data, a junção lateral da carga não produz a linha diária; confirme a cobertura de tarifas ao investigar períodos ausentes.
 
----
+## Views e definições dos indicadores
 
-## 3. Modelo dimensional (star schema)
+### Consumo diário — `dw.vw_ft_consumption_daily`
 
-O núcleo de consumo, faturas e alertas segue Star Schema, com `gold.dm_date` como
-dimensão conformada compartilhada pelas tabelas fato temporais:
+Retorna litros e custo por unidade/dia, além de:
 
+- `running_total_liters`: soma acumulada desde o primeiro dia disponível para a unidade;
+- `moving_avg_7d_liters`: média da linha atual e das até seis linhas anteriores.
+
+**Interpretação:** a média é das últimas sete linhas/dias com registro, não necessariamente dos últimos sete dias corridos. Em dias sem telemetria não há linha com zero; portanto, lacunas fazem a janela cobrir mais de sete dias de calendário. O total acumulado também começa no histórico disponível, não em um ano civil específico.
+
+### Variação mensal — `dw.vw_ft_monthly_variation`
+
+Agrega litros por unidade e mês e usa `LAG(total_liters)` para obter a linha mensal observada anterior. A variação é:
+
+```text
+(consumo do mês − consumo da linha mensal observada anterior)
+÷ consumo da linha mensal observada anterior × 100
 ```
-                    gold.dm_date (dimensão conformada)
-                   /                              \
-gold.dm_property--+--gold.ft_consumption_daily      gold.ft_water_bill_monthly--+--gold.dm_person
+
+O SQL arredonda a uma casa decimal. Se o valor anterior for zero ou inexistente, a variação é `NULL`. **`LAG` compara com o mês observado anterior, que pode não ser o mês de calendário imediatamente anterior se houver lacunas.** A mesma ressalva vale para `previous_month_liters` nas views mensais de unidade e organização.
+
+### Indicadores mensais por unidade — `dw.vw_ft_property_monthly`
+
+Uma linha por unidade e mês com consumo, custo, meta, variação, economia e sinalização de completude.
+
+| Campo | Regra implementada | Observação |
+|---|---|---|
+| `total_liters` | soma de `gold.ft_consumption_daily.total_liters` no mês | Soma só os dias com fato; ausência de fato não vira zero. |
+| `total_cost` | soma do custo diário já calculado com tarifa vigente | R$; não recalcula tarifa no front. |
+| `days_with_data` | quantidade distinta de datas com fato | Não mede quantas leituras eram esperadas em cada dia. |
+| `is_complete_month` | `days_with_data` maior ou igual ao número de dias do mês | Heurística baseada em presença de datas, não confirmação de cobertura de todos os dispositivos ou de horário de corte do ETL. |
+| `liters_per_m2` | litros do mês ÷ área construída | Duas casas decimais; `NULL` quando área é nula ou zero. |
+| `goal_pct` | litros do mês ÷ meta mensal em litros × 100 | Uma casa decimal; `NULL` sem meta. Em mês parcial compara o consumo acumulado até então com a meta mensal inteira, sem rateio pelos dias decorridos. |
+| `daily_limit_liters` | meta mensal ÷ quantidade de dias do mês | Arredondado a litro; é uma média diária uniforme, não uma recomendação baseada no calendário restante. |
+| `remaining_liters` | maior entre meta − consumo e zero | Nunca fica negativo; continua comparando com a meta mensal cheia em mês parcial. |
+| `goal_status` | `OK` até 85%; `ATENCAO` acima de 85% até 100%; `CRITICO` acima de 100%; `SEM_META` sem percentual | Os limites se aplicam ao percentual não arredondado pelo SQL. |
+| `variation_pct` | comparação percentual com a linha anterior do `LAG` | Só preenchida quando o mês está marcado completo e existe denominador diferente de zero; mês anterior pode ser não consecutivo. |
+| `saved_liters` | maior entre litros do mês anterior e atual subtraídos, e zero | Só conta quando o mês atual está marcado completo. Se não houver mês anterior, `COALESCE` usa zero, resultando em zero para consumo não negativo. |
+| `estimated_savings_value` | litros economizados × custo médio do mês em R$/m³ ÷ 1000 | Só em mês completo; custo médio é `total_cost ÷ total_liters × 1000`. É estimativa comparativa, não medição financeira independente. |
+
+O status da meta não é uma previsão de fechamento do mês. Por exemplo, uma unidade pode estar abaixo de 85% no meio do mês e ultrapassar a meta depois.
+
+### KPIs mensais da organização — `dw.vw_ft_organization_monthly_kpi`
+
+Agrega por organização/mês as linhas disponíveis da view de unidade:
+
+- litros, custo, litros anteriores, economia e litros poupados: soma;
+- total de unidades: quantidade de linhas de unidade naquele mês;
+- unidades dentro da meta, em atenção e críticas: contagem por `goal_status`;
+- `avg_goal_pct`: média simples do percentual entre unidades com meta (percentuais nulos são ignorados), sem ponderar pela meta ou pelo consumo;
+- `min_days_with_data`: menor quantidade de dias observada entre as unidades presentes;
+- `is_complete_month`: `BOOL_AND` da completude das linhas de unidade presentes.
+
+Variação percentual usa os totais atuais e anteriores da organização, apenas se `is_complete_month` for verdadeiro e o denominador não for zero. **A completude organizacional considera somente unidades que têm linha no mês.** Unidade sem fato no período não aparece no agrupamento; assim, a flag não garante que todas as unidades cadastradas nem todos os dispositivos tenham enviado dados.
+
+Projeção simples:
+
+```text
+litros projetados = maior(total atual + (total atual − total anterior), 0)
+custo projetado = litros projetados × (custo atual ÷ litros atuais)
 ```
 
-### Dimensões
+O custo projetado usa o custo médio atual por litro. Não é modelo sazonal nem previsão estatística. Sem mês anterior, a fórmula substitui o anterior pelo valor atual e projeta o próprio consumo. Se litros atuais forem zero, o custo médio fica `NULL`.
 
-| Tabela | Grão | PK | Chave natural |
+### Monitoramento por hora — `dw.vw_ft_monitoring_hourly`
+
+Agrupa leituras por organização, unidade, duração da janela de origem (`window_minutes`) e hora cheia (`DATE_TRUNC('hour', read_at)`). `total_liters` é a soma dos volumes no grupo, `avg_flow_lmin` é a média aritmética dos fluxos registrados (3 casas decimais) e `readings_count` é a quantidade de leituras. Não é interpolação: uma hora sem leituras não gera linha. Resultados de janelas diferentes permanecem separados.
+
+### Status de dispositivos — `dw.vw_ft_device_status` e `dw.vw_ft_organization_device_summary`
+
+- `is_online` é verdadeiro somente quando `connectivity_status`, sem distinção de maiúsculas, é `online` ou `connected`.
+- `is_low_battery` é verdadeiro para bateria não nula menor ou igual a 20; bateria nula não é classificada como baixa.
+- `devices_paired` conta dispositivos ativos; `devices_online` conta ativos cujo status foi mapeado como online; `devices_low_battery` conta ativos com bateria baixa.
+- `properties_without_device` é o total de unidades da organização menos unidades distintas com pelo menos um dispositivo ativo.
+
+O resumo depende da atualização da fonte `stage.device_status`/`gold.dm_device_status`. Status antigo pode produzir um KPI desatualizado; veja também `last_ping_at` e o horário da carga antes de interpretar como estado ao vivo.
+
+### Alertas e vazamentos — `dw.vw_ft_alert` e `dw.vw_ft_leak`
+
+`vw_ft_alert` expõe tipo, severidade, início, resolução e duração em minutos. A duração é a diferença entre `resolved_at` e `triggered_at`, dividida por 60; alerta ainda ativo tem duração nula nessa view.
+
+`vw_ft_leak` filtra `alert_type = 'vazamento_continuo'`. A classificação é `ATIVO` sem `resolved_at`, caso contrário `RESOLVIDO`. Para cada alerta, a perda estimada soma `volume_liters` das leituras do mesmo dispositivo entre o início e a resolução (ou o horário atual para alerta ativo), inclusive nos extremos. O impacto em reais multiplica esses litros pelo custo médio histórico da unidade por m³.
+
+**Limitação importante:** toda água medida durante o intervalo do alerta é tratada como perda. A view não subtrai consumo normal nem aplica uma vazão-base; `estimated_loss_liters` e `estimated_loss_cost` são estimativas-proxy e podem superestimar o vazamento. Alertas sobrepostos do mesmo dispositivo podem contar leituras mais de uma vez, uma vez em cada ocorrência.
+
+### Impacto de investimentos — `dw.vw_ft_capex_comparison` e `dw.vw_ft_investment_impact`
+
+`vw_ft_capex_comparison` apenas lê os valores de investimento, redução, economia anual e payback já cadastrados em `tb_investment_scenario`/gold e os ordena pelo payback. Esses valores não são derivados nesta view.
+
+`vw_ft_investment_impact` calcula uma linha de base por organização usando a média do consumo mensal dos meses marcados completos multiplicada por 12. Para cada cenário aplicável:
+
+```text
+litros anuais poupados = linha de base anual × reduction_pct ÷ 100
+caminhões-pipa equivalentes = litros poupados ÷ 10.000
+meses de consumo familiar = litros poupados ÷ 18.000
+```
+
+Os equivalentes usam 10.000 L como capacidade de referência de um caminhão-pipa e 18.000 L como consumo mensal de referência de quatro pessoas (`4 × 150 L/dia × 30 dias`). A Embasa publica a estimativa nacional de 150 L por morador/dia e ressalta que o consumo varia por hábitos e condições econômicas ([fonte](https://www.ba.gov.br/comunicacao/2022/01/noticias/embasa-orienta-sobre-instalacao-de-reservatorio-para-prevenir-desabastecimento-em-imoveis)). Editais públicos usam caminhões-pipa de 10.000 L como especificação mínima, mas há veículos de outras capacidades ([exemplo municipal de 10.000 L](https://ribasdoriopardo.ms.gov.br/wp-content/uploads/2024/08/FLS.-213-a-214-RESOLUCAO-N2-65-SEINFRA-2024.pdf)). Portanto, os dois divisores são equivalências de referência, não constantes universais nem volumes físicos efetivamente transportados/consumidos. A linha de base só usa meses presentes e marcados completos, sem preencher meses ausentes com zero.
+
+**Agregação na web:** quando uma conta tem mais de uma organização, os litros poupados por cenário são somados primeiro; a web divide esse total por 10.000 ou 18.000 para obter equivalências. Isso evita acumular o arredondamento das equivalências feitas separadamente por organização. Os litros fornecidos pelo SQL já são arredondados a litro por organização.
+
+### ESG mensal — `dw.vw_ft_organization_esg`
+
+`saved_liters_month` usa `saved_liters` da view de organização. `saved_liters_year_projection` multiplica o valor mensal por 12; caminhões-pipa e meses familiares dividem essa projeção por 10.000 e 18.000 e arredondam a uma casa decimal.
+
+Isso é uma anualização do resultado de um mês fechado, não uma soma dos últimos doze meses nem uma previsão sazonal. Em um mês não completo, a economia mensal da view-base é zero e a projeção também será zero.
+
+### Pesquisa e valores de referência de investimentos
+
+Os cenários de investimento são registros de referência em `tb_investment_scenario`, copiados para `gold.ft_investment_scenario`. `dw.vw_ft_capex_comparison` apresenta os valores cadastrados e ordena pelo payback; não calcula preço de obra nem atualiza valores de mercado. A metodologia, fontes consultadas, valores carregados e limitações estão em [pesquisa de cenários de investimento](pesquisa-cenarios-investimento.md).
+
+O campo financeiro estático usa a relação simples:
+
+```text
+payback em meses = investimento ÷ (economia anual cadastrada ÷ 12)
+```
+
+Exemplo: `R$ 75.000 ÷ (R$ 51.800 ÷ 12) = 17,3745...`, que arredondado a uma casa decimal dá **17,4 meses**. O dataload Swift informava 17,3; o valor foi corrigido para 17,4. Esse payback continua sendo uma premissa armazenada do cenário, independente do consumo medido da organização. Já `vw_ft_investment_impact` calcula litros evitados a partir do consumo observado e do percentual de redução do cenário. Não se deve interpretar o `annual_savings_value`/`payback_months` estático como uma previsão financeira personalizada.
+
+### Rankings e distribuição
+
+| View | Cálculo e ordenação | Escopo/limite |
+|---|---|---|
+| `vw_ft_property_ranking` | soma histórica de litros e custos; `liters_per_m2 = litros ÷ área`; `RANK` por menor L/m², `DENSE_RANK` por maior custo, `NTILE(4)` e `PERCENT_RANK` por L/m² | Sem filtro de mês. Exclui unidades sem área. Menor L/m² é tratado como melhor eficiência, embora unidades de usos/tamanhos diferentes possam não ser diretamente comparáveis. |
+| `vw_ft_residential_efficiency_ranking` | ordena faturas pelo menor m³ por mês; `RANK` e `PERCENT_RANK` particionados pela data de referência | Mede menor volume faturado, não eficiência por pessoa ou área; pessoas/faturas ausentes não são estimadas. |
+| `vw_ft_consumption_distribution` | mínimo, máximo, quartis contínuos e mediana sobre todos os fatos diários; `NTILE(5)` cria cinco grupos por volume | Distribuição global do conjunto carregado, não separada por organização ou mês. Empates podem fazer grupos terem tamanhos diferentes. |
+| `vw_audit_history_chain` | CTE recursiva percorre `previous_log_id` e numera níveis | Trilha de auditoria, não métrica de consumo. |
+
+Rankings de eficiência e de consumo têm sentidos distintos: menor L/m² pode ser classificado como maior eficiência, enquanto menor consumo faturado é apenas menor volume registrado naquele mês.
+
+## Cálculos feitos depois da API
+
+O front deve formatar indicadores e não substituir as regras SQL. Os hooks podem:
+
+- escolher o mês mais recente disponível/fechado para apresentação;
+- somar KPIs retornados para as organizações acessíveis à conta;
+- contar ou resumir itens já calculados pelo banco;
+- arredondar apenas para exibição.
+
+Na tela de metas, o “potencial econômico anual” é a soma da economia estimada das unidades no mês selecionado multiplicada por 12. É uma anualização de um mês, não economia observada em doze meses. Na tela de investimentos, equivalências ambientais são derivadas do total de litros somados por cenário, como descrito acima.
+
+## Atualização e migração
+
+O `bi_etl.py` no repositório SQL extrai documentos do Mongo para `stage` e chama as cargas silver/gold. A view é recalculada pelo PostgreSQL quando consultada, mas seus fatos/dimensões só refletem o estado da última carga. O estado online, alertas, telemetria e indicadores não são automaticamente atualizados apenas porque a aplicação abriu uma página.
+
+### Escopo do ETL e evidência de gravação
+
+Na branch `feat/indicadores-views-medalhao`, o ETL Python carrega:
+
+| Origem MongoDB | Banco/coleção | Destino PostgreSQL | Estratégia |
 |---|---|---|---|
-| `gold.dm_date` | 1 linha por dia | `date_key` (INTEGER, YYYYMMDD) | - (dimensão raiz, gerada por `generate_series`) |
-| `gold.dm_property` | 1 linha por propriedade | `property_key` (substituta) | `property_id` (único, aponta pra `tb_property.id`) |
-| `gold.dm_person` | 1 linha por pessoa | `person_key` (substituta) | `user_id` (único, aponta pra `tb_user.id`) |
-| `gold.dm_user_preference` | 1 linha de preferências por pessoa | `preference_key` | Pessoa e metas de consumo |
+| Telemetria | `db_delta_telemetry.consumption_summary` | `stage.consumption_summary` | Busca incremental pela borda `window_started_at >= MAX(stage.window_started_at)`; `ON CONFLICT (mongo_id) DO NOTHING` torna a releitura idempotente. |
+| Estado de dispositivos | `db_delta_telemetry.device_status` | `stage.device_status` | UPSERT por `mongo_id`, atualizando os campos de status. |
+| Preferências | `db_delta_app.user_preferences` | `stage.user_preferences` | UPSERT por `mongo_id`, incluindo meta diária, notificações, horário silencioso e tema. |
+| Alertas | `db_delta_app.alerts_history` | `stage.alerts_history` | UPSERT por `mongo_id`, permitindo atualizar resolução e severidade. |
 
-`gold.dm_property` traz o nome da organização já denormalizado na própria linha (`organization_name`) - é
-isso preserva a organização dentro da dimensão de propriedade. A extensão de preferências referencia `gold.dm_person` por `person_key`, acrescentando uma relação entre dimensões.
+Depois, `silver.sp_load()` trata e associa as linhas; `gold.sp_load()` atualiza dimensões e fatos; as views `dw` consultam a camada gold. `bi_etl.py` não escreve diretamente nas tabelas operacionais `public.tb_*`. Metas de unidade e cenários de investimento têm origem no PostgreSQL operacional, não nas coleções Mongo acima.
 
-### Fatos
+**Status da evidência:** leitura do código, presença de objetos no branch e testes offline demonstram que o fluxo foi implementado e que suas regras de idempotência foram verificadas com adaptadores simulados. Isso não demonstra uma execução recente contra os bancos hospedados. Até conferir o histórico do workflow, os logs de execução e as contagens Mongo/PostgreSQL no mesmo instante, não afirmar que os dados reais estão sendo gravados ou atualizados agora.
 
-| Tabela | Grão | PK | FK | Medidas |
-|---|---|---|---|---|
-| `gold.ft_consumption_daily` | 1 linha por propriedade x dia | `fact_key` | `property_key`, `date_key` | `total_liters`, `avg_flow_lmin`, `cost_value` |
-| `gold.ft_water_bill_monthly` | 1 linha por pessoa x mês | `fact_key` | `person_key`, `date_key` | `total_value`, `m3_value` |
-| `gold.ft_alert` | 1 linha por ocorrência de alerta | `alert_key` | `property_key`, `person_key`, `date_key` | Instantes de disparo/resolução; tempo de resolução calculado pela view |
-| `gold.ft_investment_scenario` | 1 linha por cenário (fato degenerado, sem FK de dimensão - não cruza com tempo/propriedade/pessoa) | `scenario_key` | - | `investment_value`, `reduction_pct`, `annual_savings_value`, `payback_months` |
+Na revisão de 03/11/2026, o ETL com carga de `device_status`, as views analíticas recentes e os objetos de metas/alertas estavam na branch `feat/indicadores-views-medalhao`, não na `main` observada. Portanto, os objetos encontrados na branch não comprovam que o banco publicado os recebeu. A sincronização de arquivos individuais com os agregadores SQL foi feita separadamente; compare cada camada antes de aplicar uma migração.
 
-`gold.ft_investment_scenario` é fato (tem medida numérica analisável - ranking por payback) mas não é
-transacional: é referência estática, por isso não tem dimensão de tempo associada.
+Para provar uma execução real sem expor credenciais, registre: URL/ambiente de destino (sem parâmetros secretos), commit/branch publicado, horário da execução, status dos jobs, contagens de documentos por coleção e contagens por `mongo_id` nos destinos `stage`, além do resultado das cargas Silver/Gold. Compare amostras por IDs e timestamps. Faça consultas somente de leitura; não rode o ETL manualmente em produção durante uma auditoria sem confirmar antes o destino e a política operacional.
 
----
+As conexões Mongo usam `MONGODB_TELEMETRY_URI` e `MONGODB_APP_URI`; os nomes de banco usam `MONGO_DB_TELEMETRY` e `MONGO_DB_APP`. Se a conexão do Mongo de aplicação não estiver configurada no código/execução, preferências e alertas não são carregados. Configure esses valores como secrets do workflow e não os registre em logs ou documentação.
 
-## 4. Fluxo de dados por conjunto
+O workflow ETL observado na `main` roda de hora em hora e também tenta disparar uma sincronização do Redis ao concluir. Uma proposta local de cron a cada cinco minutos não está ativa até ser mergeada na branch padrão; antes de habilitar, confirme duração, concorrência, cota e carga que cada execução faz nos bancos. O estado e a atualização do ranking Redis pertencem ao fluxo Redis e devem ser verificados separadamente.
 
-- **Consumo (telemetria industrial)** - um fluxo que passa pelas 4 camadas, por ser
-  um dos conjuntos que chegam de fora do Postgres:
+Para um banco vazio, siga a ordem documentada pelo `setup_db.py` no repositório SQL. Para banco existente, examine o `migrate_db.py` e `script-migration-indicadores.sql`, faça backup, confira o alvo e aplique a migração planejada; depois carregue silver/gold conforme o README do repositório. Não execute migração em produção como parte de uma revisão documental.
 
-  `MongoDB db_delta_telemetry.consumption_summary` (real) → `bi_etl.py` → `stage.consumption_summary`
-  (cópia 1:1, `mongo_id` único e idempotente) → `silver.sp_load_ft_consumption_reading` (`JOIN tb_device`
-  resolve `device_id` → `property_id`) → `silver.ft_consumption_reading` (grão device x instante -
-  `UNIQUE (device_id, read_at)`, porque uma propriedade pode ter mais de 1 dispositivo instalado) →
-  `silver.sp_load_ft_consumption_daily` (CTE de agregação por dia, soma todos os devices de uma
-  propriedade) → `silver.ft_consumption_daily` →
-  `gold.sp_load_ft_consumption_daily` (chave substituta + consulta `LATERAL` em `tb_region_rate` para o custo) →
-  `gold.ft_consumption_daily` → `dw.vw_ft_consumption_daily` / `vw_ft_property_ranking` / `vw_ft_monthly_variation`
-  / `vw_ft_consumption_distribution`.
+Antes de atribuir uma fórmula ao estado de produção, confirme se a migração que cria/recria a view foi aplicada nesse banco. O branch e o arquivo local são evidência do código-fonte, não evidência da versão em execução.
 
-- **Propriedade + organização + perfil operacional** - dado cadastral já limpo, pula a `stage`:
-  `tb_property` + `tb_organization` + `tb_property_operational_profile` → `silver.sp_load_dm_property`
-  (achata organização/perfil operacional numa linha só) → `silver.dm_property` →
-  `gold.sp_load_dm_property` (chave substituta + remove órfão) → `gold.dm_property`.
+## Verificações recomendadas dos cálculos
 
-- **Pessoa** - pula a `stage`: `tb_user` → `silver.sp_load_dm_person` (hoje um `SELECT` direto, sem
-  transformação) → `silver.dm_person` → `gold.sp_load_dm_person` → `gold.dm_person`.
+Faça as conferências em banco descartável ou de teste, com dados determinísticos e rollback. Para cada fórmula, compare a saída da view com cálculo manual simples:
 
-- **Fatura residencial** - pula a `stage`: `tb_last_water_bill` + `tb_user` →
-  `silver.sp_load_ft_water_bill` → `silver.ft_water_bill` → `gold.sp_load_ft_water_bill_monthly` (chave
-  substituta via `dm_person`/`dm_date`) → `gold.ft_water_bill_monthly` →
-  `dw.vw_ft_residential_efficiency_ranking`.
+1. **Custo diário:** 1.500 L a R$ 8,00/m³ deve resultar em R$ 12,00 antes das regras de arredondamento.
+2. **Variação:** 1.200 L contra 1.000 L resulta em +20%; contra zero ou sem observação anterior, a variação deve ser `NULL`.
+3. **Meta:** meta de 1.000 L e consumo de 850 L resulta em 85% e `OK`; 1.000 L resulta em 100% e `ATENCAO`; acima disso, `CRITICO`.
+4. **Meta diária:** meta mensal de 31.000 L em mês de 31 dias resulta em 1.000 L/dia.
+5. **Projeção:** 1.200 L no mês contra 1.000 L na observação anterior projeta 1.400 L; redução projetada abaixo de zero fica limitada a zero.
+6. **Impacto de cenário:** linha de base anual de 120.000 L e redução de 10% resulta em 12.000 L poupados/ano, 1,2 caminhões equivalentes e 0,7 mês familiar (`12.000 ÷ 18.000 = 0,666...`, uma casa decimal).
+7. **Completude:** criar mês com uma data sem fato deve impedir a marcação de mês completo; testar separadamente uma unidade cadastrada sem nenhuma linha no mês, pois ela não participa do `BOOL_AND` organizacional.
+8. **Vazamento:** usar intervalo conhecido de leituras para confirmar inclusão dos instantes inicial/final e demonstrar que leituras de consumo normal também entram na estimativa.
 
-- **Cenário de investimento (CAPEX)** - o mais curto, dado de referência estático, não passa por
-  `stage`/`silver`: `tb_investment_scenario` → `gold.sp_load_ft_investment_scenario` (só chave substituta)
-  → `gold.ft_investment_scenario` → `dw.vw_ft_capex_comparison`.
-
-- **Alertas e metas** - `MongoDB alerts_history` e `user_preferences` → `bi_etl.py` → respectivas tabelas de `stage` → procedures de `silver` e `gold` → `dw.vw_ft_alert` e `dw.vw_ft_user_goal`. A view de metas também associa as propriedades às pessoas por `tb_user_property`.
-
-- **Auditoria (cadeia de reajuste de tarifa)** - fora do star schema, é a estrutura avançada da seção 6:
-  `tb_region_rate` (operações reais) → `trg_log_region_rate`/`fn_log_region_rate` (auditoria já existente)
-  → `tb_log_region_rate` → `dw.vw_audit_history_chain` (CTE recursiva direto sobre o log de auditoria).
-
----
-
-## 5. CTEs e Window Functions
-
-### CTEs (`WITH`)
-
-Oito das nove views de `dw` usam CTEs, além da procedure de carga; `vw_ft_alert` usa um `SELECT` direto:
-
-- `silver.sp_load_ft_consumption_daily` - agrega leituras por propriedade/dia antes do `INSERT`.
-- `dw.vw_ft_consumption_daily` - CTE monta os `JOIN`s (propriedade, data) antes das window functions -
-  organiza a leitura em etapas; o PostgreSQL também permite `JOIN` e window functions na mesma consulta.
-- `dw.vw_ft_property_ranking` - 2 CTEs em cadeia: agrega consumo/custo, depois calcula litros/m² - evita
-  repetir a divisão em cada `OVER` do `SELECT` final.
-- `dw.vw_ft_consumption_distribution` - agrega os totais diários, depois calcula os percentis
-  (`PERCENTILE_CONT`) numa CTE separada que entra via `CROSS JOIN`.
-- `dw.vw_ft_monthly_variation` - agrega por mês antes de aplicar `LAG()`.
-- `dw.vw_ft_capex_comparison` - CTE simples, por padronização com as outras views.
-- `dw.vw_ft_residential_efficiency_ranking` - monta os `JOIN`s antes das window functions.
-- `dw.vw_audit_history_chain` - `WITH RECURSIVE` (seção 6).
-- `dw.vw_ft_user_goal` - média de consumo por pessoa nos últimos 30 dias antes da comparação com a meta.
-
-### Window Functions
-
-| Tipo | Onde | Uso |
-|---|---|---|
-| Running total | `SUM() OVER (PARTITION BY property_id ORDER BY full_date ROWS UNBOUNDED PRECEDING)` em `vw_ft_consumption_daily` | Soma acumulada de consumo por propriedade ao longo do tempo |
-| Média móvel | `AVG() OVER (... ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)`, mesma view | Média móvel de 7 dias, suaviza variação diária |
-| Ranking | `RANK()`/`DENSE_RANK()` em `vw_ft_property_ranking`, `vw_ft_capex_comparison`, `vw_ft_residential_efficiency_ranking` | Eficiência (L/m²), custo, payback, consumo residencial (`PARTITION BY` mês) |
-| Distribuição | `NTILE(4)`/`NTILE(5)` + `PERCENT_RANK()` em `vw_ft_property_ranking`/`vw_ft_consumption_distribution` | Quartil/quintil de consumo, posição relativa 0-1 |
-| Comparação com período anterior | `LAG()` em `vw_ft_monthly_variation` | Variação percentual mês a mês |
-
-Todas testadas com dado real (seção 7).
-
----
-
-## 6. Estrutura avançada: CTE Recursiva
-
-A rubrica pedia CTE Recursiva **ou** Herança de Tabelas. As duas foram avaliadas:
-
-- **Herança de tabelas** (`INHERITS`) foi tentada em `tb_property_operational_profile` e descartada depois
-  de testar contra um Postgres descartável: FK de outras tabelas apontando pra `tb_property(id)` não
-  enxerga linhas da tabela filha quando ela usa `INHERITS` - o Postgres trata tabela pai/filha como relações
-  fisicamente separadas pra fins de integridade referencial. Foi substituída por uma extensão 1:1
-  (`property_id` como PK e FK ao mesmo tempo), que resolve "propriedade com dado extra opcional" sem
-  quebrar FK.
-- **CTE Recursiva** foi a escolha final, sobre um cenário que já existia de verdade: a cadeia de auditoria
-  de reajuste de tarifa (`tb_log_region_rate.previous_log_id`).
-
-```sql
-WITH RECURSIVE chain AS (
-    SELECT id, region_rate_id, m3_value, operation, executed_by, executed_at, previous_log_id, 1 AS level
-    FROM tb_log_region_rate
-    WHERE previous_log_id IS NULL
-
-    UNION ALL
-
-    SELECT l.id, l.region_rate_id, l.m3_value, l.operation, l.executed_by, l.executed_at,
-           l.previous_log_id, c.level + 1
-    FROM tb_log_region_rate l
-    JOIN chain c ON l.previous_log_id = c.id
-)
-SELECT id AS log_id, region_rate_id, m3_value, operation, executed_by, executed_at, level
-FROM chain;
-```
-
-Testado com dado real: o dataload faz 1 `INSERT` + 2 `UPDATE` reais na mesma tarifa, cada um disparando o
-trigger de auditoria de verdade. `dw.vw_audit_history_chain WHERE region_rate_id = 5` devolve os 3 níveis
-esperados (`level` 1, 2 e 3), confirmando que a cadeia sobe certo por `previous_log_id`.
-
-O cenário de auditoria (lista encadeada) é o caso de uso correto pra CTE recursiva; hierarquia de tipos de
-entidade (o caso de uso correto pra `INHERITS`) não existe no domínio do projeto - por isso a CTE recursiva
-sozinha satisfaz o requisito sem forçar herança onde ela não se encaixa.
-
----
-
-## 7. Índices e `EXPLAIN ANALYZE`
-
-### Metodologia
-
-No volume real de produção hoje (14 a 400 linhas nas tabelas envolvidas), nenhum índice muda o plano de
-nenhuma consulta que existe no projeto - o Postgres corretamente prefere Seq Scan porque a tabela cabe em
-poucas páginas. Isso foi confirmado com `EXPLAIN (ANALYZE, BUFFERS)` real contra o dado real, não é uma
-suposição.
-
-Como o dado real ainda é pequeno (telemetria cobre só 3 propriedades hoje), o `EXPLAIN ANALYZE` sozinho
-contra o dado real não prova nem desmente a necessidade de um índice - ele só mostra que hoje não é
-necessário. Pra responder "esse índice vai ajudar quando o volume crescer de verdade?", foi feito um
-**teste de capacidade em duas rodadas**, sempre no mesmo formato:
-
-1. Container Postgres descartável, nunca commitado, criado só para o teste.
-2. Carrega o schema real (`script-schema.sql` até `script-indexes.sql`, ordem oficial do `setup_db.py`).
-3. Insere volume sintético claramente identificado como teste (nomes tipo `ORG_TESTE_UNICA`,
-   `PROPRIEDADE SINTETICA N`), em quantidade compatível com anos de operação contínua - nunca no
-   `script-dataload.sql` real, nunca commitado.
-4. Roda `ANALYZE` pra atualizar as estatísticas do planner.
-5. Roda a consulta real (a mesma que a view/procedure executa) com `EXPLAIN (ANALYZE, BUFFERS)`, sem
-   índice.
-6. Cria o índice candidato, roda `ANALYZE` de novo, repete o `EXPLAIN (ANALYZE, BUFFERS)`.
-7. Compara os dois planos reais - nunca usando `SET enable_seqscan=off` pra forçar um resultado.
-8. Container descartado ao final.
-
-**Rodada 1** testou os 2 índices que já existiam (ver tabela abaixo). **Rodada 2** testou sistematicamente **as 7 views de `dw`, uma por uma**, em volume grande
-(até 730.000 linhas em `gold.ft_consumption_daily`), pra confirmar se sobrava algum índice faltando -
-processo descrito na íntegra a seguir.
-
-### O que foi testado view por view (rodada 2)
-
-| View | Padrão de acesso | Resultado no volume grande |
-|---|---|---|
-| `vw_ft_consumption_daily` | `JOIN` propriedade+data, window functions | Já usa Index Scan nos índices de `UNIQUE` existentes (não precisa de índice novo) |
-| `vw_ft_property_ranking` | `SUM` de TODAS as linhas por propriedade | `Seq Scan` correto - agregação total não tem filtro pra um índice explorar |
-| `vw_ft_monthly_variation` | `SUM` de TODAS as linhas por mês | Mesmo caso - agregação total |
-| `vw_ft_consumption_distribution` | Percentis (`PERCENTILE_CONT`) sobre 100% dos dados | Por definição lê tudo - índice não ajudaria |
-| `vw_ft_capex_comparison` | Tabela de referência, não cresce em volume | Sem necessidade de índice |
-| `vw_ft_residential_efficiency_ranking` | Ranking global por mês | `Seq Scan` correto - lê tudo por definição |
-| `vw_audit_history_chain` | CTE recursiva sobre `previous_log_id` | **Achado real, ver abaixo** |
-
-Conclusão: das 7 views, 6 fazem agregação/ranking sobre 100% dos dados de entrada - nelas, `Seq Scan`/
-`Parallel Seq Scan` já é o plano correto, não uma lacuna de índice. A única com um padrão de acesso que um
-índice poderia mesmo mudar era a CTE recursiva.
-
-### Três índices, com evidência real de ganho em volume de produção continuado
-
-```sql
-CREATE INDEX idx_stage_consumption_summary_device_window
-    ON stage.consumption_summary (device_id, window_started_at DESC);
-
-CREATE INDEX idx_gold_dm_property_organization
-    ON gold.dm_property (organization_name);
-
-CREATE INDEX idx_log_region_rate_previous_log_id
-    ON tb_log_region_rate (previous_log_id);
-```
-
-| Índice | Consulta | Sem índice | Com índice | Ganho |
-|---|---|---|---|---|
-| `idx_stage_consumption_summary_device_window` | Histórico de 1 device (`WHERE device_id = X ORDER BY window_started_at DESC LIMIT 20`) | Parallel Seq Scan, 4690 buffers, 52,000 ms | Index Scan, 23 buffers, 0,144 ms | ~360x |
-| `idx_gold_dm_property_organization` | Filtro por organização específica (`WHERE organization_name = X`) | Parallel Seq Scan, 4684 buffers, 19,588 ms | Index Scan, 4 buffers, 0,070 ms | ~280x |
-| `idx_log_region_rate_previous_log_id` | CTE recursiva (`dw.vw_audit_history_chain`), tabela de log com 500.342 linhas reais+teste | Merge Join com sort em disco a cada nível da recursão, 69.417 ms | Index Scan, 1.134 ms | ~61x |
-
-O terceiro índice foi achado na rodada 2: a chave estrangeira auto-referenciada `previous_log_id` (que a
-CTE recursiva percorre a cada nível) não tinha índice de apoio - problema clássico de performance em
-Postgres, onde uma FK nunca ganha índice automático no lado que referencia (só o lado referenciado, via
-`PRIMARY KEY`). Em volume pequeno isso não aparece (o Postgres consegue fazer hash da tabela inteira de
-uma vez), mas em volume real de anos de histórico de reajuste de tarifa, o plano degenera pra um sort em
-disco repetido a cada nível da cadeia - e o índice resolve isso de verdade.
-
-Os três índices ficam no schema mesmo sem uso na consulta cotidiana de hoje (volume real ainda pequeno) -
-o ganho é real, medido, e vai aparecer conforme o volume real de telemetria e de histórico de auditoria
-cresce.
-
----
-
-## 8. Extração real de dados (MongoDB → Postgres)
-
-`bi_etl.py` (raiz do `delta-sql-database`) extrai `db_delta_telemetry.consumption_summary` do MongoDB real e
-carrega a cadeia `stage → silver → gold`:
-
-1. Lê o watermark atual (`MAX(window_started_at)` em `stage.consumption_summary`); se vazio, busca todo o
-   histórico.
-2. Busca no MongoDB os documentos com `window_started_at >= watermark` (inclusive, não estrito) - garante
-   que nenhum documento com o mesmo instante do watermark fique de fora, mesmo que uma execução anterior
-   tenha sido interrompida no meio.
-3. Processa o cursor em lotes de 1000 documentos (não carrega tudo em memória de uma vez), inserindo em
-   `stage.consumption_summary` com `ON CONFLICT (mongo_id) DO NOTHING` a cada lote - o `>=` do passo 2
-   pode reencontrar um documento já carregado, mas essa trava garante que ele nunca duplica.
-4. Executa `CALL silver.sp_load(); CALL gold.sp_load();`.
-
-Agendado via GitHub Actions (`.github/workflows/bi-etl.yml`), diariamente, mesmo padrão de cron já usado
-pelo backup do banco.
-
-**Estado real hoje**: telemetria do MongoDB Atlas (produção) ainda não foi testada por bloqueio de rede;
-testado de ponta a ponta contra o MongoDB local (`docker-compose.dev.yml` do
-`delta-artificial-intelligence`, populado pelo `delta-hardware-data-simulator`) - 80 documentos reais
-extraídos, 44 resolvidos pra propriedade (via `tb_device.device_id`), números conferidos em toda a cadeia
-silver/gold/dw. O parque de dispositivos (`tb_device`) tem 155 linhas, mas só 3 propriedades (1, 151, 152)
-têm telemetria real vinculada hoje - as demais têm `device_id` no formato certo, mas sem documento
-correspondente no Mongo ainda.
-
----
-
-## 9. Quem consome o PostgreSQL
-
-| Consumidor | O que lê |
-|---|---|
-| `delta-api-postgres` (API REST, Java) | Tabelas de cadastro, as seis views `dw.vw_ft_*` de rankings e consumo e `dw.vw_audit_history_chain` (`AnalyticsController`), `sp_register_property` e `fn_calculate_water_cost` |
-| `delta-artificial-intelligence` (agentes de IA) | `dw.vw_ft_consumption_daily`, as Functions `fn_user_*` e `fn_organization_*` e tabelas como `tb_last_water_bill` e `tb_investment_scenario` |
-| `delta-business-rules` (regras de detecção) | `tb_user_property`, `tb_property` e `fn_get_property_classification_group` |
-| `delta-redis-database` (ranking em tempo real) | Propriedades e consumo do PostgreSQL, buscados pela `delta-api-postgres` na rota `/sync` |
-| Web app e mobile app | Dados do PostgreSQL pela `delta-api-postgres` |
+Esses exemplos verificam a aritmética e as regras declaradas. Não substituem a validação de qualidade/cobertura dos dados de origem, da execução do ETL ou da migração instalada.
